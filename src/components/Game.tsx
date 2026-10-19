@@ -60,7 +60,7 @@ export default function Game() {
   const [presentOpen, setPresentOpen] = useState(false);
   const personalized = useRef<string | null>(null);
 
-  // Restore a saved game and check whether the server has a Claude key.
+  // Restore a saved game and check whether the server has an AI key.
   useEffect(() => {
     const s = loadSave();
     if (s?.life || s?.profile.birthDate) setSaved(s); // eslint-disable-line react-hooks/set-state-in-effect
@@ -179,7 +179,7 @@ export default function Game() {
     return () => clearInterval(t);
   }, [auto, screen]);
 
-  // Ask Claude to write the scene and personalize the options for each new choice event.
+  // Ask the narrator to write the scene and personalize the options for each new choice event.
   const pendingKey = life?.pending ? `${life.pending.eventId}@${life.mi}` : null;
   const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && !(auto && autoDecide);
   const sceneLoading = wantsScene && sceneDone !== pendingKey;

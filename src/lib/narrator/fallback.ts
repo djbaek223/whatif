@@ -1,4 +1,4 @@
-// Template narration used when no Claude API key is configured, so the prototype always plays end to end.
+// Template narration used when no AI API key is configured, so the prototype always plays end to end.
 import { ageAt } from "../events";
 import { eraHints } from "../era";
 import { formatMi, formatWealth, heuristicInitial, statusLabel, turningPointMi } from "../engine";

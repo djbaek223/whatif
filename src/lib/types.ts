@@ -114,7 +114,7 @@ export interface LifeState {
   dead: boolean;
   deathAge: number | null;
   choices: ChoiceRecord[];
-  history: { year: number; stats: Stats }[]; // one snapshot per simulated year, for the life map
+  history: { year: number; stats: Stats }[]; // one snapshot per simulated year, for the life graph
 }
 
 export interface Ending {

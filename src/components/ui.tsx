@@ -39,11 +39,11 @@ export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea rows={4} {...props} className={`${inputClass} resize-y leading-relaxed`} />;
 }
 
-const STAT_COLORS: Record<StatKey, string> = {
-  health: "bg-emerald-500",
-  happiness: "bg-amber-500",
-  knowledge: "bg-indigo-500",
-  relationships: "bg-rose-500",
+export const STAT_COLORS: Record<StatKey, string> = {
+  health: "var(--stat-health)",
+  happiness: "var(--stat-happiness)",
+  knowledge: "var(--stat-knowledge)",
+  relationships: "var(--stat-relationships)",
 };
 
 export function StatBars({ stats, compact = false }: { stats: Stats; compact?: boolean }) {
@@ -56,7 +56,7 @@ export function StatBars({ stats, compact = false }: { stats: Stats; compact?: b
             <span className="font-semibold tabular-nums">{stats[k]}</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
-            <div className={`h-full ${STAT_COLORS[k]} transition-all duration-500`} style={{ width: `${stats[k]}%` }} />
+            <div className="h-full transition-all duration-500" style={{ width: `${stats[k]}%`, background: STAT_COLORS[k] }} />
           </div>
         </div>
       ))}

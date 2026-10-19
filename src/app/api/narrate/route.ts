@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { aiConfigured, narrate } from "@/lib/narrator/claude";
+import { aiConfigured, narrate, NarratorError } from "@/lib/narrator/deepseek";
 import type { NarrateRequest } from "@/lib/narrator/schema";
 
 const KINDS = new Set(["opening", "scene", "classify", "ending"]);
@@ -26,12 +25,10 @@ export async function POST(request: Request) {
     if (!data) return Response.json({ ok: false, reason: "empty" });
     return Response.json({ ok: true, data });
   } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return Response.json({ ok: false, reason: "rate-limited" }, { status: 429 });
-    }
-    if (error instanceof Anthropic.APIError) {
-      console.error(`Claude API error ${error.status}:`, error.message);
-      return Response.json({ ok: false, reason: "api-error" }, { status: 502 });
+    if (error instanceof NarratorError) {
+      console.error(error.message);
+      const rateLimited = error.status === 429;
+      return Response.json({ ok: false, reason: rateLimited ? "rate-limited" : "api-error" }, { status: rateLimited ? 429 : 502 });
     }
     console.error("narrate failed", error);
     return Response.json({ ok: false, reason: "error" }, { status: 500 });

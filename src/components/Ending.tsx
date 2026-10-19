@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatWealth, statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
+import { LifeChart } from "./LifeChart";
 import { Button, Card, StatBars } from "./ui";
 
 export function EndingView({
@@ -67,17 +68,8 @@ export function EndingView({
       </Card>
 
       <Card>
-        <p className="text-xs font-semibold text-stone-500">인생 지도 · 한 칸이 1년, 진할수록 행복했던 해</p>
-        <div className="mt-3 grid grid-cols-10 gap-1">
-          {life.history.map((h) => (
-            <div
-              key={h.year}
-              title={`${h.year}년 · 행복 ${h.stats.happiness}`}
-              className="aspect-square rounded-sm bg-amber-500"
-              style={{ opacity: 0.15 + (h.stats.happiness / 100) * 0.85 }}
-            />
-          ))}
-        </div>
+        <p className="mb-3 text-xs font-semibold text-stone-500">인생 그래프 · 나이에 따른 능력치 변화</p>
+        <LifeChart life={life} />
       </Card>
 
       <Card>
