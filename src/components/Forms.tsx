@@ -60,11 +60,20 @@ export function ProfileForm({
           {step + 1} / {STEPS.length}
         </p>
         <h2 className="mt-1 text-2xl font-bold">{STEPS[step]}</h2>
-        <div className="mt-3 flex gap-1">
-          {STEPS.map((_, i) => (
-            <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? "bg-indigo-500" : "bg-stone-200 dark:bg-stone-800"}`} />
+        <ol className="mt-3 flex gap-1">
+          {STEPS.map((label, i) => (
+            <li key={label} className="flex-1" aria-current={i === step ? "step" : undefined}>
+              <div className={`h-1 rounded-full ${i <= step ? "bg-indigo-500" : "bg-stone-200 dark:bg-stone-800"}`} />
+              <span
+                className={`mt-1.5 block text-center text-xs leading-tight break-keep ${
+                  i === step ? "font-semibold text-indigo-600 dark:text-indigo-400" : i < step ? "text-stone-500" : "text-stone-400 dark:text-stone-500"
+                }`}
+              >
+                {label}
+              </span>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
 
       <Card className="space-y-5">
