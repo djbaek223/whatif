@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, statusLabel } from "@/lib/engine";
 import type { LifeState, LogEntry } from "@/lib/types";
@@ -36,19 +36,16 @@ export function PlayView({
   presentOpen: boolean;
   handlers: PlayHandlers;
 }) {
-  const bottom = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const [free, setFree] = useState("");
+  const { following, jumpToLatest } = useFollowLatest(root);
   const age = ageOf(life);
-
-  useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [life.log.length, life.pending, presentOpen]);
 
   const pending = life.pending;
   const canAdvance = !pending && !life.dead && !presentOpen && !busy;
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div ref={root} className="flex flex-1 flex-col">
       <header className="sticky top-0 z-10 -mx-4 border-b border-stone-200 bg-[var(--background)]/95 px-4 pb-3 pt-3 backdrop-blur dark:border-stone-800">
         <div className="flex items-baseline justify-between gap-2">
           <div className="min-w-0">
@@ -72,10 +69,17 @@ export function PlayView({
           <LogLine key={i} entry={entry} showDate={i === 0 || life.log[i - 1].mi !== entry.mi} />
         ))}
         {presentOpen && <PresentCard life={life} onClose={handlers.onClosePresent} />}
-        <div ref={bottom} />
       </div>
 
       <div className="sticky bottom-0 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pb-5 pt-3 backdrop-blur dark:border-stone-800">
+        {!following && (
+          <button
+            onClick={jumpToLatest}
+            className="absolute -top-12 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-lg hover:bg-indigo-700"
+          >
+            ↓ 최신 내용 보기
+          </button>
+        )}
         {pending && !presentOpen ? (
           <div className="space-y-3">
             <div>
@@ -140,6 +144,57 @@ export function PlayView({
       </div>
     </div>
   );
+}
+
+/**
+ * Keeps the page pinned to the newest content as the feed and the bottom panel grow.
+ * Scrolling up pauses it; coming back near the bottom (or pressing the button) resumes it.
+ */
+function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
+  const [following, setFollowing] = useState(true);
+  const followingRef = useRef(true);
+
+  const setFollow = useCallback((v: boolean) => {
+    followingRef.current = v;
+    setFollowing(v);
+  }, []);
+
+  const scrollToEnd = useCallback((behavior: ScrollBehavior) => {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
+  }, []);
+
+  useEffect(() => {
+    let lastTop = window.scrollY;
+    const onScroll = () => {
+      const top = window.scrollY;
+      const gap = document.documentElement.scrollHeight - top - window.innerHeight;
+      // Only an upward move counts as the user leaving; shrinking content can also lower scrollY.
+      if (gap < 80) setFollow(true);
+      else if (top < lastTop) setFollow(false);
+      lastTop = top;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [setFollow]);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    scrollToEnd("auto");
+    // Watching size instead of log length also catches same-length updates, scene text and the choice panel.
+    const ro = new ResizeObserver(() => {
+      if (followingRef.current) scrollToEnd("smooth");
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [root, scrollToEnd]);
+
+  const jumpToLatest = useCallback(() => {
+    setFollow(true);
+    scrollToEnd("smooth");
+  }, [setFollow, scrollToEnd]);
+
+  return { following, jumpToLatest };
 }
 
 function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
