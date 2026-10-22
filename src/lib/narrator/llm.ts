@@ -2,12 +2,33 @@ import "server-only";
 import { z } from "zod";
 import { ClassifySchema, EndingSchema, OpeningSchema, SceneSchema, type NarrateRequest } from "./schema";
 
-// DeepSeek's chat completions API is OpenAI-compatible: https://api-docs.deepseek.com
-const BASE_URL = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
-const MODEL = process.env.WHATIF_MODEL || "deepseek-flash";
+// Both providers speak the OpenAI-compatible chat completions API.
+// WHATIF_PROVIDER picks one: "deepseek" (default, cheapest) or "openai" (GPT-6 Luna).
+type Provider = { name: string; baseUrl: string; model: string; apiKey: string | undefined; extra: Record<string, unknown> };
+
+function provider(): Provider {
+  if (process.env.WHATIF_PROVIDER === "openai") {
+    const effort = process.env.OPENAI_REASONING_EFFORT;
+    return {
+      name: "OpenAI",
+      baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+      model: process.env.WHATIF_MODEL || "gpt-6-luna",
+      apiKey: process.env.OPENAI_API_KEY,
+      extra: { max_completion_tokens: 4000, ...(effort ? { reasoning_effort: effort } : {}) },
+    };
+  }
+  // DeepSeek directly (https://api-docs.deepseek.com) or via BytePlus ModelArk with DEEPSEEK_BASE_URL.
+  return {
+    name: "DeepSeek",
+    baseUrl: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+    model: process.env.WHATIF_MODEL || "deepseek-flash",
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    extra: { thinking: { type: "disabled" }, max_tokens: 4000 }, // narration doesn't need reasoning; keeps it fast and cheap
+  };
+}
 
 export function aiConfigured(): boolean {
-  return Boolean(process.env.DEEPSEEK_API_KEY);
+  return Boolean(provider().apiKey);
 }
 
 export class NarratorError extends Error {
@@ -32,22 +53,17 @@ const data = (label: string, value: unknown) =>
   `<user_data name="${label}">\n${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n</user_data>`;
 
 async function complete(messages: { role: "system" | "user" | "assistant"; content: string }[]): Promise<string> {
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const p = provider();
+  const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      response_format: { type: "json_object" },
-      thinking: { type: "disabled" }, // narration doesn't need reasoning; keeps it fast and cheap
-      max_tokens: 4000,
-    }),
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
+    body: JSON.stringify({ model: p.model, messages, response_format: { type: "json_object" }, ...p.extra }),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new NarratorError(`DeepSeek ${res.status}: ${(await res.text()).slice(0, 300)}`, res.status);
+  if (!res.ok) throw new NarratorError(`${p.name} ${res.status}: ${(await res.text()).slice(0, 300)}`, res.status);
   const json = await res.json();
   const choice = json.choices?.[0];
-  if (choice?.finish_reason === "length") throw new NarratorError("DeepSeek output was cut off", 502);
+  if (choice?.finish_reason === "length") throw new NarratorError(`${p.name} output was cut off`, 502);
   return choice?.message?.content ?? "";
 }
 
