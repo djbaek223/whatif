@@ -47,8 +47,11 @@ console.log(`death age  mean ${avg(ages).toFixed(1)}  p10 ${pct(0.1)}  median ${
 console.log(`choices per life  mean ${avg(results.map((r) => r.life.choices.length)).toFixed(1)}`);
 console.log(`log lines per life  mean ${avg(results.map((r) => r.turns)).toFixed(0)}`);
 console.log(`married ${(results.filter((r) => ["married", "widowed"].includes(r.life.flags.partner) || r.life.flags.partner === "divorced").length / n * 100).toFixed(0)}%  with kids ${(results.filter((r) => r.life.flags.children > 0).length / n * 100).toFixed(0)}%  home ${(results.filter((r) => r.life.flags.homeOwner).length / n * 100).toFixed(0)}%`);
+const per = (kind: string) => avg(results.map((r) => r.life.log.filter((l) => l.kind === kind).length)).toFixed(1);
+const distinct = avg(results.map((r) => new Set(r.life.log.filter((l) => l.kind === "event" || l.kind === "outcome").map((l) => l.text)).size)).toFixed(0);
+console.log(`per life  news ${per("news")}  passive/choice events ${per("event")}  distinct event texts ${distinct}`);
 console.log(`final wealth median ${formatWealth(results.map((r) => r.life.wealth).sort((a, b) => a - b)[Math.floor(n / 2)])}`);
 
 const sample = results[0].life;
 console.log(`\n── sample life: died ${sample.deathAge} (${statusLabel(sample)}) ──`);
-for (const l of sample.log.filter((l) => l.kind !== "turn").slice(0, 60)) console.log(`${formatMi(l.mi)} [${l.kind}] ${l.text.split("\n")[0].slice(0, 90)}`);
+for (const l of sample.log.filter((l) => l.kind !== "turn").slice(0, 90)) console.log(`${formatMi(l.mi)} [${l.kind}] ${l.text.split("\n")[0].slice(0, 90)}`);
