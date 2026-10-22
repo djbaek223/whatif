@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #faf8f5;
+  --foreground: #1c1917;
+  /* One color per stat, shared by the stat bars and the life graph (categorical slots 1-4). */
+  --stat-health: #2a78d6;
+  --stat-happiness: #eb6834;
+  --stat-knowledge: #1baf7a;
+  --stat-relationships: #eda100;
+  --chart-grid: #e7e5e4;
+  --chart-axis: #a8a29e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121110;
+    --foreground: #ece8e3;
+    --stat-health: #3987e5;
+    --stat-happiness: #d95926;
+    --stat-knowledge: #199e70;
+    --stat-relationships: #c98500;
+    --chart-grid: #292524;
+    --chart-axis: #57534e;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  word-break: keep-all;
+}
