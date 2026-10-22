@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PROFILE_TTL_DAYS } from "@/lib/localData";
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { Button, Card, Field, Input, Textarea } from "./ui";
 
@@ -24,9 +25,30 @@ const MBTI = ["", "ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP"
 
 const STEPS = ["기본 정보", "학교", "가족과 환경", "성향", "지금의 나"] as const;
 
-export function ProfileForm({ initial, onDone, onBack }: { initial: Profile; onDone: (p: Profile) => void; onBack: () => void }) {
+const NICKNAMES = ["새벽산책러", "늦깎이여행자", "골목고양이", "주말등산가", "별헤는밤", "커피한잔", "느린거북이", "바닷가소년", "책방주인", "구름조각", "밤하늘고래", "봄날의곰"];
+
+// Common Korean surnames; a 2-4 syllable Hangul name starting with one of these probably is a real name.
+const SURNAMES = "김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부";
+const looksLikeRealName = (name: string) => /^[가-힣]{2,4}$/.test(name.trim()) && SURNAMES.includes(name.trim()[0]);
+
+export function ProfileForm({
+  initial,
+  initialRemember,
+  onDone,
+  onBack,
+}: {
+  initial: Profile;
+  initialRemember: boolean;
+  onDone: (p: Profile, remember: boolean) => void;
+  onBack: () => void;
+}) {
   const [p, setP] = useState<Profile>(initial);
   const [step, setStep] = useState(0);
+  const [remember, setRemember] = useState(initialRemember);
+  const suggestNickname = () => {
+    const pool = NICKNAMES.filter((n) => n !== p.name);
+    setP({ ...p, name: pool[Math.floor(Math.random() * pool.length)] });
+  };
   const set = (k: keyof Profile) => (e: { target: { value: string } }) => setP({ ...p, [k]: e.target.value });
   const birthOk = /^\d{4}-\d{2}-\d{2}$/.test(p.birthDate) && p.birthDate >= "1930-01-01" && new Date(p.birthDate) < new Date();
   const canNext = step !== 0 || birthOk;
@@ -48,8 +70,16 @@ export function ProfileForm({ initial, onDone, onBack }: { initial: Profile; onD
       <Card className="space-y-5">
         {step === 0 && (
           <>
-            <Field label="이름 또는 별명">
-              <Input value={p.name} onChange={set("name")} placeholder="예: 동준" maxLength={20} />
+            <Field label="별명" hint="실명 대신 별명을 써주세요. 이야기 속 주인공을 부를 때만 쓰여요.">
+              <div className="flex gap-2">
+                <Input value={p.name} onChange={set("name")} placeholder="예: 늦깎이여행자" maxLength={20} />
+                <Button type="button" variant="ghost" onClick={suggestNickname} className="shrink-0 py-2.5">
+                  추천
+                </Button>
+              </div>
+              {looksLikeRealName(p.name) && (
+                <span className="block text-xs text-amber-700 dark:text-amber-400">혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.</span>
+              )}
             </Field>
             <Field label="생년월일 (필수)">
               <Input type="date" value={p.birthDate} onChange={set("birthDate")} min="1930-01-01" />
@@ -127,11 +157,24 @@ export function ProfileForm({ initial, onDone, onBack }: { initial: Profile; onD
         )}
       </Card>
 
+      {step === STEPS.length - 1 && (
+        <label className="flex cursor-pointer gap-3 rounded-xl border border-stone-200 p-4 dark:border-stone-800">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-indigo-600" />
+          <span className="space-y-1">
+            <span className="block text-sm font-semibold">다음에 다시 입력하지 않도록 이 기기에 저장하기</span>
+            <span className="block text-xs leading-relaxed text-stone-500">
+              암호화해서 이 브라우저에만 보관하고 서버에는 저장하지 않아요. {PROFILE_TTL_DAYS}일 동안 쓰지 않으면 자동으로 지워지고, 첫 화면에서 언제든
+              지울 수 있어요. 여러 사람이 쓰는 기기라면 체크하지 마세요.
+            </span>
+          </span>
+        </label>
+      )}
+
       <div className="flex gap-3">
         <Button variant="ghost" onClick={() => (step === 0 ? onBack() : setStep(step - 1))}>
           이전
         </Button>
-        <Button className="flex-1" disabled={!canNext} onClick={() => (step === STEPS.length - 1 ? onDone(p) : setStep(step + 1))}>
+        <Button className="flex-1" disabled={!canNext} onClick={() => (step === STEPS.length - 1 ? onDone(p, remember) : setStep(step + 1))}>
           {step === STEPS.length - 1 ? "다음: 변곡점 고르기" : "다음"}
         </Button>
       </div>
