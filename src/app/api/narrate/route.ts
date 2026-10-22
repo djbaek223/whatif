@@ -1,4 +1,4 @@
-import { aiConfigured, narrate, NarratorError } from "@/lib/narrator/deepseek";
+import { aiConfigured, narrate, NarratorError } from "@/lib/narrator/llm";
 import type { NarrateRequest } from "@/lib/narrator/schema";
 
 const KINDS = new Set(["opening", "scene", "classify", "ending"]);
