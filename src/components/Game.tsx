@@ -14,6 +14,7 @@ import {
   turningPointMi,
   type StopReason,
 } from "@/lib/engine";
+import { dropLegacySaves, eraseAll, forgetProfile, loadProfile, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
 import { aiAvailable, narrate } from "@/lib/narrator/client";
 import { fallbackEnding, fallbackOpening } from "@/lib/narrator/fallback";
 import type { ClassifyResult, EndingResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
@@ -33,17 +34,7 @@ interface Saved {
   ending: EndingResult | null;
 }
 
-const SAVE_KEY = "whatif:save:v1";
 const EMPTY_TP: TurningPoint = { date: "", situation: "", actualChoice: "", regret: "" };
-
-function loadSave(): Saved | null {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    return raw ? (JSON.parse(raw) as Saved) : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function Game() {
   const [screen, setScreen] = useState<Screen>("intro");
@@ -53,6 +44,8 @@ export default function Game() {
   const [ending, setEnding] = useState<EndingResult | null>(null);
   const [ai, setAi] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
+  const [stored, setStored] = useState<StoredProfile | null>(null);
+  const [remember, setRemember] = useState(false);
   const [auto, setAuto] = useState(false);
   const [autoDecide, setAutoDecide] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -60,21 +53,35 @@ export default function Game() {
   const [presentOpen, setPresentOpen] = useState(false);
   const personalized = useRef<string | null>(null);
 
-  // Restore a saved game and check whether the server has an AI key.
+  // Restore the saved profile and game, and check whether the server has an AI key.
   useEffect(() => {
-    const s = loadSave();
-    if (s?.life || s?.profile.birthDate) setSaved(s); // eslint-disable-line react-hooks/set-state-in-effect
+    dropLegacySaves();
+    loadProfile().then((sp) => {
+      setStored(sp);
+      setRemember(!!sp);
+    });
+    readProgress<Saved>().then((s) => {
+      if (s?.life || s?.profile.birthDate) setSaved(s);
+    });
     aiAvailable().then(setAi);
   }, []);
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
-    try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ screen, profile, tp, life, ending } satisfies Saved));
-    } catch {
-      // Storage can be unavailable (private mode); the game still works without saving.
-    }
-  }, [screen, profile, tp, life, ending]);
+    writeProgress({ screen, profile, tp, life, ending } satisfies Saved, remember);
+  }, [screen, profile, tp, life, ending, remember]);
+
+  const eraseDevice = async () => {
+    if (!confirm("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요.")) return;
+    await eraseAll();
+    setStored(null);
+    setRemember(false);
+    setSaved(null);
+    setProfile(EMPTY_PROFILE);
+    setTp(EMPTY_TP);
+    setLife(null);
+    setEnding(null);
+  };
 
   const resume = () => {
     if (!saved) return;
@@ -86,7 +93,7 @@ export default function Game() {
   };
 
   const startNew = () => {
-    setProfile(saved?.profile ?? EMPTY_PROFILE);
+    setProfile(stored?.profile ?? saved?.profile ?? EMPTY_PROFILE);
     setTp(EMPTY_TP);
     setLife(null);
     setEnding(null);
@@ -239,8 +246,26 @@ export default function Game() {
                 이어하기
               </Button>
             )}
+            {stored && (
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3 text-sm dark:border-stone-800">
+                <span className="text-stone-600 dark:text-stone-400">
+                  저장된 기본정보: <b className="text-stone-900 dark:text-stone-100">{stored.profile.name || "별명 없음"}</b> · {stored.profile.birthDate.slice(0, 4)}년생
+                </span>
+                <button type="button" onClick={eraseDevice} className="shrink-0 text-rose-600 underline-offset-2 hover:underline dark:text-rose-400">
+                  지우기
+                </button>
+              </div>
+            )}
             <p className="text-center text-xs text-stone-500">
-              {ai ? "AI 내레이션이 켜져 있어요." : "AI 키가 없어 기본 문장으로 진행해요."} 입력한 정보는 이 기기에만 저장돼요.
+              {ai ? "AI 내레이션이 켜져 있어요." : "AI 키가 없어 기본 문장으로 진행해요."} 입력한 정보는 서버에 보관하지 않아요.
+              {!stored && saved && (
+                <>
+                  {" "}
+                  <button type="button" onClick={eraseDevice} className="underline underline-offset-2">
+                    진행 기록 지우기
+                  </button>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -250,9 +275,17 @@ export default function Game() {
         <div className="py-10">
           <ProfileForm
             initial={profile}
+            initialRemember={remember}
             onBack={() => setScreen("intro")}
-            onDone={(p) => {
+            onDone={(p, keep) => {
               setProfile(p);
+              setRemember(keep);
+              if (keep)
+                saveProfile(p).then(setStored, () => {
+                  setStored(null);
+                  setRemember(false); // this browser can't encrypt or store; fall back to not saving
+                });
+              else if (stored) forgetProfile().then(() => setStored(null));
               setScreen("turning");
             }}
           />
