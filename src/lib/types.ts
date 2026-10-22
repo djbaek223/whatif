@@ -48,6 +48,9 @@ export interface LifeFlags {
   military: boolean;
   busyUntil: number; // month index; no choice events while busy (e.g. military service)
   noKids: boolean;
+  kidsBorn?: number[]; // month index of each child's birth (missing in lives saved before it existed)
+  pet?: boolean;
+  petSince?: number;
 }
 
 export type Preset =
@@ -77,13 +80,14 @@ export interface PendingChoice {
   freeText: boolean;
 }
 
-export type LogKind = "era" | "turn" | "event" | "choice" | "outcome" | "milestone" | "present" | "death";
+export type LogKind = "era" | "news" | "turn" | "event" | "choice" | "outcome" | "milestone" | "present" | "death";
 
 export interface LogEntry {
   mi: number; // month index (year * 12 + month - 1)
   kind: LogKind;
   text: string;
   delta?: Partial<Stats>;
+  tag?: string; // news category and month, e.g. "스포츠 · 6월"
 }
 
 export interface ChoiceRecord {

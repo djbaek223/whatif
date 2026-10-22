@@ -207,6 +207,19 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
           <p className="whitespace-pre-line rounded-xl bg-stone-100 px-4 py-3 text-[15px] leading-relaxed text-stone-700 dark:bg-stone-900 dark:text-stone-300">{entry.text}</p>
         </>
       );
+    case "news":
+      return (
+        <>
+          {date}
+          <div className="border-l-2 border-amber-400 pl-3 dark:border-amber-600">
+            {entry.tag && <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">📰 {entry.tag}</p>}
+            <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+              {entry.text}
+              <DeltaChips delta={entry.delta} />
+            </p>
+          </div>
+        </>
+      );
     case "turn":
       return (
         <>

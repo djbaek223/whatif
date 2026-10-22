@@ -1,5 +1,5 @@
 import { EVENTS, ageAt, ageOf, eventById, type Effect, type EventDef } from "./events";
-import { eraLine } from "./era";
+import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
 import { Rng, newSeed } from "./rng";
 import type {
   LifeFlags,
@@ -73,6 +73,8 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     military: profile.gender !== "남" || age > 24,
     busyUntil: mi,
     noKids: false,
+    // Children who already exist at the turning point get rough birth months, oldest first.
+    kidsBorn: Array.from({ length: Math.max(0, Math.min(5, init.children)) }, (_, i) => mi - 36 - (Math.min(5, init.children) - 1 - i) * 30),
   };
   const stats: Stats = {
     health: clamp(opening.stats.health),
@@ -177,7 +179,7 @@ interface Applied {
 }
 
 function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { texts: [], delta: {} }): Applied {
-  out.texts.push(effect.text);
+  out.texts.push(effect.alt?.length ? rng.pick([effect.text, ...effect.alt]) : effect.text);
   if (effect.stats) {
     for (const [k, v] of Object.entries(effect.stats) as [StatKey, number][]) {
       const before = s.stats[k];
@@ -189,10 +191,17 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.wealthPct && s.wealth > 0) s.wealth += Math.round(s.wealth * effect.wealthPct);
   if (effect.income !== undefined) s.income = Math.round(effect.income);
   if (effect.incomePct) s.income = Math.round(s.income * effect.incomePct);
-  if (effect.flags) s.flags = { ...s.flags, ...effect.flags };
+  if (effect.flags) {
+    const hadPet = s.flags.pet;
+    s.flags = { ...s.flags, ...effect.flags };
+    if (s.flags.pet && !hadPet) s.flags.petSince = s.mi;
+  }
   if (effect.eduYears) s.flags.eduUntil = s.mi + effect.eduYears * 12;
   if (effect.busyMonths) s.flags.busyUntil = Math.max(s.flags.busyUntil, s.mi + effect.busyMonths);
-  if (effect.addChild) s.flags.children += 1;
+  if (effect.addChild) {
+    s.flags.children += 1;
+    s.flags.kidsBorn = [...(s.flags.kidsBorn ?? []), s.mi];
+  }
   if (effect.intense) s.intenseUntil = Math.max(s.intenseUntil, s.mi + effect.intense);
   if (effect.risk) {
     const ok = rng.chance(effect.risk.chance(s));
@@ -294,21 +303,89 @@ function drift(s: LifeState, months: number) {
   if (f.education === "highschool" && age >= 21) f.education = "done";
 }
 
-function statusLine(s: LifeState): string {
+const SEASON: Record<number, string[]> = {
+  1: ["새해 첫날, 올해는 다를 거라고 다짐했다.", "설 연휴에 떡국을 먹으며 한 살을 더 먹었다."],
+  2: ["설 연휴, 고향 가는 길은 꽉 막혀 있었다."],
+  3: ["새 학기, 새 출발의 공기가 감돌았다."],
+  4: ["벚꽃이 흩날리는 길을 걸었다.", "봄비가 내리고 공기가 한결 부드러워졌다."],
+  5: ["가정의 달, 카네이션을 샀다."],
+  6: ["장마가 시작되었다."],
+  7: ["무더위에 에어컨 앞을 떠나지 못했다.", "여름휴가 계획을 세웠다."],
+  8: ["열대야에 잠을 설쳤다.", "매미 소리가 요란한 여름이었다."],
+  9: ["추석 연휴, 송편을 빚었다.", "아침저녁으로 바람이 선선해졌다."],
+  10: ["단풍이 물들기 시작했다.", "하늘이 유난히 높고 파랬다."],
+  11: ["첫 추위가 찾아왔다.", "김장철이 다가왔다."],
+  12: ["연말, 한 해를 돌아보았다.", "첫눈이 내렸다.", "거리에 캐럴이 울려 퍼졌다."],
+};
+
+function statusLine(s: LifeState, rng: Rng): string {
   const f = s.flags;
   const age = ageOf(s);
-  if (s.mi < f.busyUntil && f.military && age < 26) return "군 복무를 하며 시간을 보냈다.";
-  if (s.mi < f.busyUntil) return "목표를 위해 하루하루를 버텼다.";
-  if (f.education === "school") return "학교와 집을 오가며 자랐다.";
-  if (f.education === "highschool") return "야간 자율학습과 모의고사에 쫓기는 나날이었다.";
-  if (f.education === "university") return "강의와 아르바이트 사이를 오갔다.";
-  if (f.education === "graduate") return "연구실에서 밤을 새우는 날이 많았다.";
-  if (f.retired) return "느긋한 하루가 이어졌다.";
-  if (f.employed) {
-    if (f.children > 0) return `${f.job}로 일하며 아이를 키웠다.`;
-    return `${f.job}로 출퇴근을 반복했다.`;
+  const pick = (...lines: string[]) => rng.pick(lines);
+  if (s.mi < f.busyUntil && f.military && age < 26) return pick("군 복무를 하며 시간을 보냈다.", "점호와 근무 사이로 계절이 지나갔다.", "전역 날짜가 조금씩 가까워졌다.");
+  if (s.mi < f.busyUntil) return pick("목표를 위해 하루하루를 버텼다.", "책상 앞에서 계절이 바뀌었다.");
+  const season = SEASON[(s.mi % 12) + 1];
+  if (season && rng.chance(0.35)) return rng.pick(season);
+  if (f.education === "school")
+    return age < 8 ? pick("동네 골목에서 해가 질 때까지 뛰어놀았다.", "그림책을 읽으며 자랐다.") : pick("학교와 집을 오가며 자랐다.", "쉬는 시간마다 운동장으로 뛰어나갔다.", "방학 숙제를 개학 전날 몰아서 했다.");
+  if (f.education === "highschool") return pick("야간 자율학습과 모의고사에 쫓기는 나날이었다.", "매점 빵 하나로 버티는 날이 많았다.", "독서실 책상 앞에서 졸다 깨기를 반복했다.");
+  if (f.education === "university") return pick("강의와 아르바이트 사이를 오갔다.", "학교 앞 밥집에서 동기들과 끼니를 때웠다.", "과제 마감에 쫓겨 밤을 새웠다.", "도서관 자리 맡기 경쟁이 치열했다.");
+  if (f.education === "graduate") return pick("연구실에서 밤을 새우는 날이 많았다.", "논문 마감이 다가왔다.", "교수님의 메일 한 통에 하루가 좌우되었다.");
+  if (f.retired) {
+    if (f.children > 0) return pick("느긋한 하루가 이어졌다.", "자식들의 안부 전화를 기다렸다.", "공원 벤치에서 햇볕을 쬐었다.", "텃밭에 상추를 심었다.");
+    return pick("느긋한 하루가 이어졌다.", "공원 벤치에서 햇볕을 쬐었다.", "아침 산책이 하루의 시작이 되었다.");
   }
-  return "다음 일을 고민하며 시간을 보냈다.";
+  if (f.employed) {
+    if (kidsUnder(s, 13)) return pick(`${withRo(f.job)} 일하며 아이를 키웠다.`, "퇴근하면 육아로 두 번째 출근을 했다.", "주말이면 아이 손을 잡고 놀이공원에 갔다.");
+    if (f.children > 0) return pick(`${withRo(f.job)} 일하며 가족을 꾸렸다.`, "아이 학원비 고지서를 보며 한숨을 쉬었다.", "다 큰 아이와 어색한 저녁을 먹었다.");
+    if (f.partner === "married") return pick(`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, "주말이면 배우자와 장을 보러 갔다.");
+    if (f.pet) return pick(`${withRo(f.job)} 출퇴근을 반복했다.`, "퇴근하면 반려동물이 현관에서 기다렸다.");
+    return pick(`${withRo(f.job)} 출퇴근을 반복했다.`, "월요병과 불금 사이를 오갔다.", "점심 메뉴 고르는 게 하루의 고민이었다.", "월급날을 손꼽아 기다렸다.");
+  }
+  return pick("다음 일을 고민하며 시간을 보냈다.", "채용 공고를 뒤적이며 하루를 보냈다.");
+}
+
+/** Appends 로 or 으로 to a Korean noun, by its final consonant. */
+function withRo(word: string): string {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  if (code < 0 || code > 11171) return `${word}(으)로`;
+  const final = code % 28;
+  return final === 0 || final === 8 ? `${word}로` : `${word}으로`;
+}
+
+function kidsUnder(s: LifeState, age: number): boolean {
+  return (s.flags.kidsBorn ?? []).some((b) => s.mi - b < age * 12);
+}
+
+// ── News ───────────────────────────────────────────────
+
+/** Headlines that broke during this turn, as feed entries. Big news always shows; the rest are sampled. */
+function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): LogEntry[] {
+  const cap = months >= 12 ? 3 : 2;
+  let items: NewsItem[] = [];
+  const real = newsBetween(fromMi, s.mi);
+  if (real.length) {
+    const big = real.filter((x) => x.big);
+    const rest = rng.shuffle(real.filter((x) => !x.big));
+    items = [...big, ...rest].slice(0, Math.max(cap, big.length)).sort((a, b) => a.mi - b.mi);
+  }
+  if (s.mi > LAST_REAL_NEWS_MI) {
+    // About two imagined headlines a year once real news runs out.
+    const p = 1 - Math.pow(1 - 2 / 12, months);
+    const pool = futureCandidates(Math.floor(s.mi / 12), s.done);
+    if (pool.length && rng.chance(p)) {
+      const { id, item } = rng.pick(pool);
+      s.done.push(id);
+      items.push({ ...item, mi: s.mi });
+    }
+  }
+  return items.map((x) => {
+    const tag = `${x.cat} · ${(x.mi % 12) + 1}월`;
+    const impact = x.impact?.(s);
+    if (!impact) return { mi: s.mi, kind: "news", text: x.text, tag };
+    const applied = applyEffect(s, impact, rng);
+    return { mi: s.mi, kind: "news", text: `${x.text}\n${applied.texts.join(" ")}`, tag, delta: applied.delta };
+  });
 }
 
 function eventChance(ev: EventDef, s: LifeState, months: number): number {
@@ -341,11 +418,7 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
   const entries: LogEntry[] = [];
   let stop: StopReason = null;
 
-  if (year !== prevYear) {
-    s.history.push({ year, stats: { ...s.stats } });
-    const era = eraLine(year);
-    if (era) entries.push({ mi: s.mi, kind: "era", text: era });
-  }
+  if (year !== prevYear) s.history.push({ year, stats: { ...s.stats } });
 
   const q = annualDeathRate(age, s.stats.health);
   if (age >= 110 || rng.chance(1 - Math.pow(1 - q, months / 12))) {
@@ -354,27 +427,33 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
     entries.push({ mi: s.mi, kind: "death", text: `${age}세, 눈을 감았다.` });
     stop = "death";
   } else {
+    entries.push(...newsEntries(s, s.mi - months, months, rng));
+    // At most one passive moment and one choice per turn, so small moments don't crowd out the big forks.
     let happened = false;
+    let passive = false;
     for (const ev of rng.shuffle(EVENTS)) {
+      if (ev.effect && !ev.choices && passive) continue;
       if (!eligible(ev, s, age) || !rng.chance(eventChance(ev, s, months))) continue;
       if (ev.once) s.done.push(ev.id);
       if (ev.cooldown) s.cooldowns[ev.id] = s.mi + ev.cooldown;
+      happened = true;
       if (ev.choices) {
         s.pending = pendingFor(ev, s);
         entries.push({ mi: s.mi, kind: "event", text: ev.title });
         stop = "choice";
-      } else if (ev.effect) {
+        break;
+      }
+      if (ev.effect) {
         const applied = applyEffect(s, ev.effect, rng);
         entries.push({ mi: s.mi, kind: "event", text: applied.texts.join(" "), delta: applied.delta });
+        passive = true;
       }
-      happened = true;
-      break;
     }
     if (!happened) {
       // Keep only the latest routine line between notable entries so the feed stays readable.
       const last = s.log.at(-1);
       if (last?.kind === "turn" && entries.length === 0) s.log.pop();
-      entries.push({ mi: s.mi, kind: "turn", text: statusLine(s) });
+      entries.push({ mi: s.mi, kind: "turn", text: statusLine(s, rng) });
     }
 
     if (!s.presentShown && s.mi >= presentMi()) {
@@ -452,7 +531,7 @@ export function lifeSummary(s: LifeState, recent = 12): string {
     `능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 지식 ${s.stats.knowledge}, 관계 ${s.stats.relationships}.`,
     `지금까지의 주요 선택: ${s.choices.map((c) => `${c.age}세 ${c.title} → ${c.picked}`).join(" / ") || "없음"}`,
     `최근 기록: ${s.log
-      .filter((l) => l.kind !== "turn")
+      .filter((l) => l.kind !== "turn" && l.kind !== "news")
       .slice(-recent)
       .map((l) => `[${formatMi(l.mi)}] ${l.text.slice(0, 120)}`)
       .join(" / ")}`,

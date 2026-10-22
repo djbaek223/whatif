@@ -1,11 +1,12 @@
 // Short Korean era notes used as hints for narration. Not exhaustive; the LLM fills in texture.
+import { newsHints } from "./news";
+
 const ERA: Record<number, string> = {
   1980: "컬러 TV 방송이 시작되었다.",
   1986: "서울 아시안게임이 열렸다.",
   1987: "6월 민주항쟁으로 대통령 직선제 개헌이 이루어졌다.",
   1988: "서울 올림픽이 열리고 '호돌이'가 어디에나 있었다.",
-  1993: "금융실명제가 전격 시행되었다.",
-  1994: "첫 대학수학능력시험이 치러졌다.",
+  1993: "금융실명제가 전격 시행되었고, 첫 대학수학능력시험이 치러졌다.",
   1997: "외환위기로 IMF 구제금융을 받게 되었고, 정리해고와 금 모으기 운동이 이어졌다.",
   1998: "외환위기의 여파로 취업난이 심했다.",
   1999: "PC방과 스타크래프트, 초고속 인터넷이 퍼져 나갔다.",
@@ -26,12 +27,11 @@ const ERA: Record<number, string> = {
 };
 
 export function eraHints(year: number): string[] {
+  const headlines = newsHints(year);
   return Object.entries(ERA)
     .map(([y, text]) => [Number(y), text] as const)
-    .filter(([y]) => Math.abs(y - year) <= 2)
-    .map(([y, text]) => `${y}년: ${text}`);
-}
-
-export function eraLine(year: number): string | null {
-  return ERA[year] ?? null;
+    // The year itself is covered by its headlines when there are any.
+    .filter(([y]) => Math.abs(y - year) <= 2 && !(y === year && headlines.length))
+    .map(([y, text]) => `${y}년: ${text}`)
+    .concat(headlines);
 }

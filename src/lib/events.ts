@@ -1,7 +1,9 @@
+import { LIFE_EVENTS } from "./lifeEvents";
 import type { LifeFlags, LifeState, Stats } from "./types";
 
 export interface Effect {
   text: string;
+  alt?: string[]; // other ways to say text; one is picked at random
   stats?: Partial<Stats>;
   wealth?: number; // 만원, added
   wealthPct?: number; // fraction of current positive wealth, added
@@ -861,6 +863,7 @@ export const EVENTS: EventDef[] = [
     intro: "",
     effect: { text: "평생을 함께한 배우자가 먼저 세상을 떠났다.", stats: { happiness: -20, relationships: -10, health: -5 }, flags: { partner: "widowed" } },
   },
+  ...LIFE_EVENTS,
 ];
 
 export function ageOf(s: LifeState): number {
