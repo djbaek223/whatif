@@ -133,10 +133,13 @@ body {
   animation: spin 18s linear infinite;
 }
 
-/* Stopped at a choice: the street stands still, the weather keeps falling. */
+/* Time stands still (waiting for a turn or a choice): so does the whole street, weather included. */
 .scene-paused .scene-layer,
 .scene-paused .walk *,
-.scene-paused .smoke {
+.scene-paused .smoke,
+.scene-paused .drone,
+.scene-paused .sun-rays,
+.scene-paused .fx-particle {
   animation-play-state: paused;
 }
 

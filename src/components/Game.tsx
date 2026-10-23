@@ -168,10 +168,8 @@ export default function Game() {
   function afterAdvance(prev: LifeState, advanced: LifeState, stop: StopReason) {
     const next = withBadges(advanced);
     setLife(next);
-    if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) {
-      setPresentOpen(true);
-      setAuto(false);
-    }
+    // Auto play stays on through the present-day card and choices; it only waits for them.
+    if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) setPresentOpen(true);
     if (stop === "death") {
       setAuto(false);
       finish(next);
@@ -204,11 +202,13 @@ export default function Game() {
     choose(id, text);
   }
 
-  // Auto play: one turn per tick; stops at choices unless auto-decide is on.
+  // Auto play: one turn per tick until the player turns it off. A choice or the present-day card pauses it,
+  // and it carries on once they're answered (or right away with auto-decide).
   const tick = useEffectEvent(() => {
-    if (!life || life.dead || presentOpen) return setAuto(false);
+    if (!life || life.dead) return setAuto(false);
+    if (presentOpen) return;
     if (life.pending) {
-      if (!autoDecide || sceneLoading) return autoDecide ? undefined : setAuto(false);
+      if (!autoDecide || sceneLoading) return;
       const id = autoPick(life);
       if (id) choose(id);
       return;
