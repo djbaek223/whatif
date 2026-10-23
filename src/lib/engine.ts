@@ -128,7 +128,8 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     knowledge: clamp(opening.stats.knowledge),
     relationships: clamp(opening.stats.relationships),
   };
-  const options = opening.choices.slice(0, 4).map((c, i) => ({
+  // Three suggested paths; the fourth is the user's own words, as in every later choice.
+  const options = opening.choices.slice(0, 3).map((c, i) => ({
     id: String(i),
     label: c.original ? `${c.label} (원래의 길)` : c.label,
   }));
@@ -137,7 +138,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     title: "그날로 돌아왔다",
     scene: opening.situation,
     options,
-    freeText: false,
+    freeText: true,
   };
   return {
     version: 1,
@@ -152,7 +153,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     flags,
     log: [{ mi, kind: "era", text: opening.era }],
     pending,
-    openingChoices: opening.choices.slice(0, 4),
+    openingChoices: opening.choices.slice(0, 3),
     rng: seed,
     cooldowns: {},
     done: [],

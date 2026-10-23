@@ -58,7 +58,7 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
         original: true,
         education: student && profile.university ? "university" : "same",
       },
-      ...alternatives.map((c) => ({
+      ...alternatives.slice(0, 2).map((c) => ({
         label: c.label,
         preset: c.preset,
         jobTitle: c.jobTitle ?? "",
