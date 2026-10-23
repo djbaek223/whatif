@@ -95,7 +95,7 @@ export const EndingSchema = z.object({
 export type EndingResult = z.infer<typeof EndingSchema>;
 
 export type NarrateRequest =
-  | { kind: "opening"; profile: unknown; turningPoint: unknown; eraHints: string[]; age: number }
+  | { kind: "opening"; profile: unknown; turningPoint: unknown; eraHints: string[]; age: number; hints?: { kind: string; roadNotTaken: string | null; examples: string[] } }
   | {
       kind: "scene";
       summary: string;

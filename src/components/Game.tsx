@@ -24,6 +24,7 @@ import {
 import { clearDraft, dropLegacySaves, eraseAll, forgetProfile, loadProfile, readDraft, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
 import { aiAvailable, narrate } from "@/lib/narrator/client";
 import { fallbackEnding, fallbackOpening } from "@/lib/narrator/fallback";
+import { pathHints, topUpChoices } from "@/lib/narrator/turningChoices";
 import type { ClassifyResult, EndingResult, MomentResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
 import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
@@ -138,9 +139,9 @@ export default function Game() {
     setScreen("loading");
     const mi = turningPointMi(t);
     const res = ai
-      ? await narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(Math.floor(mi / 12)), age: ageAt(p.birthDate, mi) })
+      ? await narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(Math.floor(mi / 12)), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) })
       : null;
-    const opening = res && res.choices.length >= 2 ? res : fallbackOpening(p, t);
+    const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
     personalized.current = null;
     setLife(withBadges(createLife(p, t, opening, { ai })));
     setEnding(null);

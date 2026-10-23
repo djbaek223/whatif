@@ -125,6 +125,7 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
 }
 
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음/;
+const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
 
 export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean } = {}): LifeState {
@@ -559,7 +560,8 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
     const choice = s.openingChoices[Number(optionId)];
     if (choice) {
       effect = presetEffect(choice, s);
-      if (choice.place?.trim()) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
+      // A kind of workplace ("대기업") only sets the league; a named one is where the choice leads.
+      if (choice.place?.trim() && !GENERIC_PLACE.test(choice.place.trim())) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
     }
   } else if (pending.custom?.[optionId]) {
     effect = customEffect(pending.custom[optionId]);
