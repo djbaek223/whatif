@@ -37,3 +37,14 @@ body {
   font-family: var(--font-sans);
   word-break: keep-all;
 }
+
+@keyframes fadein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

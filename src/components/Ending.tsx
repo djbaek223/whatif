@@ -6,6 +6,7 @@ import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
 import { LifeChart } from "./LifeChart";
 import { Button, Card, StatBars } from "./ui";
+import { EndingWait } from "./Waiting";
 
 export function EndingView({
   life,
@@ -22,7 +23,7 @@ export function EndingView({
 }) {
   const [copied, setCopied] = useState(false);
   if (!ending) {
-    return <p className="py-20 text-center text-stone-500">회고록을 쓰는 중...</p>;
+    return <EndingWait />;
   }
   const share = async () => {
     const text = `[What If] ${ending.title}\n${life.deathAge}세 · ${statusLabel(life)}\n"${ending.epitaph}"\nhttps://whatif.damoai.net`;
@@ -37,29 +38,29 @@ export function EndingView({
   return (
     <div className="space-y-6 py-6">
       <div className="text-center">
-        <p className="text-sm text-stone-500">
+        <p className="text-sm text-stone-500 dark:text-stone-400">
           {life.profile.name || "나"}의 또 다른 인생 · {life.deathAge}세
         </p>
-        <h2 className="mt-2 text-3xl font-bold">{ending.title}</h2>
+        <h1 className="mt-2 text-3xl font-bold text-balance">{ending.title}</h1>
         <p className="mt-3 italic text-stone-600 dark:text-stone-400">&ldquo;{ending.epitaph}&rdquo;</p>
       </div>
 
       <Card>
-        <p className="text-xs font-semibold text-stone-500">마지막 모습</p>
+        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">마지막 모습</p>
         <p className="mt-1 font-semibold">{statusLabel(life)}</p>
-        <p className="text-sm text-stone-500">남긴 자산 {formatWealth(life.wealth)}</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">남긴 자산 {formatWealth(life.wealth)}</p>
         <div className="mt-4">
           <StatBars stats={life.stats} />
         </div>
       </Card>
 
       <Card className="space-y-3">
-        <p className="text-xs font-semibold text-stone-500">현실과의 비교</p>
+        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">현실과의 비교</p>
         <p className="leading-relaxed">{ending.comparison}</p>
       </Card>
 
       <Card className="space-y-4">
-        <p className="text-xs font-semibold text-stone-500">회고록</p>
+        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">회고록</p>
         {ending.memoir.split(/\n\s*\n/).map((para, i) => (
           <p key={i} className="leading-[1.8]">
             {para}
@@ -68,25 +69,25 @@ export function EndingView({
       </Card>
 
       <Card>
-        <p className="mb-3 text-xs font-semibold text-stone-500">인생 그래프 · 나이에 따른 능력치 변화</p>
+        <p className="mb-3 text-xs font-semibold text-stone-500 dark:text-stone-400">인생 그래프 · 나이에 따른 능력치 변화</p>
         <LifeChart life={life} />
       </Card>
 
       <Card>
-        <p className="text-xs font-semibold text-stone-500">내가 한 선택들</p>
+        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">내가 한 선택들</p>
         <ol className="mt-3 space-y-2">
           {life.choices.map((c, i) => (
             <li key={i} className="flex gap-3 text-sm">
-              <span className="w-12 shrink-0 font-semibold tabular-nums text-stone-500">{c.age}세</span>
+              <span className="w-12 shrink-0 font-semibold tabular-nums text-stone-500 dark:text-stone-400">{c.age}세</span>
               <span>
-                <span className="text-stone-500">{c.title}</span> · {c.picked}
+                <span className="text-stone-500 dark:text-stone-400">{c.title}</span> · {c.picked}
               </span>
             </li>
           ))}
         </ol>
       </Card>
 
-      <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-stone-300 text-sm text-stone-400 dark:border-stone-700">
+      <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-stone-300 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
         광고 영역 (출시 때 연결)
       </div>
 
@@ -102,7 +103,7 @@ export function EndingView({
             {copied ? "복사했어요" : "결과 복사"}
           </Button>
         </div>
-        <button className="w-full py-2 text-sm text-stone-500 hover:underline" onClick={onHome}>
+        <button className="w-full py-3 text-sm text-stone-500 hover:underline dark:text-stone-400" onClick={onHome}>
           처음으로
         </button>
       </div>

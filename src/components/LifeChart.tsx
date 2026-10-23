@@ -144,10 +144,10 @@ export function LifeChart({ life }: { life: LifeState }) {
         )}
       </div>
       <details className="mt-3 text-xs">
-        <summary className="cursor-pointer text-stone-500">표로 보기</summary>
+        <summary className="cursor-pointer text-stone-500 dark:text-stone-400">표로 보기</summary>
         <table className="mt-2 w-full tabular-nums">
           <thead>
-            <tr className="text-left text-stone-500">
+            <tr className="text-left text-stone-500 dark:text-stone-400">
               <th className="py-1 font-medium">나이</th>
               {KEYS.map((k) => (
                 <th key={k} className="py-1 text-right font-medium">
