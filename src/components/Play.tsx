@@ -2,7 +2,7 @@
 
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
-import { formatMi, formatWealth, statusLabel } from "@/lib/engine";
+import { formatMi, formatWealth, payLabel, statusLabel } from "@/lib/engine";
 import type { LifeState, LogEntry } from "@/lib/types";
 import { Button, Card, DeltaChips, StatBars, Textarea } from "./ui";
 
@@ -57,6 +57,7 @@ export function PlayView({
           <div className="shrink-0 text-right">
             <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
             <p className="text-xs text-stone-500 tabular-nums">자산 {formatWealth(life.wealth)}</p>
+            {payLabel(life) && <p className="text-xs text-stone-500 tabular-nums">{payLabel(life)}</p>}
           </div>
         </div>
         <div className="mt-3">
@@ -93,6 +94,7 @@ export function PlayView({
               {pending.options.map((o) => (
                 <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => handlers.onChoose(o.id)}>
                   {o.label}
+                  {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
                 </Button>
               ))}
             </div>
@@ -215,7 +217,7 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
             {entry.tag && <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">📰 {entry.tag}</p>}
             <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600 dark:text-stone-300">
               {entry.text}
-              <DeltaChips delta={entry.delta} />
+              <DeltaChips delta={entry.delta} money={entry.money} />
             </p>
           </div>
         </>
@@ -233,7 +235,7 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
           {date}
           <p className="font-semibold">
             {entry.text}
-            <DeltaChips delta={entry.delta} />
+            <DeltaChips delta={entry.delta} money={entry.money} />
           </p>
         </>
       );
@@ -250,7 +252,7 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
           {date}
           <p className="leading-relaxed">
             {entry.text}
-            <DeltaChips delta={entry.delta} />
+            <DeltaChips delta={entry.delta} money={entry.money} />
           </p>
         </>
       );
@@ -288,7 +290,8 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
           <p className="text-xs text-stone-500">이 가지의 나 · {ageOf(life)}세</p>
           <p className="mt-1 text-[15px] font-semibold">{statusLabel(life)}</p>
           <p className="text-sm text-stone-600 dark:text-stone-400">
-            자산 {formatWealth(life.wealth)} · 월 {life.income}만원
+            자산 {formatWealth(life.wealth)}
+            {payLabel(life) && ` · ${payLabel(life)}`}
           </p>
           <div className="mt-3">
             <StatBars stats={life.stats} compact />

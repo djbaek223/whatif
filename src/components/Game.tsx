@@ -6,9 +6,15 @@ import { eraHints } from "@/lib/era";
 import {
   advanceTurn,
   advanceUntilStop,
+  allowedChanges,
   autoPick,
   createLife,
+  dropPending,
+  fillMoment,
+  fillScene,
+  lifeFacts,
   lifeSummary,
+  pendingKeyOf,
   resolveChoice,
   TURNING_POINT_ID,
   turningPointMi,
@@ -17,7 +23,7 @@ import {
 import { dropLegacySaves, eraseAll, forgetProfile, loadProfile, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
 import { aiAvailable, narrate } from "@/lib/narrator/client";
 import { fallbackEnding, fallbackOpening } from "@/lib/narrator/fallback";
-import type { ClassifyResult, EndingResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
+import type { ClassifyResult, EndingResult, MomentResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { EMPTY_PROFILE, ProfileForm, TurningPointForm } from "./Forms";
@@ -87,7 +93,8 @@ export default function Game() {
     if (!saved) return;
     setProfile(saved.profile);
     setTp(saved.tp);
-    setLife(saved.life);
+    // Lives saved before AI-written moments existed pick them up when AI is on.
+    setLife(saved.life ? { ...saved.life, ai } : null);
     setEnding(saved.ending);
     setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
   };
@@ -108,7 +115,7 @@ export default function Game() {
       : null;
     const opening = res && res.choices.length >= 2 ? res : fallbackOpening(p, t);
     personalized.current = null;
-    setLife(createLife(p, t, opening));
+    setLife(createLife(p, t, opening, { ai }));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -162,7 +169,7 @@ export default function Game() {
   async function chooseFree(text: string) {
     if (!life?.pending) return;
     setBusy(true);
-    const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options });
+    const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })) });
     const id = life.pending.options.some((o) => o.id === res?.choiceId) ? res!.choiceId : life.pending.options[0].id;
     setBusy(false);
     choose(id, text);
@@ -187,32 +194,31 @@ export default function Game() {
   }, [auto, screen]);
 
   // Ask the narrator to write the scene and personalize the options for each new choice event.
-  const pendingKey = life?.pending ? `${life.pending.eventId}@${life.mi}` : null;
-  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && !(auto && autoDecide);
+  // A "personal" moment has no options until the narrator writes them from this life's state, so it always waits.
+  const pendingKey = life ? pendingKeyOf(life) : null;
+  const isMoment = life?.pending?.eventId === "personal";
+  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(auto && autoDecide));
   const sceneLoading = wantsScene && sceneDone !== pendingKey;
 
   const personalize = useEffectEvent(async (key: string) => {
     if (!life?.pending || personalized.current === key) return;
     personalized.current = key;
     const pending = life.pending;
-    const res = await narrate<SceneResult>({
-      kind: "scene",
-      summary: lifeSummary(life),
-      persona: life.persona,
-      title: pending.title,
-      intro: pending.scene,
-      options: pending.options,
-      eraHints: eraHints(Math.floor(life.mi / 12)),
-    });
-    if (res) {
-      const labels = new Map(res.labels.map((l) => [l.id, l.label]));
-      setLife((cur) => {
-        if (!cur?.pending || `${cur.pending.eventId}@${cur.mi}` !== key) return cur;
-        return {
-          ...cur,
-          pending: { ...cur.pending, scene: res.scene || cur.pending.scene, options: cur.pending.options.map((o) => ({ ...o, label: labels.get(o.id) || o.label })) },
-        };
+    const common = { summary: lifeSummary(life), facts: lifeFacts(life), persona: life.persona, eraHints: eraHints(Math.floor(life.mi / 12)) };
+    if (pending.eventId === "personal") {
+      const recentTitles = life.choices.slice(-8).map((c) => c.title);
+      const res = await narrate<MomentResult>({ kind: "moment", ...common, allowed: allowedChanges(life), recentTitles });
+      // An unwritten moment is dropped as if it never happened, so play goes on.
+      setLife((cur) => (cur && pendingKeyOf(cur) === key ? ((res && fillMoment(cur, key, res)) ?? dropPending(cur)) : cur));
+    } else {
+      const res = await narrate<SceneResult>({
+        kind: "scene",
+        ...common,
+        title: pending.title,
+        intro: pending.scene,
+        options: pending.options.map(({ id, label, detail }) => ({ id, label, ...(detail ? { detail } : {}) })),
       });
+      if (res) setLife((cur) => (cur ? fillScene(cur, key, res) : cur));
     }
     setSceneDone(key);
   });

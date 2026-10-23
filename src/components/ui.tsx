@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
+import { formatWealth } from "@/lib/format";
 import { STAT_LABELS, type StatKey, type Stats } from "@/lib/types";
 
 export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" }) {
@@ -64,12 +65,21 @@ export function StatBars({ stats, compact = false }: { stats: Stats; compact?: b
   );
 }
 
-export function DeltaChips({ delta }: { delta?: Partial<Stats> }) {
-  if (!delta) return null;
-  const items = (Object.entries(delta) as [StatKey, number][]).filter(([, v]) => v !== 0);
-  if (items.length === 0) return null;
+export function DeltaChips({ delta, money }: { delta?: Partial<Stats>; money?: number }) {
+  const items = (Object.entries(delta ?? {}) as [StatKey, number][]).filter(([, v]) => v !== 0);
+  if (items.length === 0 && !money) return null;
   return (
     <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
+      {!!money && (
+        <span
+          className={`rounded px-1.5 py-0.5 text-[11px] font-semibold tabular-nums ${
+            money > 0 ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
+          }`}
+        >
+          자산 {money > 0 ? "+" : "-"}
+          {formatWealth(Math.abs(money))}
+        </span>
+      )}
       {items.map(([k, v]) => (
         <span
           key={k}

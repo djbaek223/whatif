@@ -407,9 +407,10 @@ export const LIFE_EVENTS: EventDef[] = [
     perYear: 0.9,
     cooldown: 14,
     when: (s) => s.flags.employed && hasKidAged(0)(s) && year(s) >= 2001,
-    intro: "아이가 태어나고 몇 달, 육아와 일을 어떻게 병행할지 정해야 한다.",
+    intro: (s) =>
+      `${s.flags.children > 1 ? `${["", "첫째", "둘째", "셋째", "넷째", "다섯째"][s.flags.children] ?? "막내"}가` : "아이가"} 태어나고 몇 달, ${s.flags.company ? `${s.flags.company} 일과` : "일과"} 육아를 어떻게 병행할지 정해야 한다.`,
     choices: [
-      { id: "leave", label: "육아휴직을 쓴다", effect: { text: "회사를 잠시 쉬고 아이 곁에 있었다. 아이의 첫 뒤집기를 직접 봤다.", stats: { relationships: 8, happiness: 4, knowledge: -1 }, wealth: -600 } },
+      { id: "leave", label: "육아휴직을 쓴다", effect: { text: "회사를 잠시 쉬고 아이 곁에 있었다. 아이의 첫 뒤집기를 직접 봤다.", stats: { relationships: 8, happiness: 4, knowledge: -1 }, wealth: -600, note: "휴직 중 줄어든 월급" } },
       { id: "daycare", label: "어린이집에 보내고 일한다", effect: { text: "아침마다 아이를 어린이집에 맡기고 출근했다.", stats: { happiness: -2, health: -1 }, wealth: -200 } },
       { id: "grandparents", label: "부모님께 도움을 청한다", effect: { text: "부모님이 아이를 봐주셨다. 고마움과 미안함이 함께였다.", stats: { relationships: 3 }, wealth: -100 } },
     ],
@@ -471,10 +472,10 @@ export const LIFE_EVENTS: EventDef[] = [
     when: hasKidAged(9, 13),
     intro: "학부모 모임에서 다들 학원 이야기뿐이다. 우리 아이는 어떻게 할까.",
     choices: [
-      { id: "hard", label: "학원을 여럿 보낸다", effect: { text: "학원비 고지서가 매달 날아왔다. 아이는 지쳐 보였다.", stats: { relationships: -3, happiness: -2 }, wealth: -2000 } },
+      { id: "hard", label: "학원을 여럿 보낸다", effect: { text: "학원비 고지서가 매달 날아왔다. 아이는 지쳐 보였다.", stats: { relationships: -3, happiness: -2 }, wealth: -2000, note: "몇 년 치 학원비" } },
       { id: "balance", label: "아이가 원하는 것만 시킨다", effect: { text: "아이가 고른 학원 하나와 태권도만 보냈다.", stats: { relationships: 3 }, wealth: -600 } },
       { id: "free", label: "실컷 놀게 둔다", effect: { text: "아이는 해가 질 때까지 놀이터에서 놀았다.", stats: { relationships: 4, happiness: 2 } } },
-      { id: "move", label: "학군지로 이사한다", effect: { text: "무리해서 학군지로 이사했다.", stats: { happiness: -3, relationships: -2 }, wealth: -3000 } },
+      { id: "move", label: "학군지로 이사한다", effect: { text: "무리해서 학군지로 이사했다.", stats: { happiness: -3, relationships: -2 }, wealth: -3000, note: "이사와 전세 보증금 차액" } },
     ],
   },
   {
@@ -505,7 +506,7 @@ export const LIFE_EVENTS: EventDef[] = [
       text: "아이가 수능을 봤다. 시험장 앞에서 하루 종일 기다렸다.",
       risk: {
         chance: () => 0.6,
-        success: { text: "아이가 원하던 학교에 붙었다.", stats: { happiness: 7, relationships: 3 } },
+        success: { text: "아이가 원하던 학교에 붙었다. 등록금은 연 900만원, 4년 동안 나간다.", stats: { happiness: 7, relationships: 3 } },
         failure: { text: "아이가 재수를 하겠다고 했다. 말없이 등을 두드려 줬다.", stats: { happiness: -3 }, wealth: -500 },
       },
     },
