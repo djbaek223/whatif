@@ -6,6 +6,7 @@ export const NARRATE_TIMEOUT_MS: Record<NarrateRequest["kind"], number> = {
   opening: 25_000,
   ending: 25_000,
   scene: 15_000,
+  moment: 20_000, // writes a whole choice with outcomes, so a little longer than a scene
   classify: 10_000,
 };
 

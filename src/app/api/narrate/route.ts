@@ -1,7 +1,7 @@
 import { aiConfigured, narrate, NarratorError } from "@/lib/narrator/llm";
 import type { NarrateRequest } from "@/lib/narrator/schema";
 
-const KINDS = new Set(["opening", "scene", "classify", "ending"]);
+const KINDS = new Set(["opening", "scene", "moment", "classify", "ending"]);
 const MAX_BODY = 40_000; // characters; keeps a single request from carrying an essay-sized prompt
 
 export async function GET() {

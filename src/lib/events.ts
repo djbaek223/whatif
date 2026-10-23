@@ -1,8 +1,12 @@
+import type { CompanyTier } from "./catalog";
+import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
-import type { LifeFlags, LifeState, Stats } from "./types";
+import type { LifeFlags, LifeState, Stats, Theme } from "./types";
+
+type Dyn<T> = T | ((s: LifeState) => T);
 
 export interface Effect {
-  text: string;
+  text: Dyn<string>;
   alt?: string[]; // other ways to say text; one is picked at random
   stats?: Partial<Stats>;
   wealth?: number; // 만원, added
@@ -15,11 +19,19 @@ export interface Effect {
   addChild?: boolean;
   intense?: number; // months of month-by-month turns after this
   risk?: { chance: (s: LifeState) => number; success: Effect; failure: Effect };
+  // Concrete life changes. The engine names the company, school or home and works out the money.
+  hire?: { tier: CompanyTier | "auto"; title?: string };
+  switchJob?: { payPct: number };
+  promote?: boolean;
+  enroll?: { level: "university" | "graduate" | "abroad"; pick?: "profile" | "fit" | "better" };
+  buyHome?: "best" | "cheap";
+  homeValuePct?: number; // change in the home's price; the gain or loss lands in wealth
+  note?: string; // what a cost was for, shown with the amount
 }
 
 export interface ChoiceDef {
   id: string;
-  label: string;
+  label: Dyn<string>;
   effect: Effect;
   when?: (s: LifeState) => boolean;
 }
@@ -33,7 +45,8 @@ export interface EventDef {
   when?: (s: LifeState, age: number) => boolean;
   once?: boolean;
   cooldown?: number; // months before it can happen again
-  intro: string; // fallback scene text
+  intro: Dyn<string>; // fallback scene text
+  theme?: Theme;
   choices?: ChoiceDef[];
   effect?: Effect; // passive events apply this without asking
 }
@@ -61,6 +74,7 @@ export const EVENTS: EventDef[] = [
           stats: { knowledge: 5, happiness: 3 },
           flags: { education: "university" },
           eduYears: 4,
+          enroll: { level: "university", pick: "fit" },
         },
       },
       {
@@ -78,12 +92,14 @@ export const EVENTS: EventDef[] = [
               stats: { knowledge: 10, happiness: 12 },
               flags: { education: "university" },
               eduYears: 5,
+              enroll: { level: "university", pick: "better" },
             },
             failure: {
               text: "성적이 기대만큼 오르지 않았지만, 대학에는 진학했다.",
               stats: { knowledge: 4, happiness: -5 },
               flags: { education: "university" },
               eduYears: 5,
+              enroll: { level: "university", pick: "fit" },
             },
           },
         },
@@ -94,8 +110,8 @@ export const EVENTS: EventDef[] = [
         effect: {
           text: "또래보다 일찍 사회에 나왔다.",
           stats: { knowledge: -2, happiness: 2 },
-          flags: { education: "done", employed: true, job: "현장직 사원" },
-          income: 190,
+          flags: { education: "done" },
+          hire: { tier: "field" },
         },
       },
     ],
@@ -141,7 +157,7 @@ export const EVENTS: EventDef[] = [
     perYear: 1,
     once: true,
     when: (s) => s.flags.education === "university" && s.mi >= s.flags.eduUntil,
-    intro: "졸업장을 받았다. 무엇을 할지 정해야 한다.",
+    intro: (s) => `${s.flags.school ? `${s.flags.school} ` : ""}졸업장을 받았다. 무엇을 할지 정해야 한다.`,
     choices: [
       {
         id: "big-company",
@@ -153,16 +169,14 @@ export const EVENTS: EventDef[] = [
           risk: {
             chance: knowledgeOdds(0.4),
             success: {
-              text: "대기업 최종 합격 문자를 받았다.",
+              text: "최종 합격 문자를 받았다.",
               stats: { happiness: 12 },
-              flags: { employed: true, job: "대기업 사원" },
-              income: 390,
+              hire: { tier: "large" },
             },
             failure: {
-              text: "대기업은 떨어졌고, 중소기업에 입사했다.",
+              text: "대기업은 떨어졌고, 눈을 낮춰 다시 지원했다.",
               stats: { happiness: -4 },
-              flags: { employed: true, job: "중소기업 사원" },
-              income: 240,
+              hire: { tier: "small" },
             },
           },
         },
@@ -181,8 +195,7 @@ export const EVENTS: EventDef[] = [
             success: {
               text: "공무원 시험에 합격했다.",
               stats: { happiness: 10 },
-              flags: { employed: true, job: "공무원" },
-              income: 260,
+              hire: { tier: "civil" },
             },
             failure: {
               text: "시험에 떨어지고 아르바이트를 시작했다.",
@@ -202,6 +215,7 @@ export const EVENTS: EventDef[] = [
           flags: { education: "graduate" },
           eduYears: 2,
           income: 80,
+          enroll: { level: "graduate" },
         },
       },
       {
@@ -212,6 +226,7 @@ export const EVENTS: EventDef[] = [
           intense: 12,
           flags: { education: "done" },
           wealth: -1500,
+          note: "사무실 보증금과 초기 비용",
           risk: {
             chance: () => 0.25,
             success: {
@@ -248,8 +263,8 @@ export const EVENTS: EventDef[] = [
         effect: {
           text: "연구원으로 일하게 되었다.",
           stats: { knowledge: 5, happiness: 6 },
-          flags: { education: "done", employed: true, job: "연구원" },
-          income: 360,
+          flags: { education: "done" },
+          hire: { tier: "research" },
         },
       },
       {
@@ -261,16 +276,17 @@ export const EVENTS: EventDef[] = [
           flags: { education: "graduate" },
           eduYears: 5,
           income: 150,
+          enroll: { level: "abroad" },
         },
       },
       {
         id: "industry",
         label: "기업 연구직으로 간다",
         effect: {
-          text: "기업 연구소에 입사했다.",
+          text: "기업 연구소에 들어갔다.",
           stats: { happiness: 4 },
-          flags: { education: "done", employed: true, job: "기업 연구원" },
-          income: 420,
+          flags: { education: "done" },
+          hire: { tier: "large", title: "연구원" },
         },
       },
     ],
@@ -284,7 +300,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.8,
     cooldown: 12,
     when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done",
-    intro: "통장 잔고가 줄어들고 있다. 일을 구해야 한다.",
+    intro: (s) => `통장 잔고가 줄어들고 있다${s.wealth < 1000 ? ` (남은 자산 ${formatWealth(s.wealth)})` : ""}.${s.flags.children ? ` ${s.flags.children > 1 ? `아이 ${s.flags.children}명을` : "아이를"} 키우려면` : ""} 일을 구해야 한다.`,
     choices: [
       {
         id: "regular",
@@ -295,10 +311,9 @@ export const EVENTS: EventDef[] = [
           risk: {
             chance: knowledgeOdds(0.5),
             success: {
-              text: "정규직으로 입사했다.",
+              text: "정규직 합격 소식을 받았다.",
               stats: { happiness: 10 },
-              flags: { employed: true, job: "회사원" },
-              income: 280,
+              hire: { tier: "auto" },
             },
             failure: {
               text: "번번이 떨어졌다.",
@@ -313,15 +328,14 @@ export const EVENTS: EventDef[] = [
         effect: {
           text: "계약직으로 일을 시작했다.",
           stats: { happiness: 2 },
-          flags: { employed: true, job: "계약직 사원" },
-          income: 210,
+          hire: { tier: "contract" },
         },
       },
       {
         id: "skill-up",
         label: "기술을 배우며 준비한다",
         effect: {
-          text: "국비 교육 과정에 들어갔다.",
+          text: "국비 교육 과정에 들어갔다. 수강료는 내일배움카드로 해결했다.",
           stats: { knowledge: 8, happiness: -2 },
           busyMonths: 6,
         },
@@ -336,7 +350,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.15,
     cooldown: 24,
     when: (s) => s.flags.employed,
-    intro: "예전 동료에게서 함께 일하자는 연락이 왔다.",
+    intro: (s) => `${s.flags.company ? `${s.flags.company}에서 일한 지 몇 해, ` : ""}예전 동료에게서 함께 일하자는 연락이 왔다. 지금 연봉은 ${formatWealth(s.income * 12)}이다.`,
     choices: [
       {
         id: "move",
@@ -344,18 +358,11 @@ export const EVENTS: EventDef[] = [
         effect: {
           text: "새 회사로 옮겼다.",
           intense: 3,
+          switchJob: { payPct: 1.2 },
           risk: {
             chance: () => 0.7,
-            success: {
-              text: "연봉도 오르고 일도 잘 맞았다.",
-              stats: { happiness: 8 },
-              incomePct: 1.25,
-            },
-            failure: {
-              text: "연봉은 올랐지만 조직 문화가 맞지 않았다.",
-              stats: { happiness: -10, health: -3 },
-              incomePct: 1.15,
-            },
+            success: { text: "일도 사람도 잘 맞았다.", stats: { happiness: 8 } },
+            failure: { text: "연봉은 올랐지만 조직 문화가 맞지 않았다.", stats: { happiness: -10, health: -3 } },
           },
         },
       },
@@ -388,6 +395,7 @@ export const EVENTS: EventDef[] = [
           text: "사표를 내고 창업했다.",
           intense: 12,
           wealth: -3000,
+          note: "창업 자금",
           risk: {
             chance: () => 0.3,
             success: {
@@ -426,7 +434,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.04,
     once: true,
     when: (s) => s.flags.employed && s.flags.job !== "공무원",
-    intro: "회사가 구조조정을 발표하고 희망퇴직 신청을 받는다.",
+    intro: (s) => `${s.flags.company || "회사"}가 구조조정을 발표하고 희망퇴직 신청을 받는다. 위로금은 연봉 1년 치 수준이다.`,
     choices: [
       {
         id: "accept",
@@ -435,6 +443,7 @@ export const EVENTS: EventDef[] = [
           text: "위로금을 받고 회사를 나왔다.",
           stats: { happiness: -6 },
           wealth: 6000,
+          note: "희망퇴직 위로금",
           flags: { employed: false, job: "" },
           income: 0,
         },
@@ -496,6 +505,7 @@ export const EVENTS: EventDef[] = [
           stats: { happiness: 8, health: 4, relationships: -4 },
           flags: { employed: false, retired: true, job: "은퇴" },
           wealth: -2000,
+          note: "시골집 마련",
           income: 110,
         },
       },
@@ -554,6 +564,7 @@ export const EVENTS: EventDef[] = [
           stats: { happiness: 12, relationships: 10 },
           flags: { partner: "married" },
           wealth: -2500,
+          note: "예식과 신혼살림",
           intense: 3,
         },
       },
@@ -577,16 +588,22 @@ export const EVENTS: EventDef[] = [
     perYear: 0.3,
     cooldown: 18,
     when: (s) => s.flags.partner === "married" && s.flags.children < 3 && !s.flags.noKids,
-    intro: "배우자와 아이 이야기를 나누게 되었다.",
+    intro: (s) => {
+      const n = s.flags.children;
+      const work = !s.flags.employed && !s.flags.retired ? " 아직 일자리를 찾는 중이라 마음이 복잡하다." : "";
+      if (n === 0) return `배우자와 아이 이야기를 나누게 되었다.${work}`;
+      return `${n === 1 ? "첫째를" : `아이 ${n}명을`} 키우는 사이, 배우자와 ${n === 1 ? "둘째" : `${["", "", "", "셋째", "넷째", "다섯째"][n + 1] ?? "막내"}`} 이야기가 나왔다.${work}`;
+    },
     choices: [
       {
         id: "have",
-        label: "아이를 갖는다",
+        label: (s) => (s.flags.children === 0 ? "아이를 갖는다" : s.flags.children === 1 ? "둘째를 갖는다" : `한 명 더, ${["", "", "", "셋째", "넷째", "다섯째"][s.flags.children + 1] ?? "막내"}를 갖는다`),
         effect: {
-          text: "아이가 태어났다.",
+          text: "",
           stats: { happiness: 10, relationships: 8, health: -3 },
           addChild: true,
           wealth: -800,
+          note: "출산과 산후조리",
           intense: 6,
         },
       },
@@ -597,8 +614,8 @@ export const EVENTS: EventDef[] = [
       },
       {
         id: "dink",
-        label: "둘이서만 살기로 한다",
-        effect: { text: "둘만의 삶을 꾸리기로 했다.", stats: { happiness: 3 }, flags: { noKids: true } },
+        label: (s) => (s.flags.children === 0 ? "둘이서만 살기로 한다" : s.flags.children === 1 ? "외동으로 키우기로 한다" : "지금 아이들로 충분하다"),
+        effect: { text: (s) => (s.flags.children === 0 ? "둘만의 삶을 꾸리기로 했다." : "지금의 가족에 집중하기로 했다."), stats: { happiness: 3 }, flags: { noKids: true } },
       },
     ],
   },
@@ -615,7 +632,7 @@ export const EVENTS: EventDef[] = [
       {
         id: "counsel",
         label: "부부 상담을 받는다",
-        effect: { text: "상담을 받으며 서로를 다시 알아갔다.", stats: { relationships: 8, happiness: 4 }, wealth: -200 },
+        effect: { text: "상담을 받으며 서로를 다시 알아갔다.", stats: { relationships: 8, happiness: 4 }, wealth: -200, note: "상담비" },
       },
       {
         id: "divorce",
@@ -625,6 +642,7 @@ export const EVENTS: EventDef[] = [
           stats: { happiness: -10, relationships: -8 },
           flags: { partner: "divorced" },
           wealthPct: -0.4,
+          note: "재산 분할",
         },
       },
       {
@@ -669,19 +687,19 @@ export const EVENTS: EventDef[] = [
     perYear: 0.15,
     cooldown: 36,
     when: (s) => !s.flags.homeOwner && s.wealth > 8000,
-    intro: "전세 계약 만료가 다가온다. 집값 이야기가 끊이지 않는다.",
+    intro: (s) => `전세 계약 만료가 다가온다. 모아둔 돈은 ${formatWealth(s.wealth)}. 집값 이야기가 끊이지 않는다.`,
     choices: [
       {
         id: "buy",
-        label: "대출을 끼고 집을 산다",
+        label: (s) => (s.wealth < 30000 ? "대출을 끼고 집을 산다" : "집을 산다"),
         effect: {
-          text: "대출을 받아 집을 샀다.",
-          flags: { homeOwner: true },
+          text: "",
+          buyHome: "best",
           stats: { happiness: 6 },
           risk: {
             chance: () => 0.6,
-            success: { text: "몇 년 사이 집값이 올랐다.", wealthPct: 0.4 },
-            failure: { text: "집값이 떨어지고 이자 부담이 커졌다.", wealthPct: -0.15, stats: { happiness: -6 } },
+            success: { text: "몇 년 사이 집값이 올랐다.", homeValuePct: 0.3 },
+            failure: { text: (s) => (s.flags.mortgage ? "집값이 떨어지고 이자 부담이 커졌다." : "사자마자 집값이 떨어졌다."), homeValuePct: -0.12, stats: { happiness: -6 } },
           },
         },
       },
@@ -694,10 +712,9 @@ export const EVENTS: EventDef[] = [
         id: "move-out",
         label: "집값이 싼 곳으로 옮긴다",
         effect: {
-          text: "외곽으로 이사해 집을 샀다.",
-          flags: { homeOwner: true },
+          text: "외곽으로 이사했다.",
+          buyHome: "cheap",
           stats: { happiness: 2, relationships: -3 },
-          wealthPct: 0.05,
         },
       },
     ],
@@ -756,7 +773,7 @@ export const EVENTS: EventDef[] = [
       {
         id: "treat",
         label: "바로 정밀검사와 치료를 받는다",
-        effect: { text: "일찍 발견해 치료를 받았다.", stats: { health: 12, happiness: -2 }, wealth: -500 },
+        effect: { text: "일찍 발견해 치료를 받았다.", stats: { health: 12, happiness: -2 }, wealth: -500, note: "정밀검사와 치료비" },
       },
       {
         id: "lifestyle",
@@ -771,7 +788,7 @@ export const EVENTS: EventDef[] = [
           risk: {
             chance: () => 0.5,
             success: { text: "다행히 큰 문제는 없었다.", stats: {} },
-            failure: { text: "나중에 병이 커져서 발견되었다.", stats: { health: -20, happiness: -8 }, wealth: -1500 },
+            failure: { text: "나중에 병이 커져서 발견되었다.", stats: { health: -20, happiness: -8 }, wealth: -1500, note: "수술과 입원비" },
           },
         },
       },
@@ -819,7 +836,7 @@ export const EVENTS: EventDef[] = [
     cooldown: 24,
     when: (s) => s.flags.employed,
     intro: "",
-    effect: { text: "승진했다. 책임도 월급도 늘었다.", stats: { happiness: 5 }, incomePct: 1.12 },
+    effect: { text: "책임도 월급도 늘었다.", stats: { happiness: 5 }, incomePct: 1.12, promote: true },
   },
   {
     id: "illness",
@@ -829,7 +846,7 @@ export const EVENTS: EventDef[] = [
     perYear: (s) => 0.02 + Math.max(0, 50 - s.stats.health) / 400,
     cooldown: 12,
     intro: "",
-    effect: { text: "크게 앓아누웠다.", stats: { health: -10, happiness: -4 }, wealth: -200 },
+    effect: { text: "크게 앓아누웠다.", stats: { health: -10, happiness: -4 }, wealth: -200, note: "병원비" },
   },
   {
     id: "old-friend",
@@ -862,6 +879,44 @@ export const EVENTS: EventDef[] = [
     when: (s) => s.flags.partner === "married",
     intro: "",
     effect: { text: "평생을 함께한 배우자가 먼저 세상을 떠났다.", stats: { happiness: -20, relationships: -10, health: -5 }, flags: { partner: "widowed" } },
+  },
+  {
+    id: "home-parent",
+    title: "아이와 일자리",
+    minAge: 20,
+    maxAge: 50,
+    perYear: 0.9,
+    cooldown: 14,
+    when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done" && (s.flags.kidsBorn ?? []).some((b) => s.mi - b < 12),
+    intro: "아이가 태어났지만 아직 일자리가 없다. 육아와 구직을 어떻게 할지 정해야 한다.",
+    theme: "family",
+    choices: [
+      { id: "care", label: "1년은 육아에 전념한다", effect: { text: "아이 곁에서 첫해를 보냈다. 통장은 가벼워졌지만 아이와 가까워졌다.", stats: { relationships: 8, happiness: 3 }, busyMonths: 12 } },
+      {
+        id: "daycare",
+        label: "어린이집에 맡기고 구직에 나선다",
+        effect: {
+          text: "아이를 어린이집에 맡기고 면접을 다녔다.",
+          stats: { happiness: -2 },
+          wealth: -150,
+          note: "어린이집 비용",
+          risk: { chance: (s) => Math.min(0.8, 0.35 + s.stats.knowledge / 200), success: { text: "일자리를 구했다.", stats: { happiness: 6 }, hire: { tier: "auto" } }, failure: { text: "아직 합격 소식은 없었다.", stats: { happiness: -4 } } },
+        },
+      },
+      { id: "remote", label: "집에서 할 수 있는 일을 찾는다", effect: { text: "아이가 잠든 밤에 재택 부업을 시작했다.", stats: { health: -2, knowledge: 2 }, income: 120, flags: { employed: true, job: "재택 프리랜서" } } },
+    ],
+  },
+  {
+    // Written by the AI for this life (title, scene, options, effects); never fires without AI.
+    id: "personal",
+    title: "나만의 갈림길",
+    minAge: 15,
+    maxAge: 95,
+    perYear: 0.3,
+    cooldown: 20,
+    when: (s) => !!s.ai,
+    intro: "",
+    choices: [],
   },
   ...LIFE_EVENTS,
 ];

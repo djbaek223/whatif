@@ -51,7 +51,19 @@ export interface LifeFlags {
   kidsBorn?: number[]; // month index of each child's birth (missing in lives saved before it existed)
   pet?: boolean;
   petSince?: number;
+  // Concrete facts added later; optional so lives saved before them still load.
+  company?: string; // current employer, empty when not working
+  school?: string; // current or last school
+  tuition?: number; // 만원 / 년, while enrolled
+  workMonths?: number; // months worked so far, for titles and experienced pay
+  homeArea?: string;
+  homeValue?: number; // 만원, current market price of the home
+  mortgage?: number; // 만원, outstanding loan
 }
+
+/** What a choice is about. Temperament and past choices make some themes come up more often. */
+export type Theme = "career" | "study" | "family" | "love" | "risk" | "money" | "health" | "leisure";
+export type Traits = Record<Theme, number>; // -0.3..0.3 around a neutral 0
 
 export type Preset =
   | "original"
@@ -68,16 +80,63 @@ export interface OpeningChoice {
   label: string;
   preset: Preset;
   jobTitle?: string;
+  place?: string; // company or school this choice leads to
   original?: boolean;
   education?: Exclude<Education, "school"> | "same";
 }
+
+/** Concrete details fixed when a choice is offered, so the label and the outcome name the same place and pay. */
+export interface OptionPlan {
+  kind?: "hire" | "switch" | "enroll" | "home" | "cost";
+  risky?: boolean; // the plan holds only if the option's gamble works out
+  place?: string; // company or school
+  tier?: string; // CompanyTier of place
+  salary?: number; // 만원 / 년
+  tuition?: number; // 만원 / 년
+  price?: number; // 만원, home price
+  loan?: number; // 만원
+  from?: number; // 만원 / 년, salary before a move
+  cost?: number; // 만원, money in (+) or out (-)
+}
+
+export interface PendingOption {
+  id: string;
+  label: string;
+  detail?: string; // e.g. "네이버 · 연봉 약 6,200만원"
+  plan?: OptionPlan;
+  theme?: Theme;
+}
+
+/** A choice written by the AI for this life. Numbers are clamped by the engine before use. */
+export interface CustomOption {
+  outcome: string;
+  stats: Partial<Stats>;
+  money: number; // 만원
+  change: CustomChange;
+  chance: number; // 1 = always works
+  failure: string;
+}
+
+export type CustomChange =
+  | "none"
+  | "hire"
+  | "switchJob"
+  | "quitJob"
+  | "enrollUniversity"
+  | "enrollGraduate"
+  | "buyHome"
+  | "addChild"
+  | "startDating"
+  | "marry"
+  | "retire";
 
 export interface PendingChoice {
   eventId: string; // "turning-point" for the first choice
   title: string;
   scene: string;
-  options: { id: string; label: string }[];
+  options: PendingOption[];
   freeText: boolean;
+  custom?: Record<string, CustomOption>; // AI-written moments carry their own effects
 }
 
 export type LogKind = "era" | "news" | "turn" | "event" | "choice" | "outcome" | "milestone" | "present" | "death";
@@ -88,6 +147,7 @@ export interface LogEntry {
   text: string;
   delta?: Partial<Stats>;
   tag?: string; // news category and month, e.g. "스포츠 · 6월"
+  money?: number; // 만원 change in wealth caused by this entry
 }
 
 export interface ChoiceRecord {
@@ -119,6 +179,9 @@ export interface LifeState {
   deathAge: number | null;
   choices: ChoiceRecord[];
   history: { year: number; stats: Stats }[]; // one snapshot per simulated year, for the life graph
+  traits?: Traits; // from MBTI and self-description
+  leanings?: Partial<Record<Theme, number>>; // what past choices leaned toward
+  ai?: boolean; // AI narration on: allows moments written for this life
 }
 
 export interface Ending {
