@@ -183,6 +183,7 @@ export interface LifeState {
   traits?: Traits; // from MBTI and self-description
   leanings?: Partial<Record<Theme, number>>; // what past choices leaned toward
   ai?: boolean; // AI narration on: allows moments written for this life
+  badges?: { id: string; mi: number; age: number }[]; // achievements, in the order they were earned
 }
 
 export interface Ending {

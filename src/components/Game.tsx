@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ageAt } from "@/lib/events";
+import { withBadges } from "@/lib/badges";
 import { eraHints } from "@/lib/era";
 import {
   advanceTurn,
@@ -141,7 +142,7 @@ export default function Game() {
       : null;
     const opening = res && res.choices.length >= 2 ? res : fallbackOpening(p, t);
     personalized.current = null;
-    setLife(createLife(p, t, opening, { ai }));
+    setLife(withBadges(createLife(p, t, opening, { ai })));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -163,7 +164,8 @@ export default function Game() {
     setEnding(res ?? fallbackEnding(dead));
   }
 
-  function afterAdvance(prev: LifeState, next: LifeState, stop: StopReason) {
+  function afterAdvance(prev: LifeState, advanced: LifeState, stop: StopReason) {
+    const next = withBadges(advanced);
     setLife(next);
     if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) {
       setPresentOpen(true);
@@ -189,7 +191,7 @@ export default function Game() {
 
   const choose = (optionId: string, freeText?: string) => {
     if (!life?.pending) return;
-    setLife(resolveChoice(life, optionId, freeText));
+    setLife(withBadges(resolveChoice(life, optionId, freeText)));
   };
 
   async function chooseFree(text: string) {

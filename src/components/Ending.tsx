@@ -4,6 +4,7 @@ import { useState } from "react";
 import { formatWealth, statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
+import { BadgeCollection } from "./GameFx";
 import { LifeChart } from "./LifeChart";
 import { Button, Card, StatBars } from "./ui";
 import { EndingWait } from "./Waiting";
@@ -52,6 +53,10 @@ export function EndingView({
         <div className="mt-4">
           <StatBars stats={life.stats} />
         </div>
+      </Card>
+
+      <Card>
+        <BadgeCollection life={life} />
       </Card>
 
       <Card className="space-y-3">
