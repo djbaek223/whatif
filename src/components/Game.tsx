@@ -23,6 +23,7 @@ import { EndingView } from "./Ending";
 import { EMPTY_PROFILE, ProfileForm, TurningPointForm } from "./Forms";
 import { PlayView } from "./Play";
 import { Button } from "./ui";
+import { OpeningWait } from "./Waiting";
 
 type Screen = "intro" | "profile" | "turning" | "loading" | "play" | "ending";
 
@@ -251,17 +252,17 @@ export default function Game() {
                 <span className="text-stone-600 dark:text-stone-400">
                   저장된 기본정보: <b className="text-stone-900 dark:text-stone-100">{stored.profile.name || "별명 없음"}</b> · {stored.profile.birthDate.slice(0, 4)}년생
                 </span>
-                <button type="button" onClick={eraseDevice} className="shrink-0 text-rose-600 underline-offset-2 hover:underline dark:text-rose-400">
+                <button type="button" onClick={eraseDevice} className="-my-2 shrink-0 px-1 py-2 text-rose-700 underline-offset-2 hover:underline dark:text-rose-400">
                   지우기
                 </button>
               </div>
             )}
-            <p className="text-center text-xs text-stone-500">
+            <p className="text-center text-xs text-stone-500 dark:text-stone-400">
               {ai ? "AI 내레이션이 켜져 있어요." : "AI 키가 없어 기본 문장으로 진행해요."} 입력한 정보는 서버에 보관하지 않아요.
               {!stored && saved && (
                 <>
                   {" "}
-                  <button type="button" onClick={eraseDevice} className="underline underline-offset-2">
+                  <button type="button" onClick={eraseDevice} className="-my-2 py-2 underline underline-offset-2">
                     진행 기록 지우기
                   </button>
                 </>
@@ -307,11 +308,7 @@ export default function Game() {
       )}
 
       {screen === "loading" && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20 text-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-stone-300 border-t-indigo-500" />
-          <p className="text-lg font-semibold">그날로 돌아가는 중...</p>
-          <p className="text-sm text-stone-500">{tp.date.replace("-", "년 ")}월의 공기를 떠올리고 있어요.</p>
-        </div>
+        <OpeningWait date={tp.date} ai={ai} />
       )}
 
       {screen === "play" && life && (
