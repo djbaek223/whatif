@@ -342,7 +342,7 @@ export function alternativePaths(profile: Profile, tp: TurningPoint): Path[] {
       preset,
       jobTitle: /공무원/.test(phrase) ? "공무원" : /창업|사업/.test(phrase) ? "창업가" : "",
       place: /대기업/.test(phrase) ? "대기업" : /스타트업/.test(phrase) ? "스타트업" : "",
-      education: preset === "study" ? (/대학원|석사|박사/.test(phrase) ? "graduate" : /재수|삼수|수능/.test(phrase) ? "highschool" : ctx.student ? "university" : "same") : "same",
+      education: preset === "study" ? (/대학원|석사|박사/.test(phrase) ? "graduate" : /재수|삼수|수능/.test(phrase) ? "highschool" : ctx.student && ctx.age >= 17 ? "university" : "same") : "same",
     });
   }
 

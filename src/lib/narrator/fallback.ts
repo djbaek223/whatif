@@ -40,7 +40,8 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
         jobTitle: "",
         place: "",
         original: true,
-        education: student && profile.university ? "university" : "same",
+        // Only a turning point around the entrance exam leads straight to university.
+        education: age >= 17 && student && profile.university ? "university" : "same",
       },
       ...alternatives,
     ],

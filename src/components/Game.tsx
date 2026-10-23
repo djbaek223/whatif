@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ageAt } from "@/lib/events";
+import { withBadges } from "@/lib/badges";
 import { eraHints } from "@/lib/era";
 import {
   advanceTurn,
@@ -20,14 +21,15 @@ import {
   turningPointMi,
   type StopReason,
 } from "@/lib/engine";
-import { dropLegacySaves, eraseAll, forgetProfile, loadProfile, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
+import { clearDraft, dropLegacySaves, eraseAll, forgetProfile, loadProfile, readDraft, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
 import { aiAvailable, narrate } from "@/lib/narrator/client";
 import { fallbackEnding, fallbackOpening } from "@/lib/narrator/fallback";
 import { pathHints, topUpChoices } from "@/lib/narrator/turningChoices";
 import type { ClassifyResult, EndingResult, MomentResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
+import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
-import { EMPTY_PROFILE, ProfileForm, TurningPointForm } from "./Forms";
+import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
 import { PlayView } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
@@ -42,7 +44,6 @@ interface Saved {
   ending: EndingResult | null;
 }
 
-const EMPTY_TP: TurningPoint = { date: "", situation: "", actualChoice: "", regret: "" };
 
 export default function Game() {
   const [screen, setScreen] = useState<Screen>("intro");
@@ -59,6 +60,7 @@ export default function Game() {
   const [busy, setBusy] = useState(false);
   const [sceneDone, setSceneDone] = useState<string | null>(null);
   const [presentOpen, setPresentOpen] = useState(false);
+  const [draft, setDraft] = useState<WizardDraft | null>(null); // answers restored after a refresh
   const personalized = useRef<string | null>(null);
 
   // Restore the saved profile and game, and check whether the server has an AI key.
@@ -70,6 +72,13 @@ export default function Game() {
     });
     readProgress<Saved>().then((s) => {
       if (s?.life || s?.profile.birthDate) setSaved(s);
+    });
+    // A refresh in the middle of the questions goes straight back to the same question.
+    readDraft<WizardDraft>().then((d) => {
+      if (!d?.profile) return;
+      setDraft(d);
+      setRemember(d.remember);
+      setScreen((s) => (s === "intro" ? "profile" : s));
     });
     aiAvailable().then(setAi);
   }, []);
@@ -85,6 +94,7 @@ export default function Game() {
     setStored(null);
     setRemember(false);
     setSaved(null);
+    setDraft(null);
     setProfile(EMPTY_PROFILE);
     setTp(EMPTY_TP);
     setLife(null);
@@ -104,9 +114,25 @@ export default function Game() {
   const startNew = () => {
     setProfile(stored?.profile ?? saved?.profile ?? EMPTY_PROFILE);
     setTp(EMPTY_TP);
+    setDraft(null);
     setLife(null);
     setEnding(null);
     setScreen("profile");
+  };
+
+  // The questions start from the restored draft, or from what is known so far (a saved profile, a previous turning point).
+  const wizardStart = (): WizardDraft => {
+    if (draft) return draft;
+    const freeText = !!tp.situation; // turning points written before the fill-in-the-blanks sentence stay as plain text
+    return {
+      ...EMPTY_DRAFT,
+      step: screen === "turning" || profile.birthDate ? TURNING_STEP : 0, // a saved profile goes straight to the turning point
+      profile,
+      tp,
+      mode: freeText ? "free" : "template",
+      free: tp.situation,
+      remember,
+    };
   };
 
   async function startOpening(p: Profile, t: TurningPoint) {
@@ -117,7 +143,7 @@ export default function Game() {
       : null;
     const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
     personalized.current = null;
-    setLife(createLife(p, t, opening, { ai }));
+    setLife(withBadges(createLife(p, t, opening, { ai })));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -139,7 +165,8 @@ export default function Game() {
     setEnding(res ?? fallbackEnding(dead));
   }
 
-  function afterAdvance(prev: LifeState, next: LifeState, stop: StopReason) {
+  function afterAdvance(prev: LifeState, advanced: LifeState, stop: StopReason) {
+    const next = withBadges(advanced);
     setLife(next);
     if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) {
       setPresentOpen(true);
@@ -165,7 +192,7 @@ export default function Game() {
 
   const choose = (optionId: string, freeText?: string) => {
     if (!life?.pending) return;
-    setLife(resolveChoice(life, optionId, freeText));
+    setLife(withBadges(resolveChoice(life, optionId, freeText)));
   };
 
   async function chooseFree(text: string) {
@@ -231,7 +258,7 @@ export default function Game() {
   }, [pendingKey, wantsScene]);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4">
+    <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : "max-w-2xl"}`}>
       {screen === "intro" && (
         <div className="flex flex-1 flex-col justify-center gap-10 py-16">
           <div>
@@ -279,14 +306,21 @@ export default function Game() {
         </div>
       )}
 
-      {screen === "profile" && (
-        <div className="py-10">
-          <ProfileForm
-            initial={profile}
-            initialRemember={remember}
-            onBack={() => setScreen("intro")}
-            onDone={(p, keep) => {
+      {(screen === "profile" || screen === "turning") && (
+        <div className="py-6 sm:py-10">
+          <Onboarding
+            key={screen}
+            initial={wizardStart()}
+            onExit={() => {
+              clearDraft();
+              setDraft(null);
+              setScreen("intro");
+            }}
+            onDone={(p, t, keep) => {
+              clearDraft();
+              setDraft(null);
               setProfile(p);
+              setTp(t);
               setRemember(keep);
               if (keep)
                 saveProfile(p).then(setStored, () => {
@@ -294,21 +328,7 @@ export default function Game() {
                   setRemember(false); // this browser can't encrypt or store; fall back to not saving
                 });
               else if (stored) forgetProfile().then(() => setStored(null));
-              setScreen("turning");
-            }}
-          />
-        </div>
-      )}
-
-      {screen === "turning" && (
-        <div className="py-10">
-          <TurningPointForm
-            profile={profile}
-            initial={tp}
-            onBack={() => setScreen("profile")}
-            onDone={(t) => {
-              setTp(t);
-              startOpening(profile, t);
+              startOpening(p, t);
             }}
           />
         </div>
