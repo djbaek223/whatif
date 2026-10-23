@@ -255,6 +255,12 @@ function pool(theme: TpTheme, c: Ctx): Candidate[] {
 
 // When the user's words don't point anywhere, paths that fit their age.
 function byAge(c: Ctx): Candidate[] {
+  if (c.age < 13)
+    return [
+      { label: "공부에 재미를 붙여 본다", preset: "study" },
+      { label: "좋아하는 운동이나 악기를 시작한다", preset: "health" },
+      { label: "다른 동네 학교로 전학 간다", preset: "move" },
+    ];
   if (c.age < 17)
     return [
       { label: "공부에 모든 걸 걸어 본다", preset: "study", education: "same" },
