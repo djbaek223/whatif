@@ -86,7 +86,7 @@ export function PlayView({
           </div>
         </div>
         <div className="mt-2">
-          <LifeScene scene={fx.scene} paused={!!pending || life.dead || presentOpen}>
+          <LifeScene scene={fx.scene} paused={!(auto || fx.walking) || !!pending || life.dead || presentOpen}>
             {fx.banner && <YearBanner year={fx.banner} onDone={fx.clearBanner} />}
             {fx.roll && <DiceRoll roll={fx.roll} onDone={fx.clearRoll} />}
           </LifeScene>
@@ -175,6 +175,14 @@ export function PlayView({
                     </Button>
                   </div>
                 )}
+                {auto && (
+                  <p className="flex items-center justify-between gap-2 text-xs text-stone-500 dark:text-stone-400">
+                    자동 진행 중이에요. 고르면 이어서 진행해요.
+                    <button type="button" onClick={handlers.onToggleAuto} className="-my-2 shrink-0 px-1 py-3 font-semibold text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
+                      자동 진행 끄기
+                    </button>
+                  </p>
+                )}
               </div>
               <div
                 aria-hidden
@@ -228,7 +236,8 @@ function usePlayFx(life: LifeState) {
   const sceneKey = JSON.stringify(sceneOf(life));
   const scene = useMemo(() => JSON.parse(sceneKey) as SceneState, [sceneKey]);
 
-  const [seen, setSeen] = useState({ year, log: life.log.length, badges: life.badges?.length ?? 0, stats: life.stats });
+  const [seen, setSeen] = useState({ mi: life.mi, year, log: life.log.length, badges: life.badges?.length ?? 0, stats: life.stats });
+  const [stepping, setStepping] = useState(0); // counts up each time the calendar moves, so the street walks for that step
   const [banner, setBanner] = useState<number | null>(null);
   const [roll, setRoll] = useState<Roll | null>(null);
   const [toast, setToast] = useState<{ ids: string[]; key: number } | null>(null);
@@ -236,8 +245,9 @@ function usePlayFx(life: LifeState) {
   const [swingKey, setSwingKey] = useState(0);
 
   const badgeCount = life.badges?.length ?? 0;
-  if (seen.year !== year || seen.log !== life.log.length || seen.badges !== badgeCount || seen.stats !== life.stats) {
+  if (seen.mi !== life.mi || seen.year !== year || seen.log !== life.log.length || seen.badges !== badgeCount || seen.stats !== life.stats) {
     if (year > seen.year) setBanner(year);
+    if (life.mi > seen.mi) setStepping((n) => n + 1);
     // A choice just resolved: it logs the choice and then its outcome.
     const added = life.log.slice(seen.log);
     const outcome = added.findLast((e) => e.kind === "outcome");
@@ -248,11 +258,25 @@ function usePlayFx(life: LifeState) {
       setSwing(sw);
       setSwingKey((k) => k + 1);
     }
-    setSeen({ year, log: life.log.length, badges: badgeCount, stats: life.stats });
+    setSeen({ mi: life.mi, year, log: life.log.length, badges: badgeCount, stats: life.stats });
   }
+
+  // One step of time walks the street for a moment; auto play keeps it walking because steps keep coming.
+  const [walking, setWalking] = useState(false);
+  const [walkedFor, setWalkedFor] = useState(0);
+  if (walkedFor !== stepping) {
+    setWalkedFor(stepping);
+    setWalking(stepping > 0);
+  }
+  useEffect(() => {
+    if (!stepping) return;
+    const t = setTimeout(() => setWalking(false), 900);
+    return () => clearTimeout(t);
+  }, [stepping]);
 
   return {
     scene,
+    walking,
     banner,
     clearBanner: useCallback(() => setBanner(null), []),
     roll,
