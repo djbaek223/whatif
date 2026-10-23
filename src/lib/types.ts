@@ -31,6 +31,7 @@ export interface TurningPoint {
   situation: string;
   actualChoice: string;
   regret: string;
+  kind?: string; // 입시, 취업, 연애·결혼 ... picked before the date; missing in saves from before it existed
 }
 
 export type Education = "school" | "highschool" | "university" | "graduate" | "done";
