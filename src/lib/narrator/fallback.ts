@@ -2,8 +2,9 @@
 import { ageAt } from "../events";
 import { eraHints } from "../era";
 import { formatMi, formatWealth, heuristicInitial, statusLabel, turningPointMi } from "../engine";
-import type { LifeState, OpeningChoice, Profile, TurningPoint } from "../types";
+import type { LifeState, Profile, TurningPoint } from "../types";
 import type { EndingResult, OpeningResult } from "./schema";
+import { alternativePaths } from "./turningChoices";
 
 function mbtiStats(mbti: string) {
   const m = mbti.toUpperCase();
@@ -22,24 +23,7 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
   const hints = eraHints(year);
   const name = profile.name || "당신";
   const student = age < 20;
-  const alternatives: OpeningChoice[] =
-    student
-      ? [
-          { label: "원하던 공부에 끝까지 매달린다", preset: "study", education: "highschool" },
-          { label: "일찍 사회에 나가 돈을 번다", preset: "career", jobTitle: "사회초년생", education: "done" },
-          { label: "낯선 도시의 학교로 떠난다", preset: "move", education: profile.university ? "university" : "same" },
-        ]
-      : age < 30
-        ? [
-            { label: "더 큰 회사, 더 큰 무대로 간다", preset: "career", jobTitle: "회사원" },
-            { label: "하고 싶던 일에 모험을 건다", preset: "risk", jobTitle: "창업가" },
-            { label: "그 사람에게 마음을 전한다", preset: "love" },
-          ]
-        : [
-            { label: "모든 걸 걸고 새로운 일을 시작한다", preset: "risk", jobTitle: "사업가" },
-            { label: "가족과 보내는 시간을 택한다", preset: "family" },
-            { label: "삶의 터전을 옮긴다", preset: "move" },
-          ];
+  const alternatives = alternativePaths(profile, tp);
   return {
     persona: `${name}은(는) ${profile.mbti ? `${profile.mbti} 성향의 ` : ""}사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`.slice(0, 300),
     stats: mbtiStats(profile.mbti),
@@ -56,16 +40,10 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
         jobTitle: "",
         place: "",
         original: true,
-        education: student && profile.university ? "university" : "same",
+        // Only a turning point around the entrance exam leads straight to university.
+        education: age >= 17 && student && profile.university ? "university" : "same",
       },
-      ...alternatives.slice(0, 2).map((c) => ({
-        label: c.label,
-        preset: c.preset,
-        jobTitle: c.jobTitle ?? "",
-        place: "",
-        original: false,
-        education: c.education ?? "same",
-      })),
+      ...alternatives,
     ],
   };
 }

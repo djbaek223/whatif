@@ -1,0 +1,139 @@
+// Helpers for the profile and turning point questions: school years, sentence templates, suggestions and the MBTI quiz.
+import type { TurningPoint } from "./types";
+
+const hasFinal = (word: string) => {
+  const c = word.trim().slice(-1).charCodeAt(0);
+  return c >= 0xac00 && c <= 0xd7a3 ? (c - 0xac00) % 28 !== 0 : false;
+};
+/** Korean particle that fits the word before it, e.g. josa("재수", "와", "과") → "와". */
+export const josa = (word: string, noFinal: string, withFinal: string) => (hasFinal(word) ? withFinal : noFinal);
+
+export interface SchoolStage {
+  key: "elementary" | "middle" | "high" | "university";
+  label: string;
+  from: number; // entry year (March)
+  to: number; // graduation year (February)
+}
+
+/** School years from the birth date, Korean system: school starts in March of the year a child turns seven. */
+export function schoolYears(birthDate: string): { stages: SchoolStage[]; early: boolean } | null {
+  const [y, m] = birthDate.split("-").map(Number);
+  if (!y || !m) return null;
+  // Children born in January or February started a year early until the 2009 school year (빠른년생).
+  const early = m <= 2 && y <= 2002;
+  const e = y + (early ? 6 : 7);
+  return {
+    early,
+    stages: [
+      { key: "elementary", label: "초등학교", from: e, to: e + 6 },
+      { key: "middle", label: "중학교", from: e + 6, to: e + 9 },
+      { key: "high", label: "고등학교", from: e + 9, to: e + 12 },
+      { key: "university", label: "대학교", from: e + 12, to: e + 16 },
+    ],
+  };
+}
+
+export type TpKind = "exam" | "job" | "love" | "career" | "move" | "invest" | "other";
+
+export interface TpKindDef {
+  id: TpKind;
+  label: string;
+  icon: string;
+  /** The blanks of the sentence template; the age comes from the chosen date. */
+  a: string;
+  b: string;
+  why: string;
+  example: { a: string; b: string; why: string };
+}
+
+export const TP_KINDS: TpKindDef[] = [
+  { id: "exam", label: "입시", icon: "🎓", a: "재수", b: "성적에 맞춰 진학", why: "부모님 형편", example: { a: "재수", b: "성적에 맞춰 지방대 진학", why: "또 1년을 버틸 자신이 없었던 것" } },
+  { id: "job", label: "취업", icon: "💼", a: "대기업 인턴", b: "스타트업 정규직", why: "안정성", example: { a: "합격한 중견기업 입사", b: "1년 더 대기업 준비", why: "점점 줄어드는 통장 잔고" } },
+  { id: "love", label: "연애·결혼", icon: "💍", a: "지금 결혼", b: "조금 더 기다림", why: "서로 다른 미래 계획", example: { a: "5년 사귄 사람과 결혼", b: "헤어지고 유학", why: "그 사람을 혼자 두는 것" } },
+  { id: "career", label: "이직·창업", icon: "🚀", a: "회사에 남기", b: "창업", why: "가족의 생계", example: { a: "10년 다닌 회사에 남기", b: "친구와 카페 창업", why: "아이 학원비" } },
+  { id: "move", label: "이사·이민", icon: "✈️", a: "서울에 남기", b: "캐나다 이민", why: "부모님 곁을 떠나는 것", example: { a: "고향에 남기", b: "서울로 상경", why: "혼자 계실 어머니" } },
+  { id: "invest", label: "투자", icon: "📈", a: "집 사기", b: "전세 유지", why: "대출 이자", example: { a: "영끌해서 아파트 매수", b: "전세로 버티기", why: "금리가 오를지도 모른다는 불안" } },
+  { id: "other", label: "기타", icon: "✏️", a: "첫 번째 길", b: "두 번째 길", why: "가장 걸렸던 것", example: { a: "군대 일찍 가기", b: "대학 졸업 후 입대", why: "친구들과 멀어지는 것" } },
+];
+
+export const kindDef = (labelOrId?: string) => TP_KINDS.find((k) => k.label === labelOrId || k.id === labelOrId);
+
+export interface TpBlanks {
+  a: string;
+  b: string;
+  why: string;
+}
+
+/** "19살, 재수와 지방대 진학 사이에서 고민했다. 가장 마음에 걸린 건 부모님 형편이었다." */
+export function fillTemplate(age: number | null, f: TpBlanks): string {
+  if (!f.a.trim() && !f.b.trim()) return "";
+  const a = f.a.trim() || "____";
+  const b = f.b.trim() || "____";
+  const why = f.why.trim();
+  const head = `${age !== null && age >= 0 ? `${age}살, ` : ""}${a}${josa(a, "와", "과")} ${b} 사이에서 고민했다.`;
+  return why ? `${head} 가장 마음에 걸린 건 ${why}${josa(why, "였다", "이었다")}.` : head;
+}
+
+export interface Suggestion {
+  kind: TpKind;
+  label: string;
+  date: string; // YYYY-MM
+  age: number;
+}
+
+// Turning points many people meet, by age (만 나이) and month.
+const COMMON: { age: number; month: number; kind: TpKind; label: string; gender?: "남" }[] = [
+  { age: 15, month: 11, kind: "exam", label: "고등학교 고르기" },
+  { age: 18, month: 12, kind: "exam", label: "대학 선택" },
+  { age: 20, month: 2, kind: "other", label: "입대 시기", gender: "남" },
+  { age: 22, month: 3, kind: "move", label: "휴학·어학연수" },
+  { age: 26, month: 1, kind: "job", label: "첫 직장" },
+  { age: 29, month: 6, kind: "move", label: "독립·이사" },
+  { age: 31, month: 4, kind: "love", label: "결혼" },
+  { age: 34, month: 9, kind: "career", label: "첫 이직" },
+  { age: 37, month: 3, kind: "invest", label: "내 집 마련" },
+  { age: 42, month: 5, kind: "career", label: "창업 고민" },
+  { age: 50, month: 1, kind: "career", label: "제2의 직업" },
+];
+
+/** Common turning points that already happened in this life, newest first; optionally of one kind. */
+export function suggestions(birthDate: string, gender: string, now: Date, kind?: string): Suggestion[] {
+  const [y, m] = birthDate.split("-").map(Number);
+  if (!y || !m) return [];
+  const nowMi = now.getFullYear() * 12 + now.getMonth();
+  return COMMON.filter((c) => (!c.gender || !gender || c.gender === gender) && (!kind || kind === "other" || c.kind === kind))
+    .map((c) => {
+      // The month of the year they turned that age; earlier months fall in the next calendar year.
+      const year = y + c.age + (c.month < m ? 1 : 0);
+      return { kind: c.kind, label: c.label, date: `${year}-${String(c.month).padStart(2, "0")}`, age: c.age };
+    })
+    .filter((s) => monthIndex(s.date) <= nowMi)
+    .reverse()
+    .slice(0, 4);
+}
+
+const monthIndex = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number);
+  return y * 12 + m - 1;
+};
+
+/** 만 나이 at a YYYY-MM month, or null while either date is missing. */
+export function ageIn(birthDate: string, ym: string): number | null {
+  const [by, bm] = birthDate.split("-").map(Number);
+  if (!by || !bm || !/^\d{4}-\d{2}$/.test(ym)) return null;
+  return Math.floor((monthIndex(ym) - (by * 12 + bm - 1)) / 12);
+}
+
+export const MBTI_TYPES = ["ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP", "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"];
+
+/** Four questions, one per MBTI axis. Rough, but enough to steer the story. */
+export const MBTI_QUIZ: { q: string; options: [string, string]; letters: [string, string] }[] = [
+  { q: "오랜만에 쉬는 주말, 더 끌리는 쪽은?", options: ["친구들을 만나 밖에서 논다", "집에서 혼자 충전한다"], letters: ["E", "I"] },
+  { q: "새 가전제품을 샀을 때 나는?", options: ["설명서를 차근차근 읽는다", "일단 이것저것 눌러 본다"], letters: ["S", "N"] },
+  { q: "친구가 고민을 털어놓으면 먼저 하는 말은?", options: ["“그럼 이렇게 해 봐”", "“많이 힘들었겠다”"], letters: ["T", "F"] },
+  { q: "여행을 갈 때 나는?", options: ["일정표를 미리 짠다", "가서 정한다"], letters: ["J", "P"] },
+];
+
+export const PERSONALITY_CHIPS = ["외향적", "내성적", "도전적", "신중함", "성실함", "호기심 많음", "다정함", "현실적", "가족 중심", "여유로움", "운동 좋아함", "여행 좋아함"];
+
+export const EMPTY_TP: TurningPoint = { date: "", situation: "", actualChoice: "", regret: "" };

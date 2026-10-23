@@ -31,6 +31,7 @@ export interface TurningPoint {
   situation: string;
   actualChoice: string;
   regret: string;
+  kind?: string; // 입시, 취업, 연애·결혼 ... picked before the date; missing in saves from before it existed
 }
 
 export type Education = "school" | "highschool" | "university" | "graduate" | "done";
@@ -218,6 +219,7 @@ export interface LifeState {
   seeds?: string[]; // people and threads from earlier events the narrator can pick up again
   recent?: string[]; // "category:keyword,keyword" of recent moments, so the narrator avoids repeats
   rares?: RareMoment[];
+  badges?: { id: string; mi: number; age: number }[]; // achievements, in the order they were earned
 }
 
 export interface Ending {

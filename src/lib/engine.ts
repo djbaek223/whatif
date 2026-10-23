@@ -62,6 +62,45 @@ export function turningPointMi(tp: TurningPoint): number {
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.round(n)));
 
+// ── Age fit ────────────────────────────────────────────
+
+/** Where a young person stands at school by age (만 나이): 초등학교 at 7, 중학교 at 13, 고등학교 at 16. Adults get "". */
+export function lifeStage(age: number): string {
+  if (age < 7) return "미취학 아동";
+  if (age < 13) return "초등학생";
+  if (age < 16) return "중학생";
+  if (age < 19) return "고등학생";
+  return "";
+}
+
+/** The school a child or teen attends at this age, from the profile. */
+function schoolAt(profile: Profile, age: number): string {
+  if (age < 7) return "";
+  return (age < 13 ? profile.elementary : age < 16 ? profile.middle : profile.high).trim();
+}
+
+/** Old enough to finish school: work full time, go to university, or drop out. A senior counts from exam season (빠른년생). */
+function canLeaveSchool(age: number, mi: number): boolean {
+  return age >= 18 || (age === 17 && mi % 12 >= 8);
+}
+
+/**
+ * Keeps the starting state possible for this age, whatever the narrator guessed.
+ * A 9-year-old is in elementary school with no job, partner, children or savings, even if the profile names a university.
+ */
+export function fitInitialToAge(init: OpeningResult["initial"], age: number, mi: number, profile: Profile): OpeningResult["initial"] {
+  const out = { ...init };
+  if (!canLeaveSchool(age, mi)) {
+    out.education = age < 16 ? "school" : "highschool";
+    out.school = schoolAt(profile, age);
+    Object.assign(out, { employed: false, jobTitle: "", company: "", monthlyIncome: 0, children: 0 });
+    out.wealth = Math.max(0, Math.min(300, out.wealth));
+    if (age < 16 || out.partner !== "dating") out.partner = "none";
+  } else if (out.education === "graduate" && age < 22) out.education = "university";
+  if (age < 20 && out.partner !== "none" && out.partner !== "dating") out.partner = "none";
+  return out;
+}
+
 // ── Opening ────────────────────────────────────────────
 
 /** Rough guess of where the user stood at the turning point, used when no AI is available. */
@@ -87,12 +126,13 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
 }
 
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음/;
+const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
 
 export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean } = {}): LifeState {
   const mi = turningPointMi(tp);
-  const init = opening.initial;
   const age = ageAt(profile.birthDate, mi);
+  const init = fitInitialToAge(opening.initial, age, mi, profile);
   const seed = newSeed();
   const rng = new Rng(seed ^ 0x2f6b);
   // A title like "취업 준비생" means not working, whatever the employed flag says.
@@ -176,10 +216,19 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
   };
 }
 
+/** Whether the choice's new school state is possible at this age; otherwise it is ignored ("same"). */
+function eduFits(edu: OpeningChoice["education"], s: LifeState): boolean {
+  const age = ageOf(s);
+  if (edu === "highschool") return age >= 15;
+  if (edu === "university" || edu === "done") return canLeaveSchool(age, s.mi);
+  if (edu === "graduate") return age >= 21;
+  return true;
+}
+
 function presetEffect(choice: OpeningChoice, s: LifeState): Effect {
   const effect = basePresetEffect(choice, s);
   const edu = choice.education;
-  if (!edu || edu === "same" || edu === s.flags.education) return effect;
+  if (!edu || edu === "same" || edu === s.flags.education || !eduFits(edu, s)) return effect;
   const years = edu === "university" ? 4 : edu === "graduate" ? 2 : 0;
   const enroll: Effect["enroll"] =
     edu === "university" ? { level: "university", pick: choice.original ? "profile" : "fit" } : edu === "graduate" ? { level: "graduate" } : undefined;
@@ -189,6 +238,14 @@ function presetEffect(choice: OpeningChoice, s: LifeState): Effect {
 function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
   const preset: Preset = choice.preset;
   const job = choice.jobTitle?.trim();
+  const age = ageOf(s);
+  // A child or teen can't take a job, stake savings or marry; the same leanings play out at their age.
+  if (!canLeaveSchool(age, s.mi)) {
+    if (preset === "career") return { text: "꿈꾸던 일을 향해 일찍부터 준비를 시작했다.", stats: { knowledge: 5, happiness: 4 } };
+    if (preset === "risk") return { text: "남들과 다른 길에 과감히 도전했다.", stats: { happiness: 6, knowledge: 5, relationships: -2 } };
+    if (preset === "love" && age < 16) return { text: "마음 가는 친구에게 먼저 다가갔다.", stats: { happiness: 6, relationships: 10 } };
+    if (preset === "rest") return { text: "잠시 멈춰 쉬기로 했다.", stats: { happiness: 8, knowledge: 2 } };
+  }
   switch (preset) {
     case "original":
       return { text: "결국 원래의 길을 다시 걸었다.", stats: { happiness: -2 } };
@@ -227,7 +284,7 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
       return {
         text: "마음이 이끄는 쪽을 택했다.",
         stats: { happiness: 8, relationships: 10 },
-        flags: { partner: s.flags.partner === "dating" ? "married" : "dating" },
+        flags: { partner: s.flags.partner === "dating" && age >= 20 ? "married" : "dating" },
       };
     case "move":
       return { text: "익숙한 곳을 떠났다.", stats: { happiness: 5, relationships: -6, knowledge: 4 } };
@@ -534,7 +591,8 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
     const choice = s.openingChoices[Number(optionId)];
     if (choice) {
       effect = presetEffect(choice, s);
-      if (choice.place?.trim()) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
+      // A kind of workplace ("대기업") only sets the league; a named one is where the choice leads.
+      if (choice.place?.trim() && !GENERIC_PLACE.test(choice.place.trim())) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
     }
   } else if (pending.custom?.[optionId]) {
     effect = customEffect(pending.custom[optionId]);
@@ -783,7 +841,10 @@ function drift(s: LifeState, months: number) {
   if (yearTurned && f.employed) s.income = Math.round(s.income * 1.015);
   if (f.retired && s.income === 0) s.income = 100;
   if (f.education === "graduate" && s.mi >= f.eduUntil + 24) f.education = "done";
-  if (f.education === "school" && age >= 16) f.education = "highschool";
+  if (f.education === "school" && age >= 16) {
+    f.education = "highschool";
+    f.school = s.profile.high.trim() || undefined;
+  }
   if (f.education === "highschool" && age >= 21) f.education = "done";
 }
 
@@ -1009,7 +1070,7 @@ export function statusLabel(s: LifeState): string {
   const f = s.flags;
   const parts: string[] = [];
   if (s.mi < f.busyUntil && f.military && ageOf(s) < 26) parts.push("군 복무 중");
-  else if (f.education === "school") parts.push("학생");
+  else if (f.education === "school") parts.push(lifeStage(ageOf(s)) || "학생");
   else if (f.education === "highschool") parts.push("고등학생");
   else if (f.education === "university") parts.push(f.school ? `${f.school} 재학` : "대학생");
   else if (f.education === "graduate") parts.push(f.school ? `${f.school} 재학` : "대학원생");
@@ -1036,7 +1097,7 @@ export function lifeFacts(s: LifeState): string {
   const age = ageOf(s);
   const kidAges = (f.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
   const study =
-    f.education === "school" ? "초·중학생" : f.education === "highschool" ? "고등학생" : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
+    f.education === "school" ? `${lifeStage(age) || "학생"}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? "고등학생" : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
   const work = f.retired
     ? `은퇴함, 연금 월 ${won(s.income)}`
     : f.employed

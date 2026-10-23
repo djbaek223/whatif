@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { lifeStage } from "../engine";
 import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, type NarrateRequest } from "./schema";
 
 // Both providers speak the OpenAI-compatible chat completions API.
@@ -101,12 +102,20 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
           "사용자의 프로필과 변곡점입니다. 그 시점으로 돌아간 장면을 준비해 주세요.",
           data("profile", req.profile),
           data("turning_point", req.turningPoint),
-          `변곡점 당시 나이: ${req.age}세`,
+          `변곡점 당시 나이: 만 ${req.age}세${lifeStage(req.age) ? ` (${lifeStage(req.age)})` : ""}`,
+          `situation, initial, choices는 모두 이 나이에 실제로 가능한 것이어야 합니다. 18세 미만은 대학생·직장인이 아니고, 결혼·자녀·자산이 없습니다. 예: 9세라면 초등학생으로서 학교, 가족, 친구, 학원, 놀이 같은 그 나이의 고민과 선택을 씁니다. 프로필의 대학이나 현재 직업은 아직 오지 않은 미래입니다.`,
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
           "능력치는 입력된 성향과 상황을 근거로 0~100 사이로 정하세요. initial은 변곡점 시점의 학업, 직업, 연애, 자녀, 자산 상태입니다.",
-          "choices에는 실제로 했던 선택(original=true) 하나와, 현실적으로 가능했던 다른 길 2개, 모두 정확히 3개를 넣으세요. 네 번째 길은 사용자가 직접 씁니다. 다른 길은 이 사람의 성향과 고민(regret)에서 나와야 합니다.",
+          "choices에는 실제로 했던 선택(original=true) 하나와, 현실적으로 가능했던 다른 길 2개, 모두 정확히 3개를 넣으세요. 네 번째 길은 사용자가 직접 씁니다.",
+          [
+            "다른 길 2개는 이 변곡점에만 해당하는 구체적인 선택이어야 합니다. '새로운 일을 시작한다', '삶의 터전을 옮긴다'처럼 어떤 상황에나 붙는 문장은 쓰지 마세요.",
+            "- situation에 사용자가 고민한 다른 길이 적혀 있으면 그 길을 첫 번째 다른 길로 넣으세요.",
+            "- 나머지 하나는 변곡점의 종류, 그때의 나이와 처지, 아쉬움(regret)에서 나오는, 그 시점에 실제로 고를 수 있었던 길입니다.",
+            "- 실제 선택과 같은 뜻의 길을 다시 넣지 마세요.",
+          ].join("\n"),
+          req.hints ? data("path_hints", req.hints) : "",
           "입학·취업·이직으로 이어지는 선택은 label에 실제 학교·회사 이름을 넣고 place에도 같은 이름을 쓰세요. 그때 실제로 존재했던 곳이어야 합니다.",
-        ].join("\n\n"),
+        ].filter(Boolean).join("\n\n"),
       );
     case "scene":
       return ask(
