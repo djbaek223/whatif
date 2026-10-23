@@ -1,9 +1,13 @@
 "use client";
 
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
-import { formatMi, formatWealth, payLabel, statusLabel } from "@/lib/engine";
-import type { LifeState, LogEntry } from "@/lib/types";
+import { formatMi, formatWealth, pendingKeyOf, payLabel, statusLabel } from "@/lib/engine";
+import { sceneOf, type SceneState } from "@/lib/scene";
+import { loadSoundPref, setSound, sfx } from "@/lib/sound";
+import type { LifeState, LogEntry, StatKey } from "@/lib/types";
+import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, SoundToggle, YearBanner } from "./GameFx";
+import { LifeScene } from "./LifeScene";
 import { Button, Card, DeltaChips, Spinner, StatBars, Textarea } from "./ui";
 
 export interface PlayHandlers {
@@ -40,6 +44,13 @@ export function PlayView({
   const [free, setFree] = useState("");
   const { following, jumpToLatest } = useFollowLatest(root);
   const age = ageOf(life);
+  const fx = usePlayFx(life);
+  const [sound, setSoundOn] = useState(loadSoundPref);
+  const pendingKey = pendingKeyOf(life);
+  // Each new choice card flips in with a whoosh.
+  useEffect(() => {
+    if (pendingKey) sfx.flip();
+  }, [pendingKey]);
 
   const pending = life.pending;
   const canAdvance = !pending && !life.dead && !presentOpen && !busy;
@@ -59,14 +70,29 @@ export function PlayView({
             </h1>
             <p className="truncate text-xs text-stone-500 dark:text-stone-400">{statusLabel(life)}</p>
           </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
-            <p className="text-xs text-stone-500 tabular-nums dark:text-stone-400">자산 {formatWealth(life.wealth)}</p>
-            {payLabel(life) && <p className="text-xs text-stone-500 tabular-nums dark:text-stone-400">{payLabel(life)}</p>}
+          <div className="flex shrink-0 items-start gap-1">
+            <div className="text-right">
+              <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
+              <p className="text-xs text-stone-500 tabular-nums dark:text-stone-400">자산 {formatWealth(life.wealth)}</p>
+              {payLabel(life) && <p className="text-xs text-stone-500 tabular-nums dark:text-stone-400">{payLabel(life)}</p>}
+            </div>
+            <SoundToggle
+              on={sound}
+              onToggle={() => {
+                setSound(!sound);
+                setSoundOn(!sound);
+              }}
+            />
           </div>
         </div>
+        <div className="mt-2">
+          <LifeScene scene={fx.scene} paused={!!pending || life.dead || presentOpen}>
+            {fx.banner && <YearBanner year={fx.banner} onDone={fx.clearBanner} />}
+            {fx.roll && <DiceRoll roll={fx.roll} onDone={fx.clearRoll} />}
+          </LifeScene>
+        </div>
         <div className="mt-3">
-          <StatBars stats={life.stats} compact />
+          <StatBars stats={life.stats} compact flash={fx.swing} flashKey={fx.swingKey} />
         </div>
       </header>
 
@@ -79,6 +105,7 @@ export function PlayView({
         </p>
         {presentOpen && <PresentCard life={life} onClose={handlers.onClosePresent} />}
       </div>
+      {fx.toast && <BadgeToast ids={fx.toast.ids} toastKey={fx.toast.key} onDone={fx.clearToast} />}
 
       <div className="sticky bottom-0 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pb-5 pt-3 backdrop-blur dark:border-stone-800">
         {!following && (
@@ -91,55 +118,65 @@ export function PlayView({
         )}
         {pending && !presentOpen ? (
           // Capped so the last option and the free-text box stay reachable on short screens; the panel scrolls inside.
-          <div className="-mx-4 max-h-[60dvh] space-y-3 overflow-y-auto overscroll-contain px-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">선택의 순간</p>
-              <h2 className="text-lg font-bold">{pending.title}</h2>
-              {sceneLoading ? (
-                <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
-                  <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                  <div className="h-3 w-11/12 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                  <div className="h-3 w-3/5 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                  <p className="pt-0.5 text-xs text-stone-500 dark:text-stone-400">장면을 그리는 중이에요</p>
+          <div className="card-flip -mx-4 max-h-[60dvh] overflow-y-auto overscroll-contain px-4">
+            <div key={pendingKey} className="card-flip-inner">
+              <div className="card-face space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">선택의 순간</p>
+                  <h2 className="text-lg font-bold">{pending.title}</h2>
+                  {sceneLoading ? (
+                    <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
+                      <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+                      <div className="h-3 w-11/12 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+                      <div className="h-3 w-3/5 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+                      <p className="pt-0.5 text-xs text-stone-500 dark:text-stone-400">장면을 그리는 중이에요</p>
+                    </div>
+                  ) : (
+                    <p className="mt-1 whitespace-pre-line leading-relaxed text-stone-700 dark:text-stone-300">{pending.scene}</p>
+                  )}
                 </div>
-              ) : (
-                <p className="mt-1 whitespace-pre-line leading-relaxed text-stone-700 dark:text-stone-300">{pending.scene}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              {pending.options.map((o) => (
-                <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => handlers.onChoose(o.id)}>
-                  {o.label}
-                  {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
-                </Button>
-              ))}
-            </div>
-            {ai && pending.freeText && (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Textarea
-                    rows={1}
-                    value={free}
-                    onChange={(e) => setFree(e.target.value)}
-                    placeholder="직접 쓰기: 나라면 이렇게 하겠다"
-                    aria-label="직접 쓰기"
-                    maxLength={200}
-                  />
+                <div className="space-y-2">
+                  {pending.options.map((o) => (
+                    <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => handlers.onChoose(o.id)}>
+                      {o.label}
+                      {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
+                    </Button>
+                  ))}
                 </div>
-                <Button
-                  variant="ghost"
-                  disabled={busy || free.trim().length < 2}
-                  onClick={() => {
-                    handlers.onChooseFree(free);
-                    setFree("");
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  {busy && <Spinner />}
-                  {busy ? "읽는 중" : "결정"}
-                </Button>
+                {ai && pending.freeText && (
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Textarea
+                        rows={1}
+                        value={free}
+                        onChange={(e) => setFree(e.target.value)}
+                        placeholder="직접 쓰기: 나라면 이렇게 하겠다"
+                        aria-label="직접 쓰기"
+                        maxLength={200}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      disabled={busy || free.trim().length < 2}
+                      onClick={() => {
+                        handlers.onChooseFree(free);
+                        setFree("");
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      {busy && <Spinner />}
+                      {busy ? "읽는 중" : "결정"}
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
+              <div
+                aria-hidden
+                className="card-back flex items-center justify-center rounded-2xl bg-indigo-600 text-4xl text-white/90 [background-image:repeating-linear-gradient(45deg,transparent_0_10px,rgb(255_255_255/0.08)_10px_20px)]"
+              >
+                ?
+              </div>
+            </div>
           </div>
         ) : life.dead ? (
           <p className="flex items-center justify-center gap-2 text-center text-stone-500 dark:text-stone-400" role="status">
@@ -174,6 +211,51 @@ export function PlayView({
       </div>
     </div>
   );
+}
+
+/**
+ * Watches the life for moments worth a little show: a new year, a choice's outcome, a badge, a big swing in a stat.
+ * Each is derived while rendering by comparing with what was last seen, so no effect has to set state.
+ */
+function usePlayFx(life: LifeState) {
+  const year = Math.floor(life.mi / 12);
+  const sceneKey = JSON.stringify(sceneOf(life));
+  const scene = useMemo(() => JSON.parse(sceneKey) as SceneState, [sceneKey]);
+
+  const [seen, setSeen] = useState({ year, log: life.log.length, badges: life.badges?.length ?? 0, stats: life.stats });
+  const [banner, setBanner] = useState<number | null>(null);
+  const [roll, setRoll] = useState<Roll | null>(null);
+  const [toast, setToast] = useState<{ ids: string[]; key: number } | null>(null);
+  const [swing, setSwing] = useState<Partial<Record<StatKey, "up" | "down">>>({});
+  const [swingKey, setSwingKey] = useState(0);
+
+  const badgeCount = life.badges?.length ?? 0;
+  if (seen.year !== year || seen.log !== life.log.length || seen.badges !== badgeCount || seen.stats !== life.stats) {
+    if (year > seen.year) setBanner(year);
+    // A choice just resolved: it logs the choice and then its outcome.
+    const added = life.log.slice(seen.log);
+    const outcome = added.findLast((e) => e.kind === "outcome");
+    if (outcome && added.some((e) => e.kind === "choice")) setRoll(rollOf(outcome, life.log.length));
+    if (badgeCount > seen.badges) setToast({ ids: life.badges!.slice(seen.badges).map((b) => b.id), key: badgeCount });
+    const sw = bigSwings(seen.stats, life.stats);
+    if (Object.keys(sw).length) {
+      setSwing(sw);
+      setSwingKey((k) => k + 1);
+    }
+    setSeen({ year, log: life.log.length, badges: badgeCount, stats: life.stats });
+  }
+
+  return {
+    scene,
+    banner,
+    clearBanner: useCallback(() => setBanner(null), []),
+    roll,
+    clearRoll: useCallback(() => setRoll(null), []),
+    toast,
+    clearToast: useCallback(() => setToast(null), []),
+    swing,
+    swingKey,
+  };
 }
 
 /**

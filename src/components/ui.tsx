@@ -116,7 +116,17 @@ export const STAT_COLORS: Record<StatKey, string> = {
   relationships: "var(--stat-relationships)",
 };
 
-export function StatBars({ stats, compact = false }: { stats: Stats; compact?: boolean }) {
+export function StatBars({
+  stats,
+  compact = false,
+  flash,
+  flashKey = 0,
+}: {
+  stats: Stats;
+  compact?: boolean;
+  flash?: Partial<Record<StatKey, "up" | "down">>; // gauges that just jumped or dropped a lot
+  flashKey?: number; // changes with every new swing so the glow plays again
+}) {
   return (
     <div className={`grid grid-cols-4 ${compact ? "gap-2" : "gap-3"}`}>
       {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
@@ -125,8 +135,11 @@ export function StatBars({ stats, compact = false }: { stats: Stats; compact?: b
             <span className="text-stone-500 dark:text-stone-400">{STAT_LABELS[k]}</span>
             <span className="font-semibold tabular-nums">{stats[k]}</span>
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
-            <div className="h-full transition-all duration-500" style={{ width: `${stats[k]}%`, background: STAT_COLORS[k] }} />
+          <div className="relative mt-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+              <div className="h-full transition-[width] duration-500" style={{ width: `${stats[k]}%`, background: STAT_COLORS[k] }} />
+            </div>
+            {flash?.[k] && <span key={flashKey} aria-hidden className={`pointer-events-none absolute inset-0 rounded-full stat-flash-${flash[k]}`} />}
           </div>
         </div>
       ))}

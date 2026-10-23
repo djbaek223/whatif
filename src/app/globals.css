@@ -48,3 +48,314 @@ body {
     transform: none;
   }
 }
+
+/* ── Play scene and game effects ─────────────────────────
+   Everything below animates transform or opacity only, so it stays on the compositor. */
+
+.scene-layer {
+  animation: scene-pan linear infinite;
+  will-change: transform;
+}
+@keyframes scene-pan {
+  to {
+    transform: translate3d(-33.3333%, 0, 0);
+  }
+}
+
+.walk .leg,
+.walk .arm {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: swing 0.55s ease-in-out infinite alternate;
+}
+.walk .leg-b,
+.walk .arm-a {
+  animation-direction: alternate-reverse;
+}
+@keyframes swing {
+  from {
+    transform: rotate(18deg);
+  }
+  to {
+    transform: rotate(-18deg);
+  }
+}
+.walk .bob {
+  animation: bob 0.275s ease-in-out infinite alternate;
+}
+.walk .bob-slow {
+  animation-duration: 0.45s;
+}
+@keyframes bob {
+  to {
+    transform: translateY(-0.8px);
+  }
+}
+.walk .tail {
+  transform-box: fill-box;
+  transform-origin: 100% 100%;
+  animation: swing 0.3s ease-in-out infinite alternate;
+}
+.walk .wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.smoke {
+  animation: smoke 3.2s ease-out infinite;
+}
+@keyframes smoke {
+  from {
+    transform: translateY(0) scale(0.6);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(-14px) scale(1.6);
+    opacity: 0;
+  }
+}
+.drone {
+  animation: hover 1.6s ease-in-out infinite alternate;
+}
+@keyframes hover {
+  to {
+    transform: translateY(-3px);
+  }
+}
+.sun-rays {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 18s linear infinite;
+}
+
+/* Stopped at a choice: the street stands still, the weather keeps falling. */
+.scene-paused .scene-layer,
+.scene-paused .walk *,
+.scene-paused .smoke {
+  animation-play-state: paused;
+}
+
+.fx-particle {
+  position: absolute;
+  top: -12px;
+  animation: fall linear infinite;
+  will-change: transform;
+}
+@keyframes fall {
+  from {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(-24px, 170px, 0) rotate(300deg);
+  }
+}
+.fx-rain {
+  animation-name: rain;
+  opacity: 0.8;
+}
+@keyframes rain {
+  from {
+    transform: translate3d(0, 0, 0) rotate(12deg);
+  }
+  to {
+    transform: translate3d(-30px, 170px, 0) rotate(12deg);
+  }
+}
+.fx-snow {
+  animation-name: snow;
+  opacity: 0.95;
+}
+@keyframes snow {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(8px, 85px, 0);
+  }
+  to {
+    transform: translate3d(-4px, 170px, 0);
+  }
+}
+.fx-glint {
+  animation-name: glint;
+}
+@keyframes glint {
+  0%,
+  100% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+
+/* A new year: the number rises over the scene and fades. */
+.year-banner {
+  animation: year-banner 0.9s ease-out both;
+}
+@keyframes year-banner {
+  0% {
+    transform: translateY(14px) scale(0.85);
+    opacity: 0;
+  }
+  25% {
+    transform: none;
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}
+
+/* The choice card turns over to reveal its face. */
+.card-flip {
+  perspective: 900px;
+}
+.card-flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  animation: card-flip 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.card-face {
+  backface-visibility: hidden;
+}
+.card-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+}
+@keyframes card-flip {
+  from {
+    transform: rotateY(180deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
+}
+
+/* A die that tumbles for a moment, then lands. */
+.dice-roll {
+  animation: dice-roll 0.5s cubic-bezier(0.3, 0.6, 0.4, 1) both;
+}
+@keyframes dice-roll {
+  from {
+    transform: rotate(-540deg) scale(0.4);
+  }
+  to {
+    transform: rotate(0) scale(1);
+  }
+}
+.dice-pop {
+  animation: dice-pop 0.9s ease-out both;
+}
+@keyframes dice-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Gauges glow when a stat jumps or drops by a lot. */
+.stat-flash-up {
+  animation: flash-up 0.8s ease-out;
+}
+.stat-flash-down {
+  animation: flash-down 0.8s ease-out;
+}
+@keyframes flash-up {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px rgb(16 185 129 / 0.7), 0 0 10px rgb(16 185 129 / 0.8);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+@keyframes flash-down {
+  0%,
+  60% {
+    box-shadow: 0 0 0 2px rgb(244 63 94 / 0.7), 0 0 10px rgb(244 63 94 / 0.8);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* Achievement: confetti bursts and a badge drops in. */
+.confetti {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  animation: confetti 1.4s cubic-bezier(0.2, 0.6, 0.4, 1) both;
+  will-change: transform, opacity;
+}
+@keyframes confetti {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(var(--rot));
+    opacity: 0;
+  }
+}
+.badge-toast {
+  animation: badge-toast 2.4s ease-out both;
+}
+@keyframes badge-toast {
+  0% {
+    transform: translateY(-16px) scale(0.8);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(0) scale(1.06);
+    opacity: 1;
+  }
+  20%,
+  85% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-layer,
+  .walk *,
+  .smoke,
+  .drone,
+  .sun-rays,
+  .fx-particle,
+  .card-flip-inner,
+  .dice-roll,
+  .confetti {
+    animation: none !important;
+  }
+  .fx-particle,
+  .confetti {
+    display: none;
+  }
+}
