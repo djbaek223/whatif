@@ -555,6 +555,7 @@ export const LIFE_EVENTS: EventDef[] = [
       text: "손주가 태어났다. 작은 손이 내 손가락을 꼭 쥐었다.",
       alt: ["손주가 처음으로 '할머니', '할아버지'라고 불렀다."],
       stats: { happiness: 8, relationships: 5 },
+      mark: "grandchild",
     },
   },
   // ── 부모와 형제 ─────────────────────────────────────
@@ -1118,6 +1119,7 @@ export const LIFE_EVENTS: EventDef[] = [
       text: "20년 만의 동창회에 나갔다. 다들 많이 변했고, 또 그대로였다.",
       alt: ["단톡방에서 옛 친구들과 밤새 추억 이야기를 했다.", "동창회에서 첫사랑 소식을 들었다."],
       stats: { relationships: 4, happiness: 2 },
+      mark: "reunion", // a classmate may come back with a business idea (moreEvents: biz-offer)
     },
   },
   {

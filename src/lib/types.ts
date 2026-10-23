@@ -137,6 +137,34 @@ export interface PendingChoice {
   options: PendingOption[];
   freeText: boolean;
   custom?: Record<string, CustomOption>; // AI-written moments carry their own effects
+  rare?: boolean; // shown on a special card and kept for the ending
+  tone?: string; // AI moments: 유쾌함, 뭉클함, 긴장감, 담담함
+  small?: boolean; // a small two-way dilemma rather than a life fork
+}
+
+/** What an event is about, for spreading events evenly over a life: daily life, people, work, money, health, the times, luck. */
+export type Category = "daily" | "relation" | "work" | "money" | "health" | "era" | "chance";
+
+export const CATEGORY_LABELS: Record<Category, string> = {
+  daily: "일상",
+  relation: "관계",
+  work: "일",
+  money: "돈",
+  health: "건강",
+  era: "시대",
+  chance: "우연",
+};
+
+/** Temperament axes read from MBTI and self-description, each -1..1. */
+export type Axis = "outgoing" | "bold" | "careful" | "warm";
+export type Temper = Record<Axis, number>;
+
+/** A rare moment (1% a year or less), kept for the ending. */
+export interface RareMoment {
+  mi: number;
+  age: number;
+  title: string;
+  text: string;
 }
 
 export type LogKind = "era" | "news" | "turn" | "event" | "choice" | "outcome" | "milestone" | "present" | "death";
@@ -148,6 +176,7 @@ export interface LogEntry {
   delta?: Partial<Stats>;
   tag?: string; // news category and month, e.g. "스포츠 · 6월"
   money?: number; // 만원 change in wealth caused by this entry
+  rare?: boolean; // a rare moment, shown on a special card
 }
 
 export interface ChoiceRecord {
@@ -182,6 +211,13 @@ export interface LifeState {
   traits?: Traits; // from MBTI and self-description
   leanings?: Partial<Record<Theme, number>>; // what past choices leaned toward
   ai?: boolean; // AI narration on: allows moments written for this life
+  // Added with the larger event pool; optional so older saves still load.
+  temper?: Temper;
+  counts?: Record<string, number>; // times each event has happened
+  marks?: Record<string, number>; // month index when a chain step happened, e.g. "biz-offer"
+  seeds?: string[]; // people and threads from earlier events the narrator can pick up again
+  recent?: string[]; // "category:keyword,keyword" of recent moments, so the narrator avoids repeats
+  rares?: RareMoment[];
 }
 
 export interface Ending {

@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "simulate": "tsx scripts/simulate.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:events": "tsx scripts/validate-events.ts"
   },
   "dependencies": {
     "next": "16.4.2",

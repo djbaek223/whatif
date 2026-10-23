@@ -73,6 +73,23 @@ export function EndingView({
         <LifeChart life={life} />
       </Card>
 
+      {!!life.rares?.length && (
+        <Card className="border-2 border-amber-400 dark:border-amber-500">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간 · {life.rares.length}번</p>
+          <ol className="mt-3 space-y-3">
+            {life.rares.map((r, i) => (
+              <li key={i} className="flex gap-3 text-sm">
+                <span className="w-12 shrink-0 font-semibold tabular-nums text-stone-500 dark:text-stone-400">{r.age}세</span>
+                <span>
+                  <b>{r.title}</b>
+                  <span className="block leading-relaxed text-stone-600 dark:text-stone-300">{r.text}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
+
       <Card>
         <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">내가 한 선택들</p>
         <ol className="mt-3 space-y-2">
