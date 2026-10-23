@@ -57,8 +57,14 @@ export type SceneResult = z.infer<typeof SceneSchema>;
 const CHANGES = ["none", "hire", "switchJob", "quitJob", "enrollUniversity", "enrollGraduate", "buyHome", "addChild", "startDating", "marry", "retire"] as const;
 const THEMES = ["career", "study", "family", "love", "risk", "money", "health", "leisure"] as const;
 
+const CATEGORIES = ["daily", "relation", "work", "money", "health", "era", "chance"] as const;
+
 export const MomentSchema = z.object({
   title: z.string().describe("이 순간의 제목, 15자 이내"),
+  type: z.enum(CATEGORIES).describe("이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연"),
+  keywords: z.array(z.string()).describe("이 순간의 핵심 키워드 2~3개, 각각 한두 단어 (예: 동업, 대학 동기)"),
+  tone: z.string().describe("이 장면의 톤 하나: 유쾌함, 뭉클함, 긴장감, 담담함 중에서"),
+  rarity: z.enum(["common", "rare"]).describe("평생 한 번 있을까 말까 한 드문 일이면 rare, 대부분은 common"),
   scene: z.string().describe("이 사람의 현재 상태, 성향, 지난 선택에서 자연스럽게 생긴 갈림길을 2인칭으로 그리는 2~4문장"),
   options: z
     .array(
@@ -105,7 +111,8 @@ export type NarrateRequest =
       intro: string;
       options: { id: string; label: string; detail?: string }[];
       eraHints: string[];
+      seeds?: string[];
     }
-  | { kind: "moment"; summary: string; facts: string; persona: string; allowed: string[]; recentTitles: string[]; eraHints: string[] }
+  | { kind: "moment"; summary: string; facts: string; persona: string; allowed: string[]; recent: string[]; seeds: string[]; eraHints: string[] }
   | { kind: "classify"; text: string; options: { id: string; label: string }[] }
   | { kind: "ending"; summary: string; persona: string; profile: unknown; turningPoint: unknown; deathAge: number };

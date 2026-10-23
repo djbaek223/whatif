@@ -17,9 +17,10 @@ import {
 import { EVENTS, ageAt, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth } from "./format";
 import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
-import { affinity, effectTheme, eventTheme, lean, relativeAffinity, traitsFrom } from "./personal";
+import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
 import { Rng, newSeed } from "./rng";
 import type {
+  Category,
   CustomChange,
   CustomOption,
   LifeFlags,
@@ -206,6 +207,12 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     traits: traitsFrom(profile, opening.persona),
     leanings: {},
     ai: opts.ai,
+    temper: temperFrom(profile, opening.persona),
+    counts: {},
+    marks: {},
+    seeds: [],
+    recent: [],
+    rares: [],
   };
 }
 
@@ -472,6 +479,8 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
     out.texts.push(`집 시세 ${won(before)} → ${won(s.flags.homeValue)}.`);
   }
   if (effect.intense) s.intenseUntil = Math.max(s.intenseUntil, s.mi + effect.intense);
+  if (effect.mark) s.marks = { ...s.marks, [effect.mark]: s.mi };
+  if (effect.seed) addSeed(s, labelOf(effect.seed, s));
   if (effect.risk) {
     const ok = rng.chance(effect.risk.chance(s));
     // The plan names what the option promised, which is the success branch.
@@ -492,6 +501,26 @@ function applyTop(s: LifeState, effect: Effect, rng: Rng, plan?: OptionPlan): { 
 }
 
 const clone = (s: LifeState): LifeState => structuredClone(s);
+
+const MAX_SEEDS = 8;
+
+/** Remembers a person or thread for the narrator to pick up later; the oldest ones drop off. */
+function addSeed(s: LifeState, seed: string) {
+  if (!seed) return;
+  s.seeds = [...(s.seeds ?? []).filter((x) => x !== seed), `${ageOf(s)}세: ${seed}`].slice(-MAX_SEEDS);
+}
+
+const MAX_RECENT = 12;
+
+/** Logs what a moment was about as "category:keywords", for the narrator's no-repeat list. */
+export function noteRecent(s: LifeState, category: string, keywords: string[], tone?: string) {
+  const entry = `${category}:${keywords.slice(0, 3).join(",")}${tone ? `(${tone})` : ""}`;
+  s.recent = [...(s.recent ?? []), entry].slice(-MAX_RECENT);
+}
+
+function noteRare(s: LifeState, title: string, text: string) {
+  s.rares = [...(s.rares ?? []), { mi: s.mi, age: ageOf(s), title, text: text.split("\n")[0].slice(0, 160) }];
+}
 
 const labelOf = (label: string | ((s: LifeState) => string), s: LifeState) => (typeof label === "function" ? label(s) : label);
 
@@ -530,6 +559,8 @@ export function planDetail(p: OptionPlan | undefined): string | undefined {
 /** Lists the choices of an event that apply to this life right now, with names and money filled in. */
 export function pendingFor(ev: EventDef, s: LifeState, rng: Rng = new Rng(s.rng)): PendingChoice {
   return {
+    ...(ev.rare ? { rare: true } : {}),
+    ...(ev.small ? { small: true } : {}),
     eventId: ev.id,
     title: ev.title,
     scene: labelOf(ev.intro, s),
@@ -574,7 +605,8 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
   if (effect) {
     lean(s, option?.theme ?? effectTheme(effect));
     const applied = applyTop(s, effect, rng, plan);
-    s.log.push({ mi: s.mi, kind: "outcome", ...applied });
+    s.log.push({ mi: s.mi, kind: "outcome", ...applied, ...(pending.rare ? { rare: true } : {}) });
+    if (pending.rare) noteRare(s, pending.title, applied.text);
   }
   s.pending = null;
   s.rng = rng.state;
@@ -645,6 +677,7 @@ function customEffect(c: CustomOption): Effect {
 }
 
 const THEME_SET = new Set<Theme>(["career", "study", "family", "love", "risk", "money", "health", "leisure"]);
+const CATEGORY_SET = new Set<Category>(["daily", "relation", "work", "money", "health", "era", "chance"]);
 
 /** Turns the AI's moment into a choice, dropping changes that don't fit this life and capping every number. */
 export function fillMoment(state: LifeState, key: string, res: MomentResult): LifeState | null {
@@ -689,7 +722,20 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
     options.push({ id, label: o.label.trim().slice(0, 40), theme, ...(plan ? { plan, detail: planDetail(plan) } : {}) });
   }
   if (options.length < 2) return null;
-  s.pending = { ...s.pending!, title: res.title.trim().slice(0, 24) || s.pending!.title, scene: res.scene.trim() || s.pending!.scene, options, custom };
+  // Rare moments stay rare: at most two in a life, whatever the narrator says.
+  const rare = res.rarity === "rare" && (s.rares?.length ?? 0) < 2;
+  const tone = res.tone?.trim().slice(0, 8) || undefined;
+  s.pending = {
+    ...s.pending!,
+    title: res.title.trim().slice(0, 24) || s.pending!.title,
+    scene: res.scene.trim() || s.pending!.scene,
+    options,
+    custom,
+    ...(rare ? { rare } : {}),
+    ...(tone ? { tone } : {}),
+  };
+  const keywords = (res.keywords ?? []).map((k) => k.trim().slice(0, 12)).filter(Boolean);
+  noteRecent(s, CATEGORY_SET.has(res.type as Category) ? res.type : "daily", keywords.length ? keywords : [s.pending.title], tone);
   const last = s.log.at(-1);
   if (last?.kind === "event" && last.mi === s.mi && last.text === state.pending.title) last.text = s.pending.title;
   return s;
@@ -900,6 +946,10 @@ function eventChance(ev: EventDef, s: LifeState, months: number): number {
   // Temperament and past choices: someone who keeps choosing work meets more work moments, and so on.
   // Life-stage forks that are due anyway (exams, graduation) are left alone.
   if (perYear < 0.85) perYear *= Math.max(0.5, 1 + relativeAffinity(s, eventTheme(ev)) * 1.5);
+  // Temperament: an outgoing person meets more gatherings, a careful one fewer scams, and so on.
+  perYear *= temperFactor(s, ev.temper ?? ID_TEMPER[ev.id]);
+  // Rare stays rare: never more than 1% a year, whatever the leanings.
+  if (ev.rare) perYear = Math.min(0.01, perYear);
   return 1 - Math.pow(1 - Math.max(0, Math.min(1, perYear)), months / 12);
 }
 
@@ -909,8 +959,16 @@ function eligible(ev: EventDef, s: LifeState, age: number): boolean {
   if ((s.cooldowns[ev.id] ?? -1) > s.mi) return false;
   if (ev.when && !ev.when(s, age)) return false;
   if (ev.choices && s.mi < s.flags.busyUntil) return false;
+  // Nothing happens more than three times in a life, apart from life-stage events that must come back.
+  if (!ev.repeatable && (s.counts?.[ev.id] ?? 0) >= MAX_REPEATS) return false;
+  // Small dilemmas share one clock, so they come about once every year or two.
+  if (ev.small && (s.cooldowns[SMALL_CLOCK] ?? -1) > s.mi) return false;
   return true;
 }
+
+const MAX_REPEATS = 3;
+const SMALL_CLOCK = "small-dilemma";
+const SMALL_GAP = 12; // months
 
 export type StopReason = "choice" | "death" | "present" | null;
 
@@ -946,6 +1004,9 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
       if (!eligible(ev, s, age) || !rng.chance(eventChance(ev, s, months))) continue;
       if (ev.once) s.done.push(ev.id);
       if (ev.cooldown) s.cooldowns[ev.id] = s.mi + ev.cooldown;
+      if (ev.small) s.cooldowns[SMALL_CLOCK] = s.mi + SMALL_GAP;
+      s.counts = { ...s.counts, [ev.id]: (s.counts?.[ev.id] ?? 0) + 1 };
+      if (ev.id !== "personal") noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
       happened = true;
       if (ev.choices) {
         s.pending = pendingFor(ev, s, rng);
@@ -954,7 +1015,9 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
         break;
       }
       if (ev.effect) {
-        entries.push({ mi: s.mi, kind: "event", ...applyTop(s, ev.effect, rng) });
+        const applied = applyTop(s, ev.effect, rng);
+        entries.push({ mi: s.mi, kind: "event", ...applied, ...(ev.rare ? { rare: true } : {}) });
+        if (ev.rare) noteRare(s, ev.title, applied.text);
         passive = true;
       }
     }

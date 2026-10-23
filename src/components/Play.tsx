@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, pendingKeyOf, payLabel, statusLabel } from "@/lib/engine";
 import { sceneOf, type SceneState } from "@/lib/scene";
@@ -118,11 +118,17 @@ export function PlayView({
         )}
         {pending && !presentOpen ? (
           // Capped so the last option and the free-text box stay reachable on short screens; the panel scrolls inside.
-          <div className="card-flip -mx-4 max-h-[60dvh] overflow-y-auto overscroll-contain px-4">
+          <div
+            className={`card-flip -mx-4 max-h-[60dvh] overflow-y-auto overscroll-contain px-4 ${pending.rare ? "rounded-2xl border-2 border-amber-400 bg-amber-50/70 py-3 dark:border-amber-500 dark:bg-amber-950/40" : ""}`}
+          >
             <div key={pendingKey} className="card-flip-inner">
               <div className="card-face space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">선택의 순간</p>
+                  {pending.rare ? (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">✦ 희귀한 순간</p>
+                  ) : (
+                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-400">{pending.small ? "작은 선택" : "선택의 순간"}</p>
+                  )}
                   <h2 className="text-lg font-bold">{pending.title}</h2>
                   {sceneLoading ? (
                     <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
@@ -340,6 +346,7 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
         </>
       );
     case "event":
+      if (entry.rare) return <RareLine date={date} entry={entry} />;
       return (
         <>
           {date}
@@ -357,6 +364,7 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
         </>
       );
     case "outcome":
+      if (entry.rare) return <RareLine date={date} entry={entry} />;
       return (
         <>
           {date}
@@ -382,6 +390,21 @@ function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
         </>
       );
   }
+}
+
+function RareLine({ date, entry }: { date: ReactNode; entry: LogEntry }) {
+  return (
+    <>
+      {date}
+      <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-500 dark:bg-amber-950/50">
+        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간</p>
+        <p className="mt-0.5 font-semibold leading-relaxed">
+          {entry.text}
+          <DeltaChips delta={entry.delta} money={entry.money} />
+        </p>
+      </div>
+    </>
+  );
 }
 
 function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }) {

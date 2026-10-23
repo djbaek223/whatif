@@ -233,10 +233,10 @@ export default function Game() {
     if (!life?.pending || personalized.current === key) return;
     personalized.current = key;
     const pending = life.pending;
+    const seeds = life.seeds ?? [];
     const common = { summary: lifeSummary(life), facts: lifeFacts(life), persona: life.persona, eraHints: eraHints(Math.floor(life.mi / 12)) };
     if (pending.eventId === "personal") {
-      const recentTitles = life.choices.slice(-8).map((c) => c.title);
-      const res = await narrate<MomentResult>({ kind: "moment", ...common, allowed: allowedChanges(life), recentTitles });
+      const res = await narrate<MomentResult>({ kind: "moment", ...common, allowed: allowedChanges(life), recent: life.recent ?? [], seeds });
       // An unwritten moment is dropped as if it never happened, so play goes on.
       setLife((cur) => (cur && pendingKeyOf(cur) === key ? ((res && fillMoment(cur, key, res)) ?? dropPending(cur)) : cur));
     } else {
@@ -245,6 +245,7 @@ export default function Game() {
         ...common,
         title: pending.title,
         intro: pending.scene,
+        seeds,
         options: pending.options.map(({ id, label, detail }) => ({ id, label, ...(detail ? { detail } : {}) })),
       });
       if (res) setLife((cur) => (cur ? fillScene(cur, key, res) : cur));

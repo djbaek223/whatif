@@ -1,7 +1,8 @@
 import type { CompanyTier } from "./catalog";
 import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
-import type { LifeFlags, LifeState, Stats, Theme } from "./types";
+import { MORE_EVENTS } from "./moreEvents";
+import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
 
 type Dyn<T> = T | ((s: LifeState) => T);
 
@@ -27,6 +28,8 @@ export interface Effect {
   buyHome?: "best" | "cheap";
   homeValuePct?: number; // change in the home's price; the gain or loss lands in wealth
   note?: string; // what a cost was for, shown with the amount
+  mark?: string; // remembers when this happened, so a later event in a chain can follow it
+  seed?: Dyn<string>; // a person or thread the narrator can bring back later
 }
 
 export interface ChoiceDef {
@@ -49,6 +52,12 @@ export interface EventDef {
   theme?: Theme;
   choices?: ChoiceDef[];
   effect?: Effect; // passive events apply this without asking
+  category?: Category; // read from the theme when missing
+  keywords?: string[]; // what it is about, for the narrator's no-repeat list
+  temper?: Partial<Record<Axis, number>>; // e.g. { outgoing: 0.8 }: more likely for outgoing people, less for reserved
+  rare?: boolean; // 1% a year or less; shown on a special card and listed in the ending
+  small?: boolean; // a two-way everyday dilemma; these share one cooldown so they come about once every year or two
+  repeatable?: boolean; // life-stage events that may need to come back more than three times (job search, promotion)
 }
 
 const knowledgeOdds = (base: number) => (s: LifeState) =>
@@ -299,6 +308,7 @@ export const EVENTS: EventDef[] = [
     maxAge: 50,
     perYear: 0.8,
     cooldown: 12,
+    repeatable: true,
     when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done",
     intro: (s) => `통장 잔고가 줄어들고 있다${s.wealth < 1000 ? ` (남은 자산 ${formatWealth(s.wealth)})` : ""}.${s.flags.children ? ` ${s.flags.children > 1 ? `아이 ${s.flags.children}명을` : "아이를"} 키우려면` : ""} 일을 구해야 한다.`,
     choices: [
@@ -520,6 +530,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.35,
     cooldown: 12,
     when: (s) => s.flags.partner === "none" || s.flags.partner === "divorced" || s.flags.partner === "widowed",
+    repeatable: true, // comes back until it is settled
     intro: "자꾸 눈길이 가는 사람이 생겼다.",
     choices: [
       {
@@ -554,6 +565,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.45,
     cooldown: 12,
     when: (s) => s.flags.partner === "dating",
+    repeatable: true, // comes back until it is settled
     intro: "연인과 결혼 이야기가 오가기 시작했다.",
     choices: [
       {
@@ -588,6 +600,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.3,
     cooldown: 18,
     when: (s) => s.flags.partner === "married" && s.flags.children < 3 && !s.flags.noKids,
+    repeatable: true, // comes back until it is settled
     intro: (s) => {
       const n = s.flags.children;
       const work = !s.flags.employed && !s.flags.retired ? " 아직 일자리를 찾는 중이라 마음이 복잡하다." : "";
@@ -687,6 +700,7 @@ export const EVENTS: EventDef[] = [
     perYear: 0.15,
     cooldown: 36,
     when: (s) => !s.flags.homeOwner && s.wealth > 8000,
+    repeatable: true, // comes back until it is settled
     intro: (s) => `전세 계약 만료가 다가온다. 모아둔 돈은 ${formatWealth(s.wealth)}. 집값 이야기가 끊이지 않는다.`,
     choices: [
       {
@@ -834,6 +848,7 @@ export const EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: (s) => 0.12 + (s.stats.knowledge - 50) / 500,
     cooldown: 24,
+    repeatable: true,
     when: (s) => s.flags.employed,
     intro: "",
     effect: { text: "책임도 월급도 늘었다.", stats: { happiness: 5 }, incomePct: 1.12, promote: true },
@@ -887,6 +902,7 @@ export const EVENTS: EventDef[] = [
     maxAge: 50,
     perYear: 0.9,
     cooldown: 14,
+    repeatable: true,
     when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done" && (s.flags.kidsBorn ?? []).some((b) => s.mi - b < 12),
     intro: "아이가 태어났지만 아직 일자리가 없다. 육아와 구직을 어떻게 할지 정해야 한다.",
     theme: "family",
@@ -914,11 +930,13 @@ export const EVENTS: EventDef[] = [
     maxAge: 95,
     perYear: 0.3,
     cooldown: 20,
+    repeatable: true, // each one is written fresh
     when: (s) => !!s.ai,
     intro: "",
     choices: [],
   },
   ...LIFE_EVENTS,
+  ...MORE_EVENTS,
 ];
 
 export function ageOf(s: LifeState): number {
