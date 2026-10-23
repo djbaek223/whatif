@@ -38,7 +38,7 @@ export const OpeningSchema = z.object({
           .describe("이 선택 직후의 학업 상태. 바뀌지 않으면 same. 예: 대학 진학 → university, 재수 → highschool, 취업 → done"),
       }),
     )
-    .describe("3~4개. 실제 했던 선택 하나와, 다른 길 2~3개"),
+    .describe("정확히 3개. 실제 했던 선택 하나와, 다른 길 2개. 그 밖의 길은 사용자가 직접 씁니다"),
 });
 export type OpeningResult = z.infer<typeof OpeningSchema>;
 

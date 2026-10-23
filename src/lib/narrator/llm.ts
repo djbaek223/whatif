@@ -104,7 +104,7 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
           `변곡점 당시 나이: ${req.age}세`,
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
           "능력치는 입력된 성향과 상황을 근거로 0~100 사이로 정하세요. initial은 변곡점 시점의 학업, 직업, 연애, 자녀, 자산 상태입니다.",
-          "choices에는 실제로 했던 선택(original=true) 하나와, 현실적으로 가능했던 다른 길 2~3개를 넣으세요. 다른 길은 이 사람의 성향과 고민(regret)에서 나와야 합니다.",
+          "choices에는 실제로 했던 선택(original=true) 하나와, 현실적으로 가능했던 다른 길 2개, 모두 정확히 3개를 넣으세요. 네 번째 길은 사용자가 직접 씁니다. 다른 길은 이 사람의 성향과 고민(regret)에서 나와야 합니다.",
           "입학·취업·이직으로 이어지는 선택은 label에 실제 학교·회사 이름을 넣고 place에도 같은 이름을 쓰세요. 그때 실제로 존재했던 곳이어야 합니다.",
         ].join("\n\n"),
       );
