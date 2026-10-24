@@ -13,6 +13,7 @@ import {
   dropPending,
   fillMoment,
   fillScene,
+  isBigChoice,
   lifeFacts,
   lifeSummary,
   pendingKeyOf,
@@ -30,7 +31,7 @@ import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
-import { PlayView } from "./Play";
+import { PlayView, type Speed } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
 
@@ -57,6 +58,7 @@ export default function Game() {
   const [remember, setRemember] = useState(false);
   const [auto, setAuto] = useState(false);
   const [autoDecide, setAutoDecide] = useState(false);
+  const [speed, setSpeed] = useState<Speed>(1);
   const [busy, setBusy] = useState(false);
   const [sceneDone, setSceneDone] = useState<string | null>(null);
   const [presentOpen, setPresentOpen] = useState(false);
@@ -203,12 +205,12 @@ export default function Game() {
   }
 
   // Auto play: one turn per tick until the player turns it off. A choice or the present-day card pauses it,
-  // and it carries on once they're answered (or right away with auto-decide).
+  // and it carries on once they're answered (or right away with auto-decide, except for the big forks).
   const tick = useEffectEvent(() => {
     if (!life || life.dead) return setAuto(false);
     if (presentOpen) return;
     if (life.pending) {
-      if (!autoDecide || sceneLoading) return;
+      if (!autoDecide || sceneLoading || isBigChoice(life.pending)) return;
       const id = autoPick(life);
       if (id) choose(id);
       return;
@@ -218,15 +220,15 @@ export default function Game() {
 
   useEffect(() => {
     if (!auto || screen !== "play") return;
-    const t = setInterval(tick, 450);
+    const t = setInterval(tick, 800 / speed);
     return () => clearInterval(t);
-  }, [auto, screen]);
+  }, [auto, screen, speed]);
 
   // Ask the narrator to write the scene and personalize the options for each new choice event.
   // A "personal" moment has no options until the narrator writes them from this life's state, so it always waits.
   const pendingKey = life ? pendingKeyOf(life) : null;
   const isMoment = life?.pending?.eventId === "personal";
-  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(auto && autoDecide));
+  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(auto && autoDecide && !isBigChoice(life.pending)));
   const sceneLoading = wantsScene && sceneDone !== pendingKey;
 
   const personalize = useEffectEvent(async (key: string) => {
@@ -259,7 +261,7 @@ export default function Game() {
   }, [pendingKey, wantsScene]);
 
   return (
-    <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : "max-w-2xl"}`}>
+    <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : screen === "play" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
       {screen === "intro" && (
         <div className="flex flex-1 flex-col justify-center gap-10 py-16">
           <div>
@@ -345,6 +347,7 @@ export default function Game() {
           ai={ai}
           auto={auto}
           autoDecide={autoDecide}
+          speed={speed}
           busy={busy}
           sceneLoading={sceneLoading}
           presentOpen={presentOpen}
@@ -353,6 +356,7 @@ export default function Game() {
             onSkip: skip,
             onToggleAuto: () => setAuto((a) => !a),
             onToggleAutoDecide: () => setAutoDecide((a) => !a),
+            onSpeed: setSpeed,
             onChoose: (id) => choose(id),
             onChooseFree: chooseFree,
             onClosePresent: () => setPresentOpen(false),

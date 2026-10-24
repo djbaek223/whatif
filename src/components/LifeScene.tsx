@@ -20,11 +20,11 @@ const MOUNTAIN: Record<Season, string> = { spring: "#a3c9ab", sunny: "#73b083", 
 const CANOPY: Record<Season, string> = { spring: "#f6b3cc", sunny: "#4caf50", rain: "#3e8b4a", autumn: "#e8892f", snow: "#eef3f8" };
 const SEASON_LABEL: Record<Season, string> = { spring: "봄 🌸", sunny: "여름 ☀️", rain: "장마 ☔", autumn: "가을 🍁", snow: "겨울 ❄️" };
 
-export const LifeScene = memo(function LifeScene({ scene, paused, children }: { scene: SceneState; paused: boolean; children?: ReactNode }) {
+export const LifeScene = memo(function LifeScene({ scene, paused, slim = false, children }: { scene: SceneState; paused: boolean; slim?: boolean; children?: ReactNode }) {
   const [top, bottom] = SKY[scene.season];
   return (
     <div
-      className={`relative h-[104px] overflow-hidden rounded-xl sm:h-[140px] ${paused ? "scene-paused" : ""}`}
+      className={`relative overflow-hidden rounded-xl transition-[height] duration-300 motion-reduce:transition-none lg:h-[140px] ${slim ? "h-[52px]" : "h-[104px] sm:h-[140px]"} ${paused ? "scene-paused" : ""}`}
       style={{ background: `linear-gradient(${top}, ${bottom})` }}
       role="img"
       aria-label={`${scene.year}년 ${scene.month}월, ${SEASON_LABEL[scene.season].split(" ")[0]}의 거리를 걷는 모습`}

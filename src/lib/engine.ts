@@ -1051,6 +1051,15 @@ export function advanceUntilStop(state: LifeState, maxTurns = 400): { state: Lif
   return { state: cur, stop: null };
 }
 
+// Life forks from the main event list: where to study, work, live, whom to marry, whether to have a child.
+const BIG_EVENTS = new Set(["csat", "military", "graduation", "grad-done", "job-search", "job-offer", "startup-itch", "layoff", "retirement", "marriage", "baby", "marriage-crisis", "house"]);
+
+/** A choice big enough that auto-decide stops and asks, and that gets a moment of its own on screen. */
+export function isBigChoice(p: PendingChoice): boolean {
+  if (p.small) return false;
+  return !!p.rare || p.eventId === TURNING_POINT_ID || BIG_EVENTS.has(p.eventId);
+}
+
 /** Picks an option for auto-decide mode: weighted toward the first listed choices and toward what this person leans to. */
 export function autoPick(s: LifeState): string | null {
   if (!s.pending || s.pending.options.length === 0) return null;
