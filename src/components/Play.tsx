@@ -55,6 +55,7 @@ export function PlayView({
   const age = ageOf(life);
   const fx = usePlayFx(life);
   const [sound, setSoundOn] = useState(loadSoundPref);
+  const [news, setNews] = useState(loadNewsPref);
   const pendingKey = pendingKeyOf(life);
   // Each new choice card flips in with a whoosh.
   useEffect(() => {
@@ -161,6 +162,11 @@ export function PlayView({
                   setSound(!sound);
                   setSoundOn(!sound);
                 }}
+                news={news}
+                onNews={(m) => {
+                  saveNewsPref(m);
+                  setNews(m);
+                }}
                 onQuit={handlers.onQuit}
               />
             </div>
@@ -251,10 +257,8 @@ export function PlayView({
         )}
       </aside>
 
-      <div className="order-2 flex-1 space-y-2 py-4 lg:col-start-1 lg:row-start-1 lg:min-h-dvh lg:py-8">
-        {feed.map((entry, i) => (
-          <LogLine key={i} entry={entry} showDate={i === 0 || feed[i - 1].mi !== entry.mi} />
-        ))}
+      <div className="order-2 flex-1 py-4 lg:col-start-1 lg:row-start-1 lg:min-h-dvh lg:py-8">
+        <Feed feed={feed} news={news} />
         <p aria-live="polite" className="sr-only">
           {choosing ? `선택의 순간: ${pending.title}` : latest?.text}
         </p>
@@ -534,7 +538,19 @@ function BigMomentIntro({ pending, onDone }: { pending: PendingChoice; onDone: (
 }
 
 /** Sound and leaving live behind ⋯ so the control row holds only what moves time. */
-function PlayMenu({ sound, onSound, onQuit }: { sound: boolean; onSound: () => void; onQuit: () => void }) {
+function PlayMenu({
+  sound,
+  onSound,
+  news,
+  onNews,
+  onQuit,
+}: {
+  sound: boolean;
+  onSound: () => void;
+  news: NewsMode;
+  onNews: (m: NewsMode) => void;
+  onQuit: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -585,6 +601,27 @@ function PlayMenu({ sound, onSound, onQuit }: { sound: boolean; onSound: () => v
             </svg>
             {sound ? "효과음 끄기" : "효과음 켜기"}
           </button>
+          <div role="group" aria-label="세상 뉴스" className="border-y border-stone-100 py-1 dark:border-stone-800">
+            <p className="px-4 pt-1.5 pb-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400">세상 뉴스</p>
+            {NEWS_MODES.map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={news === m.value}
+                className={`${item} py-2.5`}
+                onClick={() => {
+                  onNews(m.value);
+                  setOpen(false);
+                }}
+              >
+                <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${news === m.value ? "" : "invisible"}`}>
+                  ✓
+                </span>
+                {m.label}
+              </button>
+            ))}
+          </div>
           <button type="button" role="menuitem" className={item} onClick={onQuit}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
@@ -777,87 +814,233 @@ function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
   return { following, jumpToLatest };
 }
 
-function LogLine({ entry, showDate }: { entry: LogEntry; showDate: boolean }) {
-  const date = showDate ? <p className="pt-2 text-xs font-semibold text-stone-500 tabular-nums dark:text-stone-400">{formatMi(entry.mi)}</p> : null;
+export type NewsMode = "full" | "headline" | "hidden";
+const NEWS_MODES: { value: NewsMode; label: string }[] = [
+  { value: "full", label: "펼쳐 보기" },
+  { value: "headline", label: "헤드라인만" },
+  { value: "hidden", label: "숨기기" },
+];
+const NEWS_KEY = "whatif.news";
+
+function loadNewsPref(): NewsMode {
+  try {
+    const v = localStorage.getItem(NEWS_KEY);
+    return v === "full" || v === "hidden" ? v : "headline";
+  } catch {
+    return "headline";
+  }
+}
+
+function saveNewsPref(m: NewsMode) {
+  try {
+    localStorage.setItem(NEWS_KEY, m);
+  } catch {
+    // Private mode or blocked storage: the choice lasts for this visit only.
+  }
+}
+
+type FeedItem =
+  | { type: "date"; mi: number }
+  | { type: "world"; items: LogEntry[] }
+  | { type: "reaction"; entry: LogEntry; headline: string }
+  | { type: "choice"; title: string; picked: string; outcome?: LogEntry }
+  | { type: "line"; entry: LogEntry };
+
+/** "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가…" → its first sentence. */
+function headlineOf(text: string): string {
+  return text.split("\n")[0].split(/(?<=[다요]\.)\s/)[0];
+}
+
+/**
+ * Sorts the log into what the feed draws: a date pill per month, the month's headlines in one box off the spine,
+ * how a headline touched this life as the player's own line, and each choice (title, answer, result) as one card.
+ */
+function feedItems(feed: LogEntry[]): FeedItem[] {
+  const out: FeedItem[] = [];
+  for (let i = 0; i < feed.length; i++) {
+    const e = feed[i];
+    if (i === 0 || feed[i - 1].mi !== e.mi) out.push({ type: "date", mi: e.mi });
+    if (e.kind === "news") {
+      const items: LogEntry[] = [];
+      while (i < feed.length && feed[i].kind === "news" && feed[i].mi === e.mi) items.push(feed[i++]);
+      i--;
+      out.push({ type: "world", items });
+      for (const n of items) {
+        // Saves from before reactions had their own field keep the reaction on the headline's last line.
+        const reaction = n.reaction ?? (n.delta || n.money ? n.text.split("\n").slice(1).join("\n") : "");
+        if (reaction) out.push({ type: "reaction", entry: { ...n, text: reaction }, headline: headlineOf(n.text) });
+      }
+      continue;
+    }
+    // The engine logs a choice as: the event's title, "title: answer", then the result.
+    const titled = e.kind === "event" && !e.delta && !e.money && !e.rare && feed[i + 1]?.kind === "choice" && feed[i + 1].text.startsWith(`${e.text}: `);
+    if (titled || e.kind === "choice") {
+      const c = titled ? feed[++i] : e;
+      const title = titled ? e.text : c.text.split(": ")[0];
+      const picked = c.text.slice(title.length + 2) || c.text;
+      const outcome = feed[i + 1]?.kind === "outcome" && feed[i + 1].mi === c.mi ? feed[++i] : undefined;
+      out.push({ type: "choice", title, picked, outcome });
+      continue;
+    }
+    out.push({ type: "line", entry: e });
+  }
+  return out;
+}
+
+/** The feed as a timeline: the line and its dots belong to the player alone; the world sits beside it, folded. */
+function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
+  const items = useMemo(() => feedItems(feed), [feed]);
+  return (
+    <ol className="relative space-y-2.5 pl-6 before:absolute before:top-3 before:bottom-2 before:left-[7px] before:w-0.5 before:rounded-full before:bg-indigo-100 dark:before:bg-indigo-950">
+      {items.map((it, i) => {
+        switch (it.type) {
+          case "date":
+            return (
+              <li key={i} className={`-ml-6 ${i === 0 ? "" : "pt-3"}`}>
+                <span className="relative inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 tabular-nums dark:bg-indigo-950 dark:text-indigo-300">
+                  {formatMi(it.mi)}
+                </span>
+              </li>
+            );
+          case "world":
+            return news === "hidden" ? null : <WorldBox key={`${i}-${news}`} items={it.items} open={news === "full"} />;
+          case "reaction":
+            return (
+              <Spine key={i}>
+                <span className="block truncate text-xs font-semibold text-amber-700 dark:text-amber-400">↳ {it.headline}</span>
+                <span className="leading-relaxed">
+                  {it.entry.text}
+                  <DeltaChips delta={it.entry.delta} money={it.entry.money} />
+                </span>
+              </Spine>
+            );
+          case "choice":
+            return <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} />;
+          case "line":
+            return <LogLine key={i} entry={it.entry} />;
+        }
+      })}
+    </ol>
+  );
+}
+
+/** A spot on the player's line. Filled dots mark the moments that changed the course. */
+function Spine({ children, filled = false, className = "" }: { children: ReactNode; filled?: boolean; className?: string }) {
+  return (
+    <li className={`relative ${className}`}>
+      <span
+        aria-hidden
+        className={`absolute top-[7px] -left-[22px] h-2.5 w-2.5 rounded-full border-2 border-indigo-500 dark:border-indigo-400 ${
+          filled ? "bg-indigo-500 dark:bg-indigo-400" : "bg-[var(--background)]"
+        }`}
+      />
+      {children}
+    </li>
+  );
+}
+
+function WorldBox({ items, open: initial }: { items: LogEntry[]; open: boolean }) {
+  const [open, setOpen] = useState(initial);
+  return (
+    <li className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2 text-[13px] text-stone-600 dark:border-amber-900 dark:bg-amber-950/20 dark:text-stone-400">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">그때 세상은 · {items.length}</p>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="-my-1.5 -mr-1.5 rounded px-1.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-400"
+        >
+          {open ? "접기 ▴" : "펼치기 ▾"}
+        </button>
+      </div>
+      <ul className={open ? "mt-1 space-y-1.5" : "mt-0.5"}>
+        {items.map((n, j) => {
+          const [cat, month] = (n.tag ?? "").split(" · ");
+          return open ? (
+            <li key={j}>
+              {n.tag && <span className="block text-[11px] font-semibold text-amber-700/80 dark:text-amber-400/80">{`${month} · ${cat}`}</span>}
+              <span className="whitespace-pre-line leading-relaxed">{n.text.split("\n")[0]}</span>
+            </li>
+          ) : (
+            <li key={j} className="truncate">
+              {month && <span className="mr-1.5 text-[11px] font-semibold text-amber-700 tabular-nums dark:text-amber-400">{month}</span>}
+              {headlineOf(n.text)}
+            </li>
+          );
+        })}
+      </ul>
+    </li>
+  );
+}
+
+function ChoiceCard({ title, picked, outcome }: { title: string; picked: string; outcome?: LogEntry }) {
+  const rare = !!outcome?.rare;
+  return (
+    <Spine filled>
+      <div className={`rounded-xl px-3.5 py-2.5 ${rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/50" : "bg-indigo-50 dark:bg-indigo-950/60"}`}>
+        <p className={`text-[11px] font-semibold ${rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
+          {rare ? "✦ 희귀한 순간" : "선택"} · {title}
+        </p>
+        <p className="font-semibold text-indigo-800 dark:text-indigo-200">{picked}</p>
+        {outcome && (
+          <p className="mt-1 leading-relaxed">
+            {outcome.text}
+            <DeltaChips delta={outcome.delta} money={outcome.money} />
+          </p>
+        )}
+      </div>
+    </Spine>
+  );
+}
+
+function LogLine({ entry }: { entry: LogEntry }) {
   switch (entry.kind) {
     case "era":
-      return (
-        <>
-          {date}
-          <p className="whitespace-pre-line rounded-xl bg-stone-100 px-4 py-3 text-[15px] leading-relaxed text-stone-700 dark:bg-stone-900 dark:text-stone-300">{entry.text}</p>
-        </>
-      );
+      return <li className="-ml-6 whitespace-pre-line rounded-xl bg-stone-100 px-4 py-3 text-[15px] leading-relaxed text-stone-700 dark:bg-stone-900 dark:text-stone-300">{entry.text}</li>;
     case "news":
-      return (
-        <>
-          {date}
-          <div className="border-l-2 border-amber-400 pl-3 dark:border-amber-600">
-            {entry.tag && <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">📰 {entry.tag}</p>}
-            <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-              {entry.text}
-              <DeltaChips delta={entry.delta} money={entry.money} />
-            </p>
-          </div>
-        </>
-      );
+      return null;
     case "turn":
       return (
-        <>
-          {date}
-          <p className="text-sm text-stone-500 dark:text-stone-400">{entry.text}</p>
-        </>
+        <Spine className="text-sm text-stone-500 dark:text-stone-400">
+          {entry.facts?.map((f) => (
+            <span key={f} className="mr-1 inline-block rounded-full border border-stone-300 px-2 py-px text-xs text-stone-600 tabular-nums dark:border-stone-700 dark:text-stone-300">
+              {f}
+            </span>
+          ))}
+          {entry.text}
+        </Spine>
       );
     case "event":
-      if (entry.rare) return <RareLine date={date} entry={entry} />;
+    case "outcome":
+      if (entry.rare) return <RareLine entry={entry} />;
       return (
-        <>
-          {date}
-          <p className="font-semibold">
-            {entry.text}
-            <DeltaChips delta={entry.delta} money={entry.money} />
-          </p>
-        </>
+        <Spine filled={entry.kind === "event"} className={entry.kind === "event" ? "font-semibold" : "leading-relaxed"}>
+          {entry.text}
+          <DeltaChips delta={entry.delta} money={entry.money} />
+        </Spine>
       );
     case "choice":
-      return (
-        <>
-          {date}
-          <p className="text-indigo-700 dark:text-indigo-300">→ {entry.text}</p>
-        </>
-      );
-    case "outcome":
-      if (entry.rare) return <RareLine date={date} entry={entry} />;
-      return (
-        <>
-          {date}
-          <p className="leading-relaxed">
-            {entry.text}
-            <DeltaChips delta={entry.delta} money={entry.money} />
-          </p>
-        </>
-      );
+      return null;
     case "present":
     case "milestone":
       return (
-        <>
-          {date}
+        <Spine filled>
           <p className="rounded-xl border border-indigo-300 px-4 py-3 font-semibold text-indigo-800 dark:border-indigo-800 dark:text-indigo-300">{entry.text}</p>
-        </>
+        </Spine>
       );
     case "death":
       return (
-        <>
-          {date}
+        <Spine filled>
           <p className="rounded-xl bg-stone-900 px-4 py-3 text-center font-semibold text-stone-50 dark:bg-stone-100 dark:text-stone-900">{entry.text}</p>
-        </>
+        </Spine>
       );
   }
 }
 
-function RareLine({ date, entry }: { date: ReactNode; entry: LogEntry }) {
+function RareLine({ entry }: { entry: LogEntry }) {
   return (
-    <>
-      {date}
+    <Spine filled>
       <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-500 dark:bg-amber-950/50">
         <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간</p>
         <p className="mt-0.5 font-semibold leading-relaxed">
@@ -865,7 +1048,7 @@ function RareLine({ date, entry }: { date: ReactNode; entry: LogEntry }) {
           <DeltaChips delta={entry.delta} money={entry.money} />
         </p>
       </div>
-    </>
+    </Spine>
   );
 }
 

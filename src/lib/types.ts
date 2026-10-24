@@ -178,6 +178,8 @@ export interface LogEntry {
   tag?: string; // news category and month, e.g. "스포츠 · 6월"
   money?: number; // 만원 change in wealth caused by this entry
   rare?: boolean; // a rare moment, shown on a special card
+  reaction?: string; // news only: how the headline touched this life, drawn as the player's own line
+  facts?: string[]; // turn only: job and pay, drawn as chips before the text
 }
 
 export interface ChoiceRecord {
