@@ -116,3 +116,14 @@ export type NarrateRequest =
   | { kind: "moment"; summary: string; facts: string; persona: string; allowed: string[]; recent: string[]; seeds: string[]; eraHints: string[] }
   | { kind: "classify"; text: string; options: { id: string; label: string }[] }
   | { kind: "ending"; summary: string; persona: string; profile: unknown; turningPoint: unknown; deathAge: number };
+
+// How long the player waits for the narrator before falling back to templates. The opening and ending
+// write the most (about 8-10s normally), so they get more room than a scene or a classification.
+// The server uses the same budget, so it stops (and skips a retry) once the player has stopped waiting.
+export const NARRATE_TIMEOUT_MS: Record<NarrateRequest["kind"], number> = {
+  opening: 25_000,
+  ending: 25_000,
+  scene: 15_000,
+  moment: 20_000, // writes a whole choice with outcomes, so a little longer than a scene
+  classify: 10_000,
+};

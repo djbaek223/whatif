@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!body || !KINDS.has(body.kind)) return Response.json({ ok: false, reason: "bad-kind" }, { status: 400 });
 
   try {
-    const data = await narrate(body);
+    const data = await narrate(body, request.signal);
     if (!data) return Response.json({ ok: false, reason: "empty" });
     return Response.json({ ok: true, data });
   } catch (error) {
@@ -29,6 +29,10 @@ export async function POST(request: Request) {
       console.error(error.message);
       const rateLimited = error.status === 429;
       return Response.json({ ok: false, reason: rateLimited ? "rate-limited" : "api-error" }, { status: rateLimited ? 429 : 502 });
+    }
+    if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      console.warn(`[narrate] ${body.kind} gave up: ${error.name === "TimeoutError" ? "over the time budget" : "the player stopped waiting"}`);
+      return Response.json({ ok: false, reason: "timeout" }, { status: 504 });
     }
     console.error("narrate failed", error);
     return Response.json({ ok: false, reason: "error" }, { status: 500 });
