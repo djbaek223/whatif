@@ -863,7 +863,16 @@ const SEASON: Record<number, string[]> = {
   12: ["연말, 한 해를 돌아보았다.", "첫눈이 내렸다.", "거리에 캐럴이 울려 퍼졌다."],
 };
 
-function statusLine(s: LifeState, rng: Rng): string {
+/** The routine line for a quiet turn. A working life sometimes shows its job and pay as chips instead. */
+function statusLine(s: LifeState, rng: Rng): Pick<LogEntry, "text" | "facts"> {
+  const f = s.flags;
+  if (f.employed && !f.retired && f.education === "done" && s.mi >= f.busyUntil && f.company && rng.chance(0.3)) {
+    return { text: "출퇴근이 이어졌다.", facts: [`${f.company} ${f.job}`, `연봉 ${won(s.income * 12)}`] };
+  }
+  return { text: statusSentence(s, rng) };
+}
+
+function statusSentence(s: LifeState, rng: Rng): string {
   const f = s.flags;
   const age = ageOf(s);
   const pick = (...lines: string[]) => rng.pick(lines);
@@ -881,7 +890,7 @@ function statusLine(s: LifeState, rng: Rng): string {
     return pick("느긋한 하루가 이어졌다.", "공원 벤치에서 햇볕을 쬐었다.", "아침 산책이 하루의 시작이 되었다.");
   }
   if (f.employed) {
-    if (f.company && rng.chance(0.3)) return pick(`${f.company} ${f.job}, 연봉 ${won(s.income * 12)}. 출퇴근이 이어졌다.`, `${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`);
+    if (f.company && rng.chance(0.15)) return `${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`;
     if (kidsUnder(s, 13)) return pick(`${withRo(f.job)} 일하며 ${f.children > 1 ? `아이 ${f.children}명을` : "아이를"} 키웠다.`, "퇴근하면 육아로 두 번째 출근을 했다.", "주말이면 아이 손을 잡고 놀이공원에 갔다.");
     if (f.children > 0) return pick(`${withRo(f.job)} 일하며 가족을 꾸렸다.`, "아이 학원비 고지서를 보며 한숨을 쉬었다.", "다 큰 아이와 어색한 저녁을 먹었다.");
     if (f.partner === "married") return pick(`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, "주말이면 배우자와 장을 보러 갔다.");
@@ -937,7 +946,7 @@ function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): Lo
     const impact = x.impact?.(s);
     if (!impact) return { mi: s.mi, kind: "news", text: x.text, tag };
     const applied = applyTop(s, impact, rng);
-    return { mi: s.mi, kind: "news", tag, ...applied, text: `${x.text}\n${applied.text}` };
+    return { mi: s.mi, kind: "news", tag, ...applied, text: x.text, reaction: applied.text };
   });
 }
 
@@ -1025,7 +1034,7 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
       // Keep only the latest routine line between notable entries so the feed stays readable.
       const last = s.log.at(-1);
       if (last?.kind === "turn" && entries.length === 0) s.log.pop();
-      entries.push({ mi: s.mi, kind: "turn", text: statusLine(s, rng) });
+      entries.push({ mi: s.mi, kind: "turn", ...statusLine(s, rng) });
     }
 
     if (!s.presentShown && s.mi >= presentMi()) {
