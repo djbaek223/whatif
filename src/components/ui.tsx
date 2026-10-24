@@ -2,18 +2,63 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAt
 import { formatWealth } from "@/lib/format";
 import { STAT_LABELS, type StatKey, type Stats } from "@/lib/types";
 
+// Matches the Figma components (Button/Primary, Button/Disabled, Button/Ghost, Choice): a disabled primary button turns flat grey instead of fading.
 export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" }) {
   const styles = {
-    primary: "bg-stone-900 text-stone-50 hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300",
-    ghost: "border border-stone-300 hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-800",
+    primary:
+      "bg-stone-900 text-stone-50 hover:bg-stone-700 disabled:bg-stone-200 disabled:text-stone-500 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-400",
+    ghost: "border border-stone-300 hover:bg-stone-100 disabled:opacity-40 dark:border-stone-700 dark:hover:bg-stone-800",
     choice:
-      "w-full text-left border border-stone-300 bg-white hover:border-indigo-500 hover:bg-indigo-50 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
+      "w-full text-left border border-stone-300 bg-white hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
   }[variant];
   return (
     <button
       {...props}
-      className={`rounded-xl px-4 py-3 text-[15px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:cursor-not-allowed disabled:opacity-40 ${styles} ${className}`}
+      className={`rounded-xl px-4 py-3 text-[15px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] disabled:cursor-not-allowed ${styles} ${className}`}
     />
+  );
+}
+
+/** An on/off switch with its label, for settings that take effect right away. */
+export function Switch({ checked, onChange, disabled, children }: { checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className="group inline-flex items-center gap-2 py-2 text-sm font-medium focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      <span
+        aria-hidden
+        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors group-focus-visible:ring-2 group-focus-visible:ring-indigo-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[var(--background)] ${checked ? "bg-indigo-600 dark:bg-indigo-500" : "bg-stone-300 dark:bg-stone-700"}`}
+      >
+        <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform motion-reduce:transition-none ${checked ? "translate-x-4" : ""}`} />
+      </span>
+      {children}
+    </button>
+  );
+}
+
+/** A row of mutually exclusive pills, such as playback speed. */
+export function Segmented<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex rounded-full border border-stone-300 p-0.5 dark:border-stone-700">
+      {options.map((o) => (
+        <button
+          key={String(o.value)}
+          type="button"
+          aria-pressed={o.value === value}
+          onClick={() => onChange(o.value)}
+          className={`min-w-11 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+            o.value === value ? "bg-indigo-600 text-white dark:bg-indigo-500" : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
