@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { lifeStage } from "../engine";
-import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, type NarrateRequest } from "./schema";
+import { ClassifySchema, EndingSchema, MomentSchema, NARRATE_TIMEOUT_MS, OpeningSchema, SceneSchema, type NarrateRequest } from "./schema";
 
 // Both providers speak the OpenAI-compatible chat completions API.
 // WHATIF_PROVIDER picks one: "deepseek" (default, cheapest) or "openai" (GPT-6 Luna).
@@ -9,13 +9,15 @@ type Provider = { name: string; baseUrl: string; model: string; apiKey: string |
 
 function provider(): Provider {
   if (process.env.WHATIF_PROVIDER === "openai") {
-    const effort = process.env.OPENAI_REASONING_EFFORT;
+    // GPT-6 Luna reasons before it answers. Left at the API default that thinking alone took most of the
+    // player's wait, and it counts against max_completion_tokens. Narration needs little of it.
+    const effort = process.env.OPENAI_REASONING_EFFORT || "low";
     return {
       name: "OpenAI",
       baseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
       model: process.env.WHATIF_MODEL || "gpt-6-luna",
       apiKey: process.env.OPENAI_API_KEY,
-      extra: { max_completion_tokens: 4000, ...(effort ? { reasoning_effort: effort } : {}) },
+      extra: { max_completion_tokens: 4000, reasoning_effort: effort },
     };
   }
   // DeepSeek directly (https://api-docs.deepseek.com) or via BytePlus ModelArk with DEEPSEEK_BASE_URL.
@@ -57,29 +59,42 @@ const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이터의 �
 const data = (label: string, value: unknown) =>
   `<user_data name="${label}">\n${typeof value === "string" ? value : JSON.stringify(value, null, 2)}\n</user_data>`;
 
-async function complete(messages: { role: "system" | "user" | "assistant"; content: string }[]): Promise<string> {
+type Usage = { prompt_tokens?: number; completion_tokens?: number; completion_tokens_details?: { reasoning_tokens?: number } };
+
+async function complete(messages: { role: "system" | "user" | "assistant"; content: string }[], signal: AbortSignal): Promise<{ content: string; usage?: Usage }> {
   const p = provider();
   const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.apiKey}` },
     body: JSON.stringify({ model: p.model, messages, response_format: { type: "json_object" }, ...p.extra }),
-    signal: AbortSignal.timeout(60_000),
+    signal,
   });
   if (!res.ok) throw new NarratorError(`${p.name} ${res.status}: ${(await res.text()).slice(0, 300)}`, res.status);
   const json = await res.json();
   const choice = json.choices?.[0];
   if (choice?.finish_reason === "length") throw new NarratorError(`${p.name} output was cut off`, 502);
-  return choice?.message?.content ?? "";
+  return { content: choice?.message?.content ?? "", usage: json.usage };
 }
 
-/** Asks for JSON matching the schema; retries once with the validation error when the reply doesn't fit. */
-async function ask<S extends z.ZodType>(schema: S, prompt: string): Promise<z.infer<S> | null> {
+/**
+ * Asks for JSON matching the schema; retries once with the validation error when the reply doesn't fit,
+ * but only while the player is still likely to be waiting. Logs each call's time and token use.
+ */
+async function ask<S extends z.ZodType>(kind: NarrateRequest["kind"], schema: S, prompt: string, abort?: AbortSignal): Promise<z.infer<S> | null> {
+  const budget = NARRATE_TIMEOUT_MS[kind];
+  const signal = abort ? AbortSignal.any([abort, AbortSignal.timeout(budget)]) : AbortSignal.timeout(budget);
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
     { role: "system", content: `${SYSTEM}\n\nJSON 스키마:\n${JSON.stringify(z.toJSONSchema(schema))}` },
     { role: "user", content: prompt },
   ];
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const content = await complete(messages);
+  const started = Date.now();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const t = Date.now();
+    const { content, usage } = await complete(messages, signal);
+    const reasoning = usage?.completion_tokens_details?.reasoning_tokens;
+    console.info(
+      `[narrate] ${kind} #${attempt} ${provider().name} ${Date.now() - t}ms in=${usage?.prompt_tokens ?? "?"} out=${usage?.completion_tokens ?? "?"}${reasoning ? ` reasoning=${reasoning}` : ""}`,
+    );
     let problem: string;
     try {
       const parsed = schema.safeParse(JSON.parse(content));
@@ -88,15 +103,20 @@ async function ask<S extends z.ZodType>(schema: S, prompt: string): Promise<z.in
     } catch {
       problem = content ? "올바른 JSON이 아닙니다." : "빈 응답이었습니다.";
     }
+    console.warn(`[narrate] ${kind} #${attempt} didn't fit the schema: ${problem.slice(0, 200)}`);
+    // A second try takes about as long as the first. If it can't finish in time, let the player move on now.
+    if (Date.now() - started > budget / 2) return null;
     messages.push({ role: "assistant", content: content || "{}" }, { role: "user", content: `방금 답이 스키마에 맞지 않습니다 (${problem.slice(0, 300)}). 스키마에 맞는 JSON만 다시 주세요.` });
   }
   return null;
 }
 
-export async function narrate(req: NarrateRequest): Promise<unknown> {
+/** `signal` is the player's request: when they stop waiting, the provider call stops too. */
+export async function narrate(req: NarrateRequest, signal?: AbortSignal): Promise<unknown> {
   switch (req.kind) {
     case "opening":
       return ask(
+        req.kind,
         OpeningSchema,
         [
           "사용자의 프로필과 변곡점입니다. 그 시점으로 돌아간 장면을 준비해 주세요.",
@@ -116,9 +136,11 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
           req.hints ? data("path_hints", req.hints) : "",
           "입학·취업·이직으로 이어지는 선택은 label에 실제 학교·회사 이름을 넣고 place에도 같은 이름을 쓰세요. 그때 실제로 존재했던 곳이어야 합니다.",
         ].filter(Boolean).join("\n\n"),
+        signal,
       );
     case "scene":
       return ask(
+        req.kind,
         SceneSchema,
         [
           `지금 이 인생에 "${req.title}"이라는 순간이 찾아왔습니다. 기본 설명: ${req.intro}`,
@@ -132,9 +154,11 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
           "detail은 엔진이 정한 회사·학교·연봉·비용입니다. 장면과 선택지에서 이 이름과 숫자를 그대로 쓰세요. 이 사람의 전공이나 지역에 더 맞는 같은 급의 실제 회사·학교가 있으면 place에 그 이름을 넣어도 됩니다. 그렇지 않으면 place는 빈 문자열.",
           JSON.stringify(req.options),
         ].join("\n\n"),
+        signal,
       );
     case "moment":
       return ask(
+        req.kind,
         MomentSchema,
         [
           "이 사람의 삶에 새 갈림길을 하나 만들어 주세요. 정해진 사건표에 없는, 이 사람이기에 생기는 순간이어야 합니다.",
@@ -159,14 +183,18 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
             "- 수능, 입대, 졸업, 결혼 이야기, 출산 결정, 이직 제안, 내 집 마련, 은퇴처럼 이미 따로 다루는 큰 사건과 똑같은 장면은 피합니다.",
           ].join("\n"),
         ].join("\n\n"),
+        signal,
       );
     case "classify":
       return ask(
+        req.kind,
         ClassifySchema,
         ["사용자가 선택지 대신 직접 쓴 결정입니다. 의미가 가장 가까운 선택지의 id를 고르세요.", data("decision", req.text), JSON.stringify(req.options)].join("\n\n"),
+        signal,
       );
     case "ending":
       return ask(
+        req.kind,
         EndingSchema,
         [
           `이 인생이 ${req.deathAge}세로 끝났습니다. 회고록을 써 주세요.`,
@@ -176,6 +204,7 @@ export async function narrate(req: NarrateRequest): Promise<unknown> {
           data("life", req.summary),
           "comparison에는 프로필의 currentLife(현실의 삶)와 이 가지의 삶을 비교해 주세요.",
         ].join("\n\n"),
+        signal,
       );
   }
 }
