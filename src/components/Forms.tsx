@@ -19,7 +19,7 @@ import {
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
-import { Button, Card, FieldError, Input, Textarea } from "./ui";
+import { Button, Card, FieldError, Input, Select, Textarea } from "./ui";
 
 export const EMPTY_PROFILE: Profile = {
   name: "",
@@ -30,6 +30,7 @@ export const EMPTY_PROFILE: Profile = {
   middle: "",
   high: "",
   university: "",
+  universityYear: "",
   major: "",
   family: "",
   mbti: "",
@@ -139,6 +140,9 @@ export function Onboarding({
   const age = ageIn(p.birthDate, tp.date);
   const kind = kindDef(tp.kind) ?? kindDef("other")!;
   const birthYear = Number(p.birthDate.slice(0, 4)) || 0;
+  // University entrance year: the usual year straight from high school, or any year from 17 up to this year (재수, 늦깎이 입학).
+  const usualUniYear = schoolYears(p.birthDate)?.stages[3].from ?? 0;
+  const uniYears = birthYear ? Array.from({ length: Math.max(0, now.getFullYear() - (birthYear + 17) + 1) }, (_, i) => birthYear + 17 + i) : [];
 
   // Keep answers in the browser (encrypted, see localData.ts) a moment after each change.
   useEffect(() => {
@@ -317,10 +321,23 @@ export function Onboarding({
       case "university":
         return (
           <>
-            {question("대학은 어디서 무엇을 공부했나요?", "안 다녔다면 건너뛰어도 괜찮아요.")}
+            {question("대학은 어디서 무엇을 공부했나요?", "재수했거나 늦게 들어갔다면 입학년도를 골라 주세요. 안 다녔다면 건너뛰어도 괜찮아요.")}
             <div className="space-y-2">
               <LabeledInput label="대학교" autoFocus value={p.university} onChange={setField("university")} placeholder="예: 충남대" />
               <LabeledInput label="전공" value={p.major} onChange={setField("major")} placeholder="예: 경영학" />
+              <label className="flex items-center gap-3">
+                <span className="w-16 shrink-0 text-sm font-medium text-stone-600 dark:text-stone-400">입학년도</span>
+                <Select className="flex-1" value={p.universityYear ?? ""} onChange={setField("universityYear")}>
+                  <option value="">{usualUniYear ? `고교 졸업 후 바로 (${usualUniYear}년)` : "선택"}</option>
+                  {uniYears
+                    .filter((y) => y !== usualUniYear)
+                    .map((y) => (
+                      <option key={y} value={y}>
+                        {y}년{!usualUniYear ? "" : y < usualUniYear ? " (조기 입학)" : ` (${y - usualUniYear}년 늦게)`}
+                      </option>
+                    ))}
+                </Select>
+              </label>
             </div>
             <SchoolTimeline profile={p} upTo="university" />
           </>
@@ -720,7 +737,7 @@ function Suggestions({ title, items, current, onPick }: { title: string; items: 
 }
 
 function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" | "university" }) {
-  const sy = schoolYears(p.birthDate);
+  const sy = schoolYears(p.birthDate, p.universityYear);
   if (!sy) return null;
   const names: Record<string, string> = { elementary: p.elementary, middle: p.middle, high: p.high, university: [p.university, p.major].filter(Boolean).join(" ") };
   // Three stages fit a phone's width, so the university step shows high school → university.
@@ -751,7 +768,7 @@ function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" |
         ))}
       </ol>
       <p className="mt-2 text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
-        {p.birthDate.slice(0, 4)}년생 기준으로 계산했어요{sy.early ? " (1~2월생이라 한 해 일찍 입학한 빠른년생 기준)" : ""}.{upTo === "university" ? " 대학은 4년제, 휴학·군대 없이 계산했어요." : ""}
+        {p.birthDate.slice(0, 4)}년생 기준으로 계산했어요{sy.early ? " (1~2월생이라 한 해 일찍 입학한 빠른년생 기준)" : ""}.{upTo === "university" ? ` 대학은 ${p.universityYear ? `${p.universityYear}년 입학, ` : ""}4년제, 휴학·군대 없이 계산했어요.` : ""}
       </p>
     </div>
   );
@@ -795,7 +812,7 @@ function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint
     ["gender", "성별", p.gender],
     ["hometown", "자란 곳", p.hometown],
     ["schools", "학교", [p.elementary, p.middle, p.high].filter(Boolean).join(" → ")],
-    ["university", "대학", [p.university, p.major].filter(Boolean).join(" · ")],
+    ["university", "대학", [p.university, p.major, p.university && p.universityYear ? `${p.universityYear}년 입학` : ""].filter(Boolean).join(" · ")],
     ["family", "가족", p.family],
     ["mbti", "MBTI", p.mbti],
     ["personality", "성격", p.personality],

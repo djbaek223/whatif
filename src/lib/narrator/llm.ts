@@ -123,6 +123,7 @@ export async function narrate(req: NarrateRequest, signal?: AbortSignal): Promis
           data("profile", req.profile),
           data("turning_point", req.turningPoint),
           `변곡점 당시 나이: 만 ${req.age}세${lifeStage(req.age) ? ` (${lifeStage(req.age)})` : ""}`,
+          "profile.universityYear가 있으면 대학 입학년도입니다. 변곡점이 그 해 3월 전이면 아직 입학 전(재수 등), 4년 안이면 재학 중으로 봅니다.",
           `situation, initial, choices는 모두 이 나이에 실제로 가능한 것이어야 합니다. 18세 미만은 대학생·직장인이 아니고, 결혼·자녀·자산이 없습니다. 예: 9세라면 초등학생으로서 학교, 가족, 친구, 학원, 놀이 같은 그 나이의 고민과 선택을 씁니다. 프로필의 대학이나 현재 직업은 아직 오지 않은 미래입니다.`,
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
           "능력치는 입력된 성향과 상황을 근거로 0~100 사이로 정하세요. initial은 변곡점 시점의 학업, 직업, 연애, 자녀, 자산 상태입니다.",

@@ -79,6 +79,12 @@ function schoolAt(profile: Profile, age: number): string {
   return (age < 13 ? profile.elementary : age < 16 ? profile.middle : profile.high).trim();
 }
 
+/** University months from the entrance year the player entered: March of that year to February four years on. */
+export function universitySpan(profile: Profile): { from: number; to: number } | null {
+  const y = Number(profile.universityYear);
+  return y && profile.university.trim() ? { from: monthIndex(y, 3), to: monthIndex(y + 4, 2) } : null;
+}
+
 /** Old enough to finish school: work full time, go to university, or drop out. A senior counts from exam season (빠른년생). */
 function canLeaveSchool(age: number, mi: number): boolean {
   return age >= 18 || (age === 17 && mi % 12 >= 8);
@@ -106,11 +112,16 @@ export function fitInitialToAge(init: OpeningResult["initial"], age: number, mi:
 /** Rough guess of where the user stood at the turning point, used when no AI is available. */
 export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningResult["initial"] {
   const age = ageAt(profile.birthDate, turningPointMi(tp));
+  const mi = turningPointMi(tp);
   const hasUni = profile.university.trim().length > 0;
+  const uni = universitySpan(profile);
   const none = { company: "", school: "" };
   if (age < 16) return { ...none, education: "school", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
-  if (age < 19) return { ...none, education: "highschool", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
-  if (age < 23 && hasUni)
+  if (uni && mi >= uni.from && mi <= uni.to)
+    return { ...none, school: profile.university, education: "university", employed: false, jobTitle: "", monthlyIncome: 50, partner: "none", children: 0, wealth: 200 };
+  // Before a late entrance year the player was still preparing for the exam (재수).
+  if (age < 19 || (uni && mi < uni.from && age < 23)) return { ...none, education: "highschool", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
+  if (age < 23 && hasUni && !uni)
     return { ...none, school: profile.university, education: "university", employed: false, jobTitle: "", monthlyIncome: 50, partner: "none", children: 0, wealth: 200 };
   if (age < 26) return { ...none, education: "done", employed: true, jobTitle: "사원", monthlyIncome: 230, partner: "none", children: 0, wealth: 800 };
   return {
@@ -123,6 +134,12 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
     children: age >= 36 ? 1 : 0,
     wealth: (age - 24) * 600,
   };
+}
+
+/** When the university the player is in at the start ends: from the entrance year if given, otherwise around 23. */
+function uniUntil(profile: Profile, mi: number, age: number): number {
+  const uni = universitySpan(profile);
+  return uni && mi >= uni.from && mi < uni.to ? uni.to : mi + Math.max(12, (23 - age) * 12);
 }
 
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음/;
@@ -146,7 +163,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
   const school = init.school?.trim() || (init.education === "university" || init.education === "graduate" ? profile.university.trim() : "");
   const flags: LifeFlags = {
     education: init.education,
-    eduUntil: init.education === "university" ? mi + Math.max(12, (23 - age) * 12) : init.education === "graduate" ? mi + 24 : mi,
+    eduUntil: init.education === "university" ? uniUntil(profile, mi, age) : init.education === "graduate" ? mi + 24 : mi,
     employed,
     job: employed ? (GENERIC_JOB.test(jobTitle) || !jobTitle ? titleFor(tier, workYears) : jobTitle) : "",
     company: company || undefined,

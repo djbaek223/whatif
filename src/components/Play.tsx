@@ -57,7 +57,7 @@ export function PlayView({
   const [sound, setSoundOn] = useState(loadSoundPref);
   const [news, setNews] = useState(loadNewsPref);
   const pendingKey = pendingKeyOf(life);
-  // Each new choice card flips in with a whoosh.
+  // Each new choice card rises in with a whoosh.
   useEffect(() => {
     if (pendingKey) sfx.flip();
   }, [pendingKey]);
@@ -202,7 +202,7 @@ export function PlayView({
             )}
             <section
               aria-label="선택의 순간"
-              className={`sticky bottom-0 z-10 order-3 -mx-4 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-5 shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
+              className={`sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-5 shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
                 pending.rare ? "border-2 border-b-0 border-amber-400 dark:border-amber-500 lg:border-b-2" : "lg:border-stone-200 dark:lg:border-stone-800"
               } ${collapsed ? "max-lg:hidden" : ""}`}
             >
@@ -399,138 +399,125 @@ function ChoicePanel({
   const kind = pending.rare ? "✦ 희귀한 순간" : pending.small ? "작은 선택" : big ? "인생의 갈림길" : "선택의 순간";
 
   return (
-    <div className="card-flip">
-      <div className="card-flip-inner">
-        <div className="card-face space-y-3">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <p className={`text-xs font-semibold tracking-wide ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-                {kind} <span className="font-normal text-stone-500 tabular-nums dark:text-stone-400">· {when}</span>
-              </p>
-              <div className="flex shrink-0 items-center gap-1">
-                {auto && (
-                  <button
-                    type="button"
-                    onClick={onStopAuto}
-                    className="-my-1 flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                    aria-label="자동 재생 중, 눌러서 멈추기"
-                  >
-                    <PlayIcon small />
-                    자동 재생 중 · 멈추기
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={onCollapse}
-                  className="-my-2 -mr-2 flex items-center gap-0.5 px-2 py-2 text-xs text-stone-500 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden dark:text-stone-400 dark:hover:text-stone-200"
-                >
-                  내리기
-                  <Chevron />
-                </button>
-              </div>
-            </div>
-            {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{spanName(skipped)}을 건너뛰었어요.</p>}
-            <h2 className="mt-1 text-lg font-bold text-balance">{pending.title}</h2>
-            {sceneLoading ? (
-              <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
-                <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                <div className="h-3 w-11/12 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                <div className="h-3 w-3/5 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-                <p className="pt-0.5 text-xs text-stone-500 dark:text-stone-400">장면을 그리는 중이에요</p>
-              </div>
-            ) : (
-              <>
-                <p className={`mt-1 leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300 ${long && !more ? "line-clamp-3 lg:line-clamp-none" : ""}`}>{pending.scene}</p>
-                {long && (
-                  <button
-                    type="button"
-                    onClick={() => setMore(!more)}
-                    className="-my-1 py-1 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline lg:hidden dark:text-indigo-300"
-                  >
-                    {more ? "접기" : "더 보기"}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-          <div className="space-y-2">
-            {pending.options.map((o, i) => (
-              <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => onChoose(o.id)} aria-keyshortcuts={i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
-                <Kbd className="mt-0.5 hidden lg:inline-flex">{i + 1}</Kbd>
-                <span className="min-w-0">
-                  {o.label}
-                  {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
-                </span>
-              </Button>
-            ))}
-          </div>
-          {ai &&
-            pending.freeText &&
-            (writing ? (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Textarea
-                    rows={1}
-                    value={free}
-                    onChange={(e) => setFree(e.target.value)}
-                    placeholder="나라면 이렇게 하겠다"
-                    aria-label="직접 쓰기"
-                    maxLength={200}
-                    autoFocus
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  disabled={busy || free.trim().length < 2}
-                  onClick={() => {
-                    onChooseFree(free);
-                    setFree("");
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  {busy && <Spinner />}
-                  {busy ? "읽는 중" : "결정"}
-                </Button>
-              </div>
-            ) : (
+    <div className="rise-in space-y-3">
+      <div>
+        <div className="flex items-center justify-between gap-2">
+          <p className={`text-xs font-semibold tracking-wide ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
+            {kind} <span className="font-normal text-stone-500 tabular-nums dark:text-stone-400">· {when}</span>
+          </p>
+          <div className="flex shrink-0 items-center gap-1">
+            {auto && (
               <button
                 type="button"
-                onClick={() => setWriting(true)}
-                disabled={busy || sceneLoading}
-                className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
+                onClick={onStopAuto}
+                className="-my-1 flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
+                aria-label="자동 재생 중, 눌러서 멈추기"
               >
-                <PencilIcon />
-                직접 쓰기
+                <PlayIcon small />
+                자동 재생 중 · 멈추기
               </button>
-            ))}
+            )}
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="-my-2 -mr-2 flex items-center gap-0.5 px-2 py-2 text-xs text-stone-500 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden dark:text-stone-400 dark:hover:text-stone-200"
+            >
+              내리기
+              <Chevron />
+            </button>
+          </div>
         </div>
-        <div
-          aria-hidden
-          className="card-back flex items-center justify-center rounded-2xl bg-indigo-600 text-4xl text-white/90 [background-image:repeating-linear-gradient(45deg,transparent_0_10px,rgb(255_255_255/0.08)_10px_20px)]"
-        >
-          ?
-        </div>
+        {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{spanName(skipped)}을 건너뛰었어요.</p>}
+        <h2 className="mt-1 text-lg font-bold text-balance">{pending.title}</h2>
+        {sceneLoading ? (
+          <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
+            <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+            <div className="h-3 w-11/12 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+            <div className="h-3 w-3/5 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
+            <p className="pt-0.5 text-xs text-stone-500 dark:text-stone-400">장면을 그리는 중이에요</p>
+          </div>
+        ) : (
+          <>
+            <p className={`mt-1 leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300 ${long && !more ? "line-clamp-3 lg:line-clamp-none" : ""}`}>{pending.scene}</p>
+            {long && (
+              <button
+                type="button"
+                onClick={() => setMore(!more)}
+                className="-my-1 py-1 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline lg:hidden dark:text-indigo-300"
+              >
+                {more ? "접기" : "더 보기"}
+              </button>
+            )}
+          </>
+        )}
       </div>
+      <div className="space-y-2">
+        {pending.options.map((o, i) => (
+          <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => onChoose(o.id)} aria-keyshortcuts={i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
+            <Kbd className="mt-0.5 hidden lg:inline-flex">{i + 1}</Kbd>
+            <span className="min-w-0">
+              {o.label}
+              {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
+            </span>
+          </Button>
+        ))}
+      </div>
+      {ai &&
+        pending.freeText &&
+        (writing ? (
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Textarea
+                rows={1}
+                value={free}
+                onChange={(e) => setFree(e.target.value)}
+                placeholder="나라면 이렇게 하겠다"
+                aria-label="직접 쓰기"
+                maxLength={200}
+                autoFocus
+              />
+            </div>
+            <Button
+              variant="ghost"
+              disabled={busy || free.trim().length < 2}
+              onClick={() => {
+                onChooseFree(free);
+                setFree("");
+              }}
+              className="flex items-center gap-2"
+            >
+              {busy && <Spinner />}
+              {busy ? "읽는 중" : "결정"}
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setWriting(true)}
+            disabled={busy || sceneLoading}
+            className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
+          >
+            <PencilIcon />
+            직접 쓰기
+          </button>
+        ))}
     </div>
   );
 }
 
-/** A big fork turns over in the middle of the screen for a moment, then settles into the sheet below. */
+/** A big fork rises into the middle of the screen for a moment, then settles into the sheet below. */
 function BigMomentIntro({ pending, onDone }: { pending: PendingChoice; onDone: () => void }) {
   return (
     <div aria-hidden onClick={onDone} className="fixed inset-0 z-40 flex items-center justify-center bg-stone-950/45 p-6 [animation:fadein_.2s_ease-out]">
-      <div className="card-flip w-full max-w-sm">
-        <div className="card-flip-inner">
-          <div
-            className={`card-face rounded-3xl px-6 py-8 text-center shadow-2xl ${pending.rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950" : "bg-white dark:bg-stone-900"}`}
-          >
-            <p className={`text-xs font-semibold tracking-widest ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-              {pending.rare ? "✦ 희귀한 순간" : "인생의 갈림길"}
-            </p>
-            <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>
-            <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">탭하면 바로 고를 수 있어요</p>
-          </div>
-          <div className="card-back flex items-center justify-center rounded-3xl bg-indigo-600 text-5xl text-white/90 [background-image:repeating-linear-gradient(45deg,transparent_0_10px,rgb(255_255_255/0.08)_10px_20px)]">?</div>
+      <div className="rise-in w-full max-w-sm">
+        <div
+          className={`rounded-3xl px-6 py-8 text-center shadow-2xl ${pending.rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950" : "bg-white dark:bg-stone-900"}`}
+        >
+          <p className={`text-xs font-semibold tracking-widest ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
+            {pending.rare ? "✦ 희귀한 순간" : "인생의 갈림길"}
+          </p>
+          <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>
+          <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">탭하면 바로 고를 수 있어요</p>
         </div>
       </div>
     </div>
@@ -903,7 +890,7 @@ function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
               </li>
             );
           case "world":
-            return news === "hidden" ? null : <WorldBox key={`${i}-${news}`} items={it.items} open={news === "full"} />;
+            return news === "hidden" ? null : <WorldBox key={i} items={it.items} open={news === "full"} />;
           case "reaction":
             return (
               <Spine key={i}>
@@ -939,21 +926,11 @@ function Spine({ children, filled = false, className = "" }: { children: ReactNo
   );
 }
 
-function WorldBox({ items, open: initial }: { items: LogEntry[]; open: boolean }) {
-  const [open, setOpen] = useState(initial);
+/** The world's news for one date. Full or headline-only follows the ⋯ menu setting; the box itself has no toggle. */
+function WorldBox({ items, open }: { items: LogEntry[]; open: boolean }) {
   return (
     <li className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2 text-[13px] text-stone-600 dark:border-amber-900 dark:bg-amber-950/20 dark:text-stone-400">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">그때 세상은 · {items.length}</p>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          aria-expanded={open}
-          className="-my-1.5 -mr-1.5 rounded px-1.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-400"
-        >
-          {open ? "접기 ▴" : "펼치기 ▾"}
-        </button>
-      </div>
+      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">그때 세상은 · {items.length}</p>
       <ul className={open ? "mt-1 space-y-1.5" : "mt-0.5"}>
         {items.map((n, j) => {
           const [cat, month] = (n.tag ?? "").split(" · ");

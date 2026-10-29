@@ -19,6 +19,7 @@ export interface Profile {
   middle: string;
   high: string;
   university: string;
+  universityYear?: string; // YYYY entered; missing or empty means the usual year (straight from high school)
   major: string;
   family: string;
   mbti: string;

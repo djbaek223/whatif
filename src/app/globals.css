@@ -221,30 +221,33 @@ body {
   }
 }
 
-/* The choice card turns over to reveal its face. */
-.card-flip {
-  perspective: 900px;
+/* A new choice slides up from below and fades in. */
+.rise-in {
+  animation: rise-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
-.card-flip-inner {
-  position: relative;
-  transform-style: preserve-3d;
-  animation: card-flip 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-}
-.card-face {
-  backface-visibility: hidden;
-}
-.card-back {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-  backface-visibility: hidden;
-}
-@keyframes card-flip {
+@keyframes rise-in {
   from {
-    transform: rotateY(180deg);
+    opacity: 0;
+    transform: translateY(24px);
   }
   to {
-    transform: rotateY(0deg);
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* On phones the choice sheet itself slides up from the bottom edge. */
+@media (max-width: 1023.98px) {
+  .sheet-up {
+    animation: sheet-up 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
   }
 }
 
@@ -352,7 +355,8 @@ body {
   .drone,
   .sun-rays,
   .fx-particle,
-  .card-flip-inner,
+  .rise-in,
+  .sheet-up,
   .dice-roll,
   .confetti {
     animation: none !important;
