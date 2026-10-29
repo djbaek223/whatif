@@ -16,19 +16,20 @@ export interface SchoolStage {
 }
 
 /** School years from the birth date, Korean system: school starts in March of the year a child turns seven. */
-export function schoolYears(birthDate: string): { stages: SchoolStage[]; early: boolean } | null {
+export function schoolYears(birthDate: string, universityYear?: string): { stages: SchoolStage[]; early: boolean } | null {
   const [y, m] = birthDate.split("-").map(Number);
   if (!y || !m) return null;
   // Children born in January or February started a year early until the 2009 school year (빠른년생).
   const early = m <= 2 && y <= 2002;
   const e = y + (early ? 6 : 7);
+  const uni = Number(universityYear) || e + 12;
   return {
     early,
     stages: [
       { key: "elementary", label: "초등학교", from: e, to: e + 6 },
       { key: "middle", label: "중학교", from: e + 6, to: e + 9 },
       { key: "high", label: "고등학교", from: e + 9, to: e + 12 },
-      { key: "university", label: "대학교", from: e + 12, to: e + 16 },
+      { key: "university", label: "대학교", from: uni, to: uni + 4 },
     ],
   };
 }
