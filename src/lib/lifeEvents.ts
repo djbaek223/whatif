@@ -2,6 +2,7 @@
 // Kept apart from events.ts, which holds the big forks (exams, jobs, marriage, retirement).
 import type { EventDef } from "./events";
 import type { LifeState } from "./types";
+import { employee } from "./work";
 
 const kidAges = (s: LifeState) => (s.flags.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
 const hasKidAged = (lo: number, hi = lo) => (s: LifeState) => kidAges(s).some((a) => a >= lo && a <= hi);
@@ -406,7 +407,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 50,
     perYear: 0.9,
     cooldown: 14,
-    when: (s) => s.flags.employed && hasKidAged(0)(s) && year(s) >= 2001,
+    when: (s) => employee(s.flags) && hasKidAged(0)(s) && year(s) >= 2001,
     intro: (s) =>
       `${s.flags.children > 1 ? `${["", "첫째", "둘째", "셋째", "넷째", "다섯째"][s.flags.children] ?? "막내"}가` : "아이가"} 태어나고 몇 달, ${s.flags.company ? `${s.flags.company} 일과` : "일과"} 육아를 어떻게 병행할지 정해야 한다.`,
     choices: [
@@ -627,7 +628,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.25,
     cooldown: 8,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: "마감 시즌이라 한 달 내내 야근을 했다.",
@@ -643,7 +644,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.25,
     cooldown: 8,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: "회식 자리에서 팀장님의 노래를 세 곡이나 들었다.",
@@ -658,7 +659,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: (s) => 0.08 + Math.max(0, s.stats.knowledge - 50) / 600,
     cooldown: 24,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: "맡았던 프로젝트가 크게 성공해 성과급을 받았다.",
@@ -674,7 +675,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.15,
     cooldown: 24,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: "제일 친했던 입사 동기가 퇴사했다. 점심 먹을 사람이 없어졌다.",
@@ -689,7 +690,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.12,
     cooldown: 24,
-    when: (s) => s.flags.employed && year(s) >= 1990,
+    when: (s) => employee(s.flags) && year(s) >= 1990,
     intro: "",
     effect: {
       text: "처음으로 해외 출장을 다녀왔다. 시차 때문에 회의 내내 졸음을 참았다.",
@@ -704,7 +705,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 55,
     perYear: 0.08,
     cooldown: 72,
-    when: (s) => s.flags.employed && !/대표|사업가/.test(s.flags.job),
+    when: (s) => employee(s.flags),
     intro: "새로 온 팀장이 사람들 앞에서 고함을 지르고, 주말에도 업무 지시를 한다.",
     choices: [
       { id: "endure", label: "꾹 참고 버틴다", effect: { text: "이를 악물고 버텼다. 위장약을 달고 살았다.", stats: { happiness: -5, health: -3 } } },
@@ -730,7 +731,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 55,
     perYear: 0.1,
     cooldown: 84,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "이대로 괜찮을까. 퇴근 후 무언가를 배워야 할 것 같다.",
     choices: [
       {
@@ -758,7 +759,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: (s) => (s.stats.health < 55 || s.stats.happiness < 40 ? 0.15 : 0.04),
     cooldown: 60,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "아침에 눈을 뜨는 게 두렵다. 출근길 지하철에서 숨이 막힌다.",
     choices: [
       { id: "leave", label: "휴직하고 쉰다", effect: { text: "석 달을 쉬었다. 처음으로 아무것도 하지 않았다.", stats: { health: 7, happiness: 7 }, wealth: -600 } },

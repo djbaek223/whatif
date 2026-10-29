@@ -3,6 +3,7 @@
 // labelled imagined headlines keeps the future from going quiet.
 import type { Effect } from "./events";
 import type { LifeState } from "./types";
+import { employee, ownsBusiness } from "./work";
 
 export type NewsCat = "사회" | "정치" | "경제" | "스포츠" | "연예" | "세계" | "과학" | "가상";
 
@@ -31,7 +32,10 @@ function ageOfState(s: LifeState): number {
 // ── Impacts of the biggest shocks ─────────────────────────
 const imfCrisis = (s: LifeState): Effect | null => {
   if (!adult(s)) return { text: "어른들의 표정이 어두워졌다. 집안 분위기도 무거워졌다.", stats: { happiness: -3 } };
-  if (s.flags.employed && s.flags.job !== "공무원" && !s.flags.retired) {
+  if (ownsBusiness(s.flags)) {
+    return { text: "손님이 눈에 띄게 줄었다. 문을 열어 두는 것만으로도 버거웠다.", stats: { happiness: -6 }, incomePct: 0.75 };
+  }
+  if (employee(s.flags) && s.flags.job !== "공무원") {
     return {
       text: "회사에도 구조조정 바람이 불었다.",
       risk: {
@@ -49,7 +53,7 @@ const financialCrisis = (s: LifeState): Effect | null =>
 
 const pandemic = (s: LifeState): Effect | null => {
   if (!adult(s)) return { text: "학교 대신 화면 속 수업을 들었다. 친구들 얼굴을 보기 어려웠다.", stats: { relationships: -4, happiness: -2 } };
-  if (s.flags.employed && /사업|대표|자영업|가게/.test(s.flags.job)) {
+  if (ownsBusiness(s.flags)) {
     return { text: "손님이 뚝 끊겼다. 버티는 것 자체가 일이었다.", stats: { happiness: -6 }, incomePct: 0.8 };
   }
   return { text: "마스크를 쓰고 사람을 피하는 생활이 시작되었다.", stats: { relationships: -4, happiness: -3 } };

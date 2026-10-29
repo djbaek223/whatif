@@ -53,7 +53,8 @@ export interface LifeFlags {
   pet?: boolean;
   petSince?: number;
   // Concrete facts added later; optional so lives saved before them still load.
-  company?: string; // current employer, empty when not working
+  company?: string; // current employer, or the name of one's own shop or business; empty when not working
+  selfEmployed?: boolean; // runs a shop or business, or freelances (missing in older saves: read from the job title)
   school?: string; // current or last school
   tuition?: number; // 만원 / 년, while enrolled
   workMonths?: number; // months worked so far, for titles and experienced pay
@@ -116,6 +117,8 @@ export interface CustomOption {
   change: CustomChange;
   chance: number; // 1 = always works
   failure: string;
+  title?: string; // startBusiness: what the person now does, e.g. 카페 사장
+  place?: string; // startBusiness: the shop or business, e.g. 연남동 작은 카페
 }
 
 export type CustomChange =
@@ -123,6 +126,8 @@ export type CustomChange =
   | "hire"
   | "switchJob"
   | "quitJob"
+  | "startBusiness"
+  | "closeBusiness"
   | "enrollUniversity"
   | "enrollGraduate"
   | "buyHome"
@@ -222,6 +227,7 @@ export interface LifeState {
   recent?: string[]; // "category:keyword,keyword" of recent moments, so the narrator avoids repeats
   rares?: RareMoment[];
   badges?: { id: string; mi: number; age: number }[]; // achievements, in the order they were earned
+  memory?: string[]; // every lasting change to this life ("34세(2019년 3월): 카페 창업"), kept for good and given to the narrator
 }
 
 export interface Ending {

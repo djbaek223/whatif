@@ -3,6 +3,7 @@
 import { tierOf } from "./catalog";
 import { ageOf } from "./events";
 import type { LifeState } from "./types";
+import { ownsBusiness } from "./work";
 
 export type Era = "old" | "apartment" | "highrise" | "future";
 export type Season = "spring" | "sunny" | "rain" | "autumn" | "snow";
@@ -31,7 +32,6 @@ export interface SceneState {
   store: string | null; // sign on the shop when this person runs one
 }
 
-export const BUSINESS = /대표|사업가|창업|프리랜서|자영업|사장/;
 
 export function eraOf(year: number): Era {
   if (year < 1990) return "old";
@@ -58,7 +58,7 @@ function outfitOf(s: LifeState, age: number): Outfit {
   if (f.education === "university" || f.education === "graduate") return "casual";
   if (f.retired || (!f.employed && age >= 65)) return "retired";
   if (!f.employed) return "casual";
-  if (BUSINESS.test(f.job)) return "apron";
+  if (ownsBusiness(f)) return "apron";
   const tier = tierOf(f.company);
   if (tier === "field" || tier === "contract" || /생산|기사|기술|현장|정비|배달|기능/.test(f.job)) return "work";
   if (tier === "it" || tier === "startup") return "casual";
@@ -98,7 +98,7 @@ export function sceneOf(s: LifeState): SceneState {
     })
     .filter((k) => k.age < KID_LEAVES)
     .slice(-3);
-  const store = f.employed && !f.retired && BUSINESS.test(f.job) ? shortSign(f.company) : null;
+  const store = ownsBusiness(f) ? shortSign(f.company) : null;
   return { year, month, era: eraOf(year), season: seasonOf(month), me, spouse, kids, pet: !!f.pet, home: f.homeOwner, store };
 }
 

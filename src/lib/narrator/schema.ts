@@ -54,7 +54,7 @@ export const SceneSchema = z.object({
 });
 export type SceneResult = z.infer<typeof SceneSchema>;
 
-const CHANGES = ["none", "hire", "switchJob", "quitJob", "enrollUniversity", "enrollGraduate", "buyHome", "addChild", "startDating", "marry", "retire"] as const;
+const CHANGES = ["none", "hire", "switchJob", "quitJob", "startBusiness", "closeBusiness", "enrollUniversity", "enrollGraduate", "buyHome", "addChild", "startDating", "marry", "retire"] as const;
 const THEMES = ["career", "study", "family", "love", "risk", "money", "health", "leisure"] as const;
 
 const CATEGORIES = ["daily", "relation", "work", "money", "health", "era", "chance"] as const;
@@ -72,7 +72,8 @@ export const MomentSchema = z.object({
         label: z.string().describe("선택지 문장, 30자 이내"),
         theme: z.enum(THEMES).describe("이 선택이 주로 무엇에 관한 것인지"),
         change: z.enum(CHANGES).describe("이 선택으로 바뀌는 큰 상태. allowed_changes 안에서만 고르고, 없으면 none"),
-        place: z.string().describe("hire/switchJob/enroll이면 구체적인 실제 회사·학교 이름, 아니면 빈 문자열"),
+        place: z.string().describe("hire/switchJob/enroll이면 구체적인 실제 회사·학교 이름, startBusiness면 차리는 가게·사업 이름 (예: 연남동 작은 카페), 아니면 빈 문자열"),
+        jobTitle: z.string().describe("startBusiness면 새 직업 이름 (예: 카페 사장, 프리랜서 디자이너), 아니면 빈 문자열"),
         salary: z.number().int().describe("hire/switchJob이면 연봉(만원, 2026년 기준), 아니면 0"),
         money: z.number().int().describe("이 선택으로 드는 돈(음수)이나 들어오는 돈(양수), 만원. 없으면 0"),
         stats: z
@@ -89,6 +90,9 @@ export type MomentResult = z.infer<typeof MomentSchema>;
 
 export const ClassifySchema = z.object({
   choiceId: z.string().describe("사용자의 글과 가장 가까운 선택지 id"),
+  change: z.enum(CHANGES).describe("사용자의 글이 말하는 큰 상태 변화. allowed_changes 안에서만 고르고, 큰 변화가 없으면 none"),
+  jobTitle: z.string().describe("change가 startBusiness면 새 직업 이름 (예: 카페 사장), 아니면 빈 문자열"),
+  place: z.string().describe("change가 hire/switchJob/startBusiness면 사용자가 말한 회사·가게 이름, 없으면 빈 문자열"),
 });
 export type ClassifyResult = z.infer<typeof ClassifySchema>;
 
@@ -114,7 +118,7 @@ export type NarrateRequest =
       seeds?: string[];
     }
   | { kind: "moment"; summary: string; facts: string; persona: string; allowed: string[]; recent: string[]; seeds: string[]; eraHints: string[] }
-  | { kind: "classify"; text: string; options: { id: string; label: string }[] }
+  | { kind: "classify"; text: string; options: { id: string; label: string }[]; allowed?: string[] }
   | { kind: "ending"; summary: string; persona: string; profile: unknown; turningPoint: unknown; deathAge: number };
 
 // How long the player waits for the narrator before falling back to templates. The opening and ending

@@ -38,6 +38,7 @@ import type {
   TurningPoint,
 } from "./types";
 import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema";
+import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
 
 export { formatWealth };
 
@@ -150,6 +151,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     employed,
     job: employed ? (GENERIC_JOB.test(jobTitle) || !jobTitle ? titleFor(tier, workYears) : jobTitle) : "",
     company: company || undefined,
+    ...(employed && BUSINESS.test(jobTitle) ? { selfEmployed: true } : {}),
     school: school || undefined,
     tuition: school && (init.education === "university" || init.education === "graduate") ? tuitionFor(school, init.education) : undefined,
     workMonths: workYears * 12,
@@ -181,7 +183,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     options,
     freeText: true,
   };
-  return {
+  const life: LifeState = {
     version: 1,
     profile,
     turningPoint: tp,
@@ -214,6 +216,8 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     recent: [],
     rares: [],
   };
+  life.memory = [`${stamp(life)}: 변곡점에서 출발 (${statusLabel(life)})`];
+  return life;
 }
 
 /** Whether the choice's new school state is possible at this age; otherwise it is ignored ("same"). */
@@ -264,7 +268,23 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
         ...(s.flags.employed && !title ? { switchJob: { payPct: 1.15 } } : { hire: { tier, title } }),
       };
     }
-    case "risk":
+    case "risk": {
+      // A venture with a name (카페 창업, 유튜버) starts for real: the old job is left behind and how it goes plays out later.
+      const generic = !job || /^(창업가?|사업가?|자영업자?)$/.test(job);
+      const own = !generic || /창업|사업|가게|카페|식당|차리|차린|열어|프리랜서|유튜|장사/.test(choice.label);
+      if (own) {
+        const named = businessTitle(`${choice.label} ${job ?? ""}`);
+        const place = choice.place?.trim();
+        return {
+          text: s.flags.employed && !ownsBusiness(s.flags) ? "사표를 내고 내 일을 시작했다." : "내 일을 시작했다.",
+          stats: { happiness: 6, knowledge: 3 },
+          wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))),
+          note: "창업 자금",
+          flags: { education: s.flags.education === "highschool" ? "done" : s.flags.education },
+          startBusiness: { title: generic ? named : job, name: place && !GENERIC_PLACE.test(place) ? place : undefined, income: 220 },
+          intense: 6,
+        };
+      }
       return {
         text: "큰 모험을 시작했다.",
         wealth: -1000,
@@ -280,6 +300,7 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
           failure: { text: "모험은 실패로 끝났지만 많은 걸 배웠다.", stats: { happiness: -10, knowledge: 8 }, wealth: -1500, note: "정리하며 남은 손실" },
         },
       };
+    }
     case "love":
       return {
         text: "마음이 이끄는 쪽을 택했다.",
@@ -356,7 +377,7 @@ const payCap = (tier: CompanyTier) => Math.round(SALARY[tier][1] * 2.1);
 
 /** Owners and freelancers set their own pay; employees stop at their league's ceiling. */
 function capPay(s: LifeState, before: number) {
-  if (!s.flags.employed || /대표|사업가|창업|프리랜서|자영업|사장/.test(s.flags.job)) return;
+  if (!employee(s.flags)) return;
   const tier = tierOf(s.flags.company) ?? guessTier(`${s.flags.company ?? ""} ${s.flags.job}`);
   s.income = Math.min(s.income, Math.max(before * 1.05, Math.round(payCap(tier) / 12)));
   s.income = Math.round(s.income);
@@ -372,14 +393,16 @@ function planHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>, 
 function doHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, out: Applied, plan?: OptionPlan) {
   const p = planHire(s, rng, spec, plan);
   const title = spec.title ?? titleFor(p.tier as CompanyTier, yearsWorked(s));
-  s.flags = { ...s.flags, employed: true, job: title, company: p.place };
+  if (ownsBusiness(s.flags)) out.texts.push(`${eulReul(s.flags.company || "하던 일")} 정리했다.`);
+  s.flags = { ...s.flags, employed: true, selfEmployed: false, job: title, company: p.place };
   s.income = Math.round(p.salary / 12);
   out.texts.push(p.tier === "civil" ? `${p.place}에 ${withRo(title)} 발령받았다. 연봉 ${won(p.salary)}.` : `${p.place}에 ${withRo(title)} 입사했다. 연봉 ${won(p.salary)}.`);
   out.payShown = true;
 }
 
 function doSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"]>, out: Applied, plan?: OptionPlan) {
-  if (!s.flags.employed) return doHire(s, rng, { tier: "auto" }, out, plan);
+  // Someone without an employer (job-seeking, or running their own shop) takes a job instead of moving between companies.
+  if (!employee(s.flags)) return doHire(s, rng, { tier: "auto" }, out, plan);
   const p = planSwitch(s, rng, spec, plan);
   const before = s.income * 12;
   const keepTitle = !/^(사원|대리|과장|차장|부장|팀원|연구원|선임연구원|책임연구원|\d급 공무원)$/.test(s.flags.job);
@@ -387,6 +410,17 @@ function doSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"]>
   s.flags = { ...s.flags, job: title, company: p.place };
   s.income = Math.round(p.salary / 12);
   out.texts.push(`${withRo(p.place)} 이직했다 (${title}). 연봉 ${won(before)} → ${won(p.salary)}.`);
+  out.payShown = true;
+}
+
+/** Opens a shop or business of one's own. The old employer is left behind; the venture's fate comes later (moreEvents: venture-result). */
+function doStartBusiness(s: LifeState, spec: NonNullable<Effect["startBusiness"]>, out: Applied) {
+  const title = spec.title?.trim() || "사업가";
+  const name = spec.name?.trim() || undefined;
+  s.flags = { ...s.flags, employed: true, selfEmployed: true, retired: false, job: title, company: name };
+  s.income = Math.round(spec.income ?? 220);
+  s.marks = { ...s.marks, venture: s.mi };
+  out.texts.push(`${name ? `${eulReul(name)} 열었다.` : `${withRo(title)} 첫발을 뗐다.`} 자리 잡기 전까지 수입은 월 ${won(s.income)} 남짓이다.`);
   out.payShown = true;
 }
 
@@ -454,10 +488,19 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.incomePct) s.income = Math.round(s.income * effect.incomePct);
   if (effect.flags) {
     const hadPet = s.flags.pet;
+    const jobBefore = s.flags.job;
     s.flags = { ...s.flags, ...effect.flags };
     if (s.flags.pet && !hadPet) s.flags.petSince = s.mi;
+    // A new title like "사업가" or "공동대표" means working for oneself: the old employer is gone unless the effect names the new place.
+    if (effect.flags.job !== undefined && s.flags.employed && s.flags.job !== jobBefore) {
+      s.flags.selfEmployed = BUSINESS.test(s.flags.job);
+      if (s.flags.selfEmployed && !("company" in effect.flags)) s.flags.company = undefined;
+    }
   }
-  if (!s.flags.employed) s.flags.company = undefined;
+  if (!s.flags.employed) {
+    s.flags.company = undefined;
+    s.flags.selfEmployed = undefined;
+  }
   if (effect.eduYears) s.flags.eduUntil = s.mi + effect.eduYears * 12;
   if (effect.busyMonths) s.flags.busyUntil = Math.max(s.flags.busyUntil, s.mi + effect.busyMonths);
   if (effect.addChild) {
@@ -471,6 +514,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.promote) doPromote(s, out);
   if (effect.enroll) doEnroll(s, rng, effect.enroll, out, plan);
   if (effect.buyHome) doBuyHome(s, rng, effect.buyHome, out, plan);
+  if (effect.startBusiness) doStartBusiness(s, effect.startBusiness, out);
   if (effect.homeValuePct && s.flags.homeOwner && s.flags.homeValue) {
     const before = s.flags.homeValue;
     const change = Math.round((before * effect.homeValuePct) / 100) * 100;
@@ -493,14 +537,55 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
 function applyTop(s: LifeState, effect: Effect, rng: Rng, plan?: OptionPlan): { text: string; delta: Partial<Stats>; money?: number } {
   const wealth = s.wealth;
   const income = s.income;
+  const before = structuredClone(s.flags);
   const out = applyEffect(s, effect, rng, { texts: [], delta: {} }, plan);
+  remember(s, before);
   if (s.income > income && !out.payShown) capPay(s, income);
-  if (!out.payShown && s.flags.employed && income > 0 && s.income > 0 && s.income !== income) out.texts.push(`연봉 ${won(income * 12)} → ${won(s.income * 12)}.`);
+  if (!out.payShown && s.flags.employed && income > 0 && s.income > 0 && s.income !== income)
+    out.texts.push(ownsBusiness(s.flags) ? `월수입 ${won(income)} → ${won(s.income)}.` : `연봉 ${won(income * 12)} → ${won(s.income * 12)}.`);
   const money = s.wealth - wealth;
   return { text: out.texts.join(" "), delta: out.delta, ...(money ? { money } : {}) };
 }
 
 const clone = (s: LifeState): LifeState => structuredClone(s);
+
+const MAX_MEMORY = 60;
+
+/** "34세(2019년 3월)": when something happened, as the narrator reads it. */
+const stamp = (s: LifeState) => `${ageOf(s)}세(${formatMi(s.mi)})`;
+
+/** The lasting changes between two states, in plain words: jobs, a business, school, love, children, a home. */
+function changesBetween(a: LifeFlags, s: LifeState): string[] {
+  const b = s.flags;
+  const out: string[] = [];
+  const wasOwn = ownsBusiness(a);
+  const isOwn = ownsBusiness(b);
+  const workName = (f: LifeFlags) => (f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
+  if (b.retired && !a.retired) out.push(`은퇴${a.employed ? ` (${workName(a)}에서)` : ""}`);
+  else if (isOwn && (!wasOwn || a.company !== b.company)) out.push(`창업: ${b.job}${b.company ? ` (${b.company} 운영)` : ""}${a.employed && !wasOwn ? `, ${workName(a)} 퇴사` : ""}`);
+  else if (b.employed && !isOwn && (!a.employed || wasOwn || a.company !== b.company))
+    out.push(`${a.employed && !wasOwn ? "이직" : wasOwn ? "가게를 정리하고 취업" : "취업"}: ${workName(b)}`);
+  else if (b.employed && b.job !== a.job && b.company === a.company) out.push(`직함 변경: ${b.job}`);
+  else if (!b.employed && a.employed && !b.retired) out.push(wasOwn ? `폐업: ${a.company || a.job} 정리` : `퇴사: ${workName(a)}`);
+  if (b.education !== a.education || b.school !== a.school) {
+    if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school) out.push(`입학: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}`);
+    else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(`학업 마침${a.school ? `: ${a.school}` : ""}`);
+  }
+  if (b.partner !== a.partner)
+    out.push({ none: "연인과 헤어짐", dating: "연애 시작", married: "결혼", divorced: "이혼", widowed: "배우자와 사별" }[b.partner]);
+  if (b.children > a.children) out.push(`${ORDINAL[b.children] ?? `${b.children}째`} 아이 출생`);
+  if (b.noKids && !a.noKids) out.push("아이를 갖지 않기로 함");
+  if (b.homeOwner && !a.homeOwner) out.push(`내 집 마련: ${b.homeArea ?? ""}`.trim());
+  if (b.pet && !a.pet) out.push("반려동물을 들임");
+  return out;
+}
+
+/** Writes lasting changes into the life's memory, which is kept for good and given to the narrator with every scene. */
+function remember(s: LifeState, before: LifeFlags) {
+  const changes = changesBetween(before, s);
+  if (!changes.length) return;
+  s.memory = [...(s.memory ?? []), `${stamp(s)}: ${changes.join(", ")}`].slice(-MAX_MEMORY);
+}
 
 const MAX_SEEDS = 8;
 
@@ -529,7 +614,7 @@ function planFor(effect: Effect, s: LifeState, rng: Rng): OptionPlan | undefined
   const e = effect.hire || effect.switchJob || effect.enroll || effect.buyHome ? effect : effect.risk?.success;
   const risky = e !== effect; // the place only comes with the gamble working out
   if (e?.hire) return { kind: "hire", risky, ...planHire(s, rng, e.hire) };
-  if (e?.switchJob) return s.flags.employed ? { kind: "switch", risky, from: s.income * 12, ...planSwitch(s, rng, e.switchJob) } : { kind: "hire", risky, ...planHire(s, rng, { tier: "auto" }) };
+  if (e?.switchJob) return employee(s.flags) ? { kind: "switch", risky, from: s.income * 12, ...planSwitch(s, rng, e.switchJob) } : { kind: "hire", risky, ...planHire(s, rng, { tier: "auto" }) };
   if (e?.enroll) return { kind: "enroll", risky, ...planEnroll(s, rng, e.enroll) };
   if (e?.buyHome) return { kind: "home", risky, ...planHome(s, rng, e.buyHome) };
   if (effect.wealth && Math.abs(effect.wealth) >= 100) return { kind: "cost", cost: effect.wealth };
@@ -579,7 +664,71 @@ export function pendingFor(ev: EventDef, s: LifeState, rng: Rng = new Rng(s.rng)
   };
 }
 
-export function resolveChoice(state: LifeState, optionId: string, freeText?: string): LifeState {
+/** A life change the player wrote in their own words, with what they named. */
+export interface Intent {
+  change: CustomChange;
+  title?: string;
+  place?: string;
+}
+
+const negated = (t: string) => /(않|안\s|안해|못\s|말자|말고|포기|접어\s?두)/.test(t);
+
+const INTENT_WORDS: [CustomChange, RegExp][] = [
+  ["closeBusiness", /폐업|(가게|카페|식당|사업|장사)[을를]?\s?(접|정리|닫)/],
+  ["startBusiness", /창업|개업|자영업|프리랜서|유튜브|유튜버|(가게|카페|식당|매장|사업|장사|회사)[을를]?\s?(차|열|낸|내|시작|해\s?본|한다|하기)/],
+  ["retire", /은퇴/],
+  ["quitJob", /퇴사|사표|사직|(회사|직장|일)[을를]?\s?(그만|나오|나온|관두)/],
+  ["switchJob", /이직|회사를?\s?옮/],
+  ["hire", /취업|취직|입사|재취업|(회사|직장)에\s?(들어|다니)/],
+  ["enrollGraduate", /대학원|석사|박사/],
+  ["enrollUniversity", /대학에?\s?(가|진학|입학|들어)|편입|재입학/],
+  ["marry", /결혼|청혼|프러포즈/],
+  ["startDating", /고백|사귀|연애를?\s?시작/],
+  ["addChild", /아이를?\s?(갖|낳)|임신|둘째|셋째/],
+  ["buyHome", /(집|아파트)[을를]?\s?(사|산|샀|마련|매수)|영끌/],
+];
+
+/** Reads a life change from the player's own words, when the narrator can't: "회사를 그만두고 카페를 차린다" opens a cafe. */
+export function intentFromText(text: string, s: LifeState): Intent | null {
+  const t = text.trim();
+  if (!t || negated(t)) return null;
+  const allowed = new Set(allowedChanges(s));
+  for (const [change, re] of INTENT_WORDS) {
+    if (!re.test(t) || !allowed.has(change)) continue;
+    return change === "startBusiness" ? { change, title: businessTitle(t) } : { change };
+  }
+  return null;
+}
+
+/** The big changes an effect makes (or makes if its gamble works), in the narrator's terms. */
+function changesOf(e: Effect | undefined, s: LifeState): Set<CustomChange> {
+  const out = new Set<CustomChange>();
+  for (const x of [e, e?.risk?.success]) {
+    if (!x) continue;
+    if (x.hire) out.add("hire");
+    if (x.switchJob) out.add(employee(s.flags) ? "switchJob" : "hire");
+    if (x.startBusiness || (x.flags?.job && BUSINESS.test(x.flags.job))) out.add("startBusiness");
+    if (x.flags?.employed === false && !x.flags.retired) out.add("quitJob").add("closeBusiness");
+    if (x.flags?.retired) out.add("retire");
+    if (x.enroll?.level === "university") out.add("enrollUniversity");
+    if (x.enroll && x.enroll.level !== "university") out.add("enrollGraduate");
+    if (x.buyHome) out.add("buyHome");
+    if (x.addChild) out.add("addChild");
+    if (x.flags?.partner === "dating") out.add("startDating");
+    if (x.flags?.partner === "married") out.add("marry");
+  }
+  return out;
+}
+
+const INTENT_TEXT: Partial<Record<CustomChange, string>> = {
+  quitJob: "회사를 그만뒀다.",
+  closeBusiness: "가게를 정리했다.",
+  retire: "일을 내려놓고 은퇴했다.",
+  marry: "결혼했다.",
+  startDating: "연애를 시작했다.",
+};
+
+export function resolveChoice(state: LifeState, optionId: string, freeText?: string, intent?: Intent | null): LifeState {
   const s = clone(state);
   const pending = s.pending;
   if (!pending) return s;
@@ -598,6 +747,15 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
     effect = customEffect(pending.custom[optionId]);
   } else {
     effect = eventById(pending.eventId)?.choices?.find((c) => c.id === optionId)?.effect;
+  }
+  // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
+  // even if the closest option was about staying at the company.
+  const wish = freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : intentFromText(freeText, s)) : null;
+  if (wish && allowedChanges(s).includes(wish.change) && !changesOf(effect, s).has(wish.change)) {
+    const text = wish.change === "startBusiness" && employee(s.flags) ? "사표를 냈다." : (INTENT_TEXT[wish.change] ?? "");
+    effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
+    if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: "창업 자금" };
+    plan = undefined;
   }
   const picked = freeText?.trim() || option?.label || optionId;
   s.choices.push({ mi: s.mi, age: ageOf(s), title: pending.title, picked });
@@ -631,8 +789,10 @@ export function allowedChanges(s: LifeState): CustomChange[] {
   const age = ageOf(s);
   const out: CustomChange[] = ["none"];
   const single = f.partner === "none" || f.partner === "divorced" || f.partner === "widowed";
-  if (!f.employed && !f.retired && age >= 18 && f.education !== "school") out.push("hire");
-  if (f.employed) out.push("switchJob", "quitJob");
+  if (!f.employed && !f.retired && age >= 18 && f.education !== "school") out.push("hire", "startBusiness");
+  // An employee can move or leave; someone running their own shop can close it or go back to working for someone.
+  if (employee(f)) out.push("switchJob", "quitJob", "startBusiness");
+  if (ownsBusiness(f)) out.push("hire", "closeBusiness");
   if (f.employed && age >= 50) out.push("retire");
   if (age >= 18 && age < 60 && (f.education === "done" || f.education === "highschool")) out.push("enrollUniversity");
   if (age >= 22 && age < 60 && f.education === "done" && !!f.school) out.push("enrollGraduate");
@@ -643,14 +803,17 @@ export function allowedChanges(s: LifeState): CustomChange[] {
   return out;
 }
 
-function changeEffect(c: CustomChange): Partial<Effect> {
+function changeEffect(c: CustomChange, o?: Pick<CustomOption, "title" | "place">): Partial<Effect> {
   switch (c) {
     case "hire":
       return { hire: { tier: "auto" } };
     case "switchJob":
       return { switchJob: { payPct: 1.15 } };
     case "quitJob":
+    case "closeBusiness":
       return { flags: { employed: false, job: "" }, income: 0 };
+    case "startBusiness":
+      return { startBusiness: { title: o?.title?.trim() || businessTitle(`${o?.place ?? ""}`), name: o?.place?.trim() || undefined }, intense: 6 };
     case "retire":
       return { flags: { employed: false, retired: true, job: "은퇴" }, income: 130 };
     case "enrollUniversity":
@@ -671,7 +834,7 @@ function changeEffect(c: CustomChange): Partial<Effect> {
 }
 
 function customEffect(c: CustomOption): Effect {
-  const base: Effect = { text: c.outcome, stats: c.stats, ...(c.money ? { wealth: c.money } : {}), ...changeEffect(c.change) };
+  const base: Effect = { text: c.outcome, stats: c.stats, ...(c.money ? { wealth: c.money } : {}), ...changeEffect(c.change, c) };
   if (c.chance >= 0.99) return base;
   return { text: "", risk: { chance: () => c.chance, success: base, failure: { text: c.failure || "생각대로 되지는 않았다.", stats: { happiness: -4 } } } };
 }
@@ -709,8 +872,12 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
       failure: (o.failure || "").trim().slice(0, 160),
     };
     const place = o.place?.trim().slice(0, 30);
+    if (change === "startBusiness") {
+      c.title = (o.jobTitle.trim() || businessTitle(`${o.label} ${o.outcome}`)).slice(0, 20);
+      if (place) c.place = place;
+    }
     // The narrator may pick the employer, but a reach for a top league is a gamble for someone who isn't ready.
-    const tier = place && (change === "hire" || change === "switchJob") ? (tierOf(place) ?? guessTier(place)) : undefined;
+    const tier = place && (change === "hire" || (change === "switchJob" && employee(s.flags))) ? (tierOf(place) ?? guessTier(place)) : undefined;
     if (tier && ["large", "it", "foreign"].includes(tier) && s.stats.knowledge < 65) c.chance = Math.min(c.chance, 0.5);
     custom[id] = c;
     const effect = customEffect(c);
@@ -867,6 +1034,7 @@ const SEASON: Record<number, string[]> = {
 function statusLine(s: LifeState, rng: Rng): Pick<LogEntry, "text" | "facts"> {
   const f = s.flags;
   if (f.employed && !f.retired && f.education === "done" && s.mi >= f.busyUntil && f.company && rng.chance(0.3)) {
+    if (ownsBusiness(f)) return { text: "가게 문을 열고 닫는 하루가 이어졌다.", facts: [`${f.company} ${f.job}`, `월수입 ${won(s.income)}`] };
     return { text: "출퇴근이 이어졌다.", facts: [`${f.company} ${f.job}`, `연봉 ${won(s.income * 12)}`] };
   }
   return { text: statusSentence(s, rng) };
@@ -888,6 +1056,13 @@ function statusSentence(s: LifeState, rng: Rng): string {
   if (f.retired) {
     if (f.children > 0) return pick("느긋한 하루가 이어졌다.", "자식들의 안부 전화를 기다렸다.", "공원 벤치에서 햇볕을 쬐었다.", "텃밭에 상추를 심었다.");
     return pick("느긋한 하루가 이어졌다.", "공원 벤치에서 햇볕을 쬐었다.", "아침 산책이 하루의 시작이 되었다.");
+  }
+  if (ownsBusiness(f)) {
+    const since = s.marks?.venture;
+    if (f.company && since !== undefined && rng.chance(0.15)) return `${eulReul(f.company)} 연 지 ${Math.max(1, Math.round((s.mi - since) / 12))}년이 되어 갔다.`;
+    if (kidsUnder(s, 13)) return pick(`${withRo(f.job)} 일하며 ${f.children > 1 ? `아이 ${f.children}명을` : "아이를"} 키웠다.`, "문 닫고 돌아오면 아이는 벌써 잠들어 있었다.");
+    if (f.partner === "married") return pick(`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, "쉬는 날이면 배우자와 장을 보러 갔다.");
+    return pick(`${withRo(f.job)} 하루하루를 꾸렸다.`, "손님이 많은 날도, 파리만 날리는 날도 있었다.", "밤마다 장부를 펴고 이번 달 매출을 계산했다.", "쉬는 날 없이 일하는 주가 이어졌다.");
   }
   if (f.employed) {
     if (f.company && rng.chance(0.15)) return `${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`;
@@ -913,6 +1088,13 @@ function withRo(word: string): string {
   if (/[LlRr17８8]/.test(last)) return `${word}로`;
   if (/[MmNn0369]/.test(last)) return `${word}으로`;
   return /[A-Za-z245]/.test(last) ? `${word}로` : `${word}(으)로`;
+}
+
+/** Appends 을 or 를 to a Korean noun, by its final consonant. */
+function eulReul(word: string): string {
+  const code = (word.replace(/\)+$/, "").trim().at(-1) ?? "").charCodeAt(0) - 0xac00;
+  if (code >= 0 && code <= 11171) return `${word}${code % 28 === 0 ? "를" : "을"}`;
+  return `${word}을(를)`;
 }
 
 function kidsUnder(s: LifeState, age: number): boolean {
@@ -1093,6 +1275,7 @@ export function statusLabel(s: LifeState): string {
   else if (f.education === "university") parts.push(f.school ? `${f.school} 재학` : "대학생");
   else if (f.education === "graduate") parts.push(f.school ? `${f.school} 재학` : "대학원생");
   else if (f.retired) parts.push("은퇴");
+  else if (ownsBusiness(f)) parts.push(f.company ? `${f.job}(${f.company})` : f.job);
   else if (f.employed) parts.push(f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
   else parts.push("구직 중");
   const partner = { none: "", dating: "연애 중", married: "기혼", divorced: "이혼", widowed: "사별" }[f.partner];
@@ -1105,7 +1288,7 @@ export function statusLabel(s: LifeState): string {
 /** Pay as a person would say it: yearly salary at work, monthly otherwise. */
 export function payLabel(s: LifeState): string {
   if (s.income <= 0) return "";
-  if (s.flags.employed && !s.flags.retired) return `연봉 ${won(s.income * 12)}`;
+  if (s.flags.employed && !s.flags.retired && !ownsBusiness(s.flags)) return `연봉 ${won(s.income * 12)}`;
   return `월 ${won(s.income)}`;
 }
 
@@ -1116,9 +1299,12 @@ export function lifeFacts(s: LifeState): string {
   const kidAges = (f.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
   const study =
     f.education === "school" ? `${lifeStage(age) || "학생"}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? "고등학생" : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
+  const since = s.marks?.venture !== undefined ? Math.max(0, s.mi - s.marks.venture) : null;
   const work = f.retired
     ? `은퇴함, 연금 월 ${won(s.income)}`
-    : f.employed
+    : ownsBusiness(f)
+      ? `자영업: ${f.job}${f.company ? `, ${f.company} 운영` : ""}${since !== null ? ` (시작한 지 ${since < 12 ? `${since}개월` : `${Math.floor(since / 12)}년`})` : ""}, 월수입 ${won(s.income)}. 회사에 다니지 않으므로 상사·회식·승진·육아휴직·이직 제안·희망퇴직 같은 직장 이야기는 해당 없음`
+      : f.employed
       ? `${f.company ? `${f.company} ` : ""}${f.job}로 일하는 중, ${payLabel(s)}, 경력 ${yearsWorked(s)}년`
       : f.education === "done" && age >= 18
         ? "일자리 없음 (구직 중). 회사에 다니지 않으므로 휴직·승진·회사 이야기는 해당 없음"
@@ -1149,6 +1335,7 @@ export function lifeSummary(s: LifeState, recent = 12): string {
   const lines = [
     `현재 ${formatMi(s.mi)}, ${age}세. 상태: ${statusLabel(s)}.`,
     lifeFacts(s),
+    `인생 이력 (이미 일어난 사실, 시간순): ${(s.memory ?? []).join(" / ") || "없음"}`,
     `지금까지의 주요 선택: ${s.choices.map((c) => `${c.age}세 ${c.title} → ${c.picked}`).join(" / ") || "없음"}`,
     `최근 기록: ${s.log
       .filter((l) => l.kind !== "turn" && l.kind !== "news")

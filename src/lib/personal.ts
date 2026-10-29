@@ -65,6 +65,7 @@ export function traitsFrom(profile: Profile, persona = ""): Traits {
 
 /** What an outcome is mostly about, read from what it changes. */
 export function effectTheme(e: Effect): Theme {
+  if (e.startBusiness) return "risk";
   if (e.hire || e.switchJob || e.promote || e.flags?.employed !== undefined || e.flags?.job !== undefined) return "career";
   if (e.enroll || e.eduYears || e.flags?.education) return "study";
   if (e.addChild || e.flags?.noKids) return "family";
