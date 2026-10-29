@@ -142,7 +142,7 @@ export default function Game() {
     setScreen("loading");
     const mi = turningPointMi(t);
     const res = ai
-      ? await narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(Math.floor(mi / 12)), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) })
+      ? await narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(mi), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) })
       : null;
     const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
     personalized.current = null;
@@ -238,7 +238,7 @@ export default function Game() {
     personalized.current = key;
     const pending = life.pending;
     const seeds = life.seeds ?? [];
-    const common = { summary: lifeSummary(life), facts: lifeFacts(life), persona: life.persona, eraHints: eraHints(Math.floor(life.mi / 12)) };
+    const common = { summary: lifeSummary(life), facts: lifeFacts(life), persona: life.persona, eraHints: eraHints(life.mi) };
     if (pending.eventId === "personal") {
       const res = await narrate<MomentResult>({ kind: "moment", ...common, allowed: allowedChanges(life), recent: life.recent ?? [], seeds });
       // An unwritten moment is dropped as if it never happened, so play goes on.

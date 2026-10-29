@@ -494,7 +494,18 @@ export function Onboarding({
               error={err?.text}
               onTypedError={setTypedError}
             />
-            {recs.length > 0 && <Suggestions title="혹시 이때였나요?" items={recs} current={tp.date} onPick={(s) => setDate(toYmd(s.date))} />}
+            {recs.length > 0 && (
+              <Suggestions
+                title="혹시 이때였나요?"
+                items={recs}
+                current={tp.date}
+                onPick={(s) => {
+                  // A skipped kind step takes the picked moment's kind, so the next step's blanks fit it.
+                  if (!tp.kind) setTp((t) => ({ ...t, kind: kindDef(s.kind)!.label }));
+                  setDate(toYmd(s.date));
+                }}
+              />
+            )}
           </>
         );
       }

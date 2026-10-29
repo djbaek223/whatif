@@ -4,6 +4,7 @@ import { eraHints } from "../era";
 import { formatMi, formatWealth, heuristicInitial, statusLabel, turningPointMi } from "../engine";
 import type { LifeState, Profile, TurningPoint } from "../types";
 import type { EndingResult, OpeningResult } from "./schema";
+import { josa } from "../onboarding";
 import { alternativePaths } from "./turningChoices";
 
 function mbtiStats(mbti: string) {
@@ -19,19 +20,20 @@ function mbtiStats(mbti: string) {
 export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResult {
   const mi = turningPointMi(tp);
   const age = ageAt(profile.birthDate, mi);
-  const year = Math.floor(mi / 12);
-  const hints = eraHints(year);
+  // A few notes read as scene-setting; more turns the opening into a list.
+  const hints = eraHints(mi).slice(-3);
   const name = profile.name || "당신";
+  const actual = tp.actualChoice || "익숙한 길";
   const student = age < 20;
   const alternatives = alternativePaths(profile, tp);
   return {
-    persona: `${name}은(는) ${profile.mbti ? `${profile.mbti} 성향의 ` : ""}사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`.slice(0, 300),
+    persona: `${name}${josa(name, "는", "은")} ${profile.mbti ? `${profile.mbti} 성향의 ` : ""}사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`.slice(0, 300),
     stats: mbtiStats(profile.mbti),
     era: [
-      `${formatMi(mi)}, ${name}은(는) ${age}세였다.`,
+      `${formatMi(mi)}, ${name}${josa(name, "는", "은")} ${age}세였다.`,
       hints.length ? hints.join(" ") : "세상은 늘 그렇듯 조금씩 변하고 있었다.",
     ].join("\n\n"),
-    situation: `${tp.situation || "그날, 당신은 갈림길 앞에 서 있었다."} 그때 당신은 "${tp.actualChoice || "익숙한 길"}"을(를) 택했다. 이번에는 어떻게 하겠는가?`,
+    situation: `${tp.situation || "그날, 당신은 갈림길 앞에 서 있었다."} 그때 당신은 "${actual}"${josa(actual, "를", "을")} 택했다. 이번에는 어떻게 하겠는가?`,
     initial: heuristicInitial(profile, tp),
     choices: [
       {
@@ -58,7 +60,7 @@ export function fallbackEnding(s: LifeState): EndingResult {
   return {
     title: `${name}의 또 다른 ${s.deathAge ?? "?"}년`,
     memoir: [
-      `${formatMi(turningPointMi(s.turningPoint))}, 나는 ${first ? `"${first.picked}"` : "다른 길"}을(를) 택했다.`,
+      `${formatMi(turningPointMi(s.turningPoint))}, 나는 ${first ? `"${first.picked}"${josa(first.picked, "를", "을")}` : "다른 길을"} 택했다.`,
       outcomes.length ? `${outcomes.join(" ")} 선택은 또 다른 선택을 불러왔다.` : "그 뒤의 삶은 생각보다 조용히 흘러갔다.",
       `마지막 순간의 나는 ${statusLabel(s) || "평범한 사람"}이었고, 남긴 자산은 ${formatWealth(s.wealth)}이었다.`,
       "돌아보면 어느 길이든 웃은 날과 운 날이 섞여 있었다.",

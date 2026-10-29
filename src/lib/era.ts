@@ -26,12 +26,14 @@ const ERA: Record<number, string> = {
   2023: "생성형 AI가 빠르게 퍼지기 시작했다.",
 };
 
-export function eraHints(year: number): string[] {
-  const headlines = newsHints(year);
+/** Era notes around a month index (year * 12 + month - 1), leaving out anything that has not happened yet. */
+export function eraHints(mi: number): string[] {
+  const year = Math.floor(mi / 12);
+  const headlines = newsHints(year, 4, mi);
   return Object.entries(ERA)
     .map(([y, text]) => [Number(y), text] as const)
-    // The year itself is covered by its headlines when there are any.
-    .filter(([y]) => Math.abs(y - year) <= 2 && !(y === year && headlines.length))
+    // Year notes carry no month, so the current year's note waits until the year is over.
+    .filter(([y]) => y < year && y >= year - 2)
     .map(([y, text]) => `${y}년: ${text}`)
     .concat(headlines);
 }

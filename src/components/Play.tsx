@@ -138,7 +138,7 @@ export function PlayView({
 
   return (
     <div ref={root} className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-10">
-      <aside className="contents lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:flex lg:max-h-dvh lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overscroll-contain lg:py-6">
+      <aside className="contents lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:flex lg:max-h-dvh lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overscroll-contain lg:-mx-2 lg:px-2 lg:py-6">
         <header className="sticky top-0 z-10 order-1 -mx-4 border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-3 backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
