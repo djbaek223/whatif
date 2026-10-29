@@ -407,8 +407,8 @@ export function newsBetween(fromMi: number, toMi: number): NewsItem[] {
 }
 
 /** Headlines near a year, biggest first, for the narrator. */
-export function newsHints(year: number, limit = 4): string[] {
-  return NEWS.filter((x) => Math.floor(x.mi / 12) === year)
+export function newsHints(year: number, limit = 4, upToMi = Infinity): string[] {
+  return NEWS.filter((x) => Math.floor(x.mi / 12) === year && x.mi <= upToMi)
     .sort((a, b) => Number(!!b.big) - Number(!!a.big))
     .slice(0, limit)
     .map((x) => `${year}년 ${(x.mi % 12) + 1}월: ${x.text}`);
