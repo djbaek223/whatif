@@ -20,6 +20,7 @@ import {
   resolveChoice,
   TURNING_POINT_ID,
   turningPointMi,
+  type Intent,
   type StopReason,
 } from "@/lib/engine";
 import { clearDraft, dropLegacySaves, eraseAll, forgetProfile, loadProfile, readDraft, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
@@ -190,18 +191,19 @@ export default function Game() {
     afterAdvance(life, r.state, r.stop);
   };
 
-  const choose = (optionId: string, freeText?: string) => {
+  const choose = (optionId: string, freeText?: string, intent?: Intent | null) => {
     if (!life?.pending) return;
-    setLife(withBadges(resolveChoice(life, optionId, freeText)));
+    setLife(withBadges(resolveChoice(life, optionId, freeText, intent)));
   };
 
   async function chooseFree(text: string) {
     if (!life?.pending) return;
     setBusy(true);
-    const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })) });
+    const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })), allowed: allowedChanges(life) });
     const id = life.pending.options.some((o) => o.id === res?.choiceId) ? res!.choiceId : life.pending.options[0].id;
     setBusy(false);
-    choose(id, text);
+    // What the player wrote decides the life change; without the narrator, the engine reads it from the words.
+    choose(id, text, res?.change && res.change !== "none" ? { change: res.change, title: res.jobTitle, place: res.place } : null);
   }
 
   // Auto play: one turn per tick until the player turns it off. A choice or the present-day card pauses it,

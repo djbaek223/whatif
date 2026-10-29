@@ -3,6 +3,7 @@ import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
+import { employee, ownsBusiness } from "./work";
 
 type Dyn<T> = T | ((s: LifeState) => T);
 
@@ -26,6 +27,7 @@ export interface Effect {
   promote?: boolean;
   enroll?: { level: "university" | "graduate" | "abroad"; pick?: "profile" | "fit" | "better" };
   buyHome?: "best" | "cheap";
+  startBusiness?: { title?: string; name?: string; income?: number }; // opens a shop or business of one's own; how it goes plays out later
   homeValuePct?: number; // change in the home's price; the gain or loss lands in wealth
   note?: string; // what a cost was for, shown with the amount
   mark?: string; // remembers when this happened, so a later event in a chain can follow it
@@ -359,7 +361,7 @@ export const EVENTS: EventDef[] = [
     maxAge: 55,
     perYear: 0.15,
     cooldown: 24,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: (s) => `${s.flags.company ? `${s.flags.company}에서 일한 지 몇 해, ` : ""}예전 동료에게서 함께 일하자는 연락이 왔다. 지금 연봉은 ${formatWealth(s.income * 12)}이다.`,
     choices: [
       {
@@ -395,33 +397,20 @@ export const EVENTS: EventDef[] = [
     maxAge: 52,
     perYear: 0.06,
     cooldown: 60,
-    when: (s) => s.flags.employed && s.flags.job !== "스타트업 대표",
+    when: (s) => employee(s.flags),
     intro: "오래 품어온 사업 아이디어가 머리를 떠나지 않는다.",
     choices: [
       {
         id: "quit",
         label: "회사를 그만두고 창업한다",
+        // The business opens now; whether it lasts plays out over the next year or two (moreEvents: venture-result).
         effect: {
           text: "사표를 내고 창업했다.",
+          stats: { happiness: 6 },
           intense: 12,
           wealth: -3000,
           note: "창업 자금",
-          risk: {
-            chance: () => 0.3,
-            success: {
-              text: "사업이 자리를 잡았다.",
-              stats: { happiness: 15 },
-              flags: { employed: true, job: "사업가" },
-              income: 700,
-            },
-            failure: {
-              text: "사업을 접고 다시 일자리를 찾게 되었다.",
-              stats: { happiness: -15, health: -5 },
-              flags: { employed: false, job: "" },
-              income: 0,
-              wealth: -2000,
-            },
-          },
+          startBusiness: { title: "사업가", income: 250 },
         },
       },
       {
@@ -443,7 +432,7 @@ export const EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.04,
     once: true,
-    when: (s) => s.flags.employed && s.flags.job !== "공무원",
+    when: (s) => employee(s.flags) && s.flags.job !== "공무원",
     intro: (s) => `${s.flags.company || "회사"}가 구조조정을 발표하고 희망퇴직 신청을 받는다. 위로금은 연봉 1년 치 수준이다.`,
     choices: [
       {
@@ -486,13 +475,13 @@ export const EVENTS: EventDef[] = [
     perYear: 0.6,
     once: true,
     when: (s) => s.flags.employed,
-    intro: "정년이 다가왔다. 이후의 삶을 정해야 한다.",
+    intro: (s) => (ownsBusiness(s.flags) ? "몸이 예전 같지 않다. 가게를 언제까지 할지 정해야 할 때가 왔다." : "정년이 다가왔다. 이후의 삶을 정해야 한다."),
     choices: [
       {
         id: "retire",
-        label: "은퇴하고 연금으로 산다",
+        label: (s) => (ownsBusiness(s.flags) ? "가게를 정리하고 은퇴한다" : "은퇴하고 연금으로 산다"),
         effect: {
-          text: "긴 직장 생활을 마쳤다.",
+          text: (s) => (ownsBusiness(s.flags) ? "오래 지킨 가게 문을 마지막으로 닫았다." : "긴 직장 생활을 마쳤다."),
           stats: { happiness: 5, health: 2 },
           flags: { employed: false, retired: true, job: "은퇴" },
           income: 130,
@@ -500,9 +489,9 @@ export const EVENTS: EventDef[] = [
       },
       {
         id: "rehire",
-        label: "재취업해 조금 더 일한다",
+        label: (s) => (ownsBusiness(s.flags) ? "규모를 줄여 조금 더 한다" : "재취업해 조금 더 일한다"),
         effect: {
-          text: "경력을 살려 작은 회사에 재취업했다.",
+          text: (s) => (ownsBusiness(s.flags) ? "가게를 줄여 쉬엄쉬엄 이어 갔다." : "경력을 살려 작은 회사에 재취업했다."),
           stats: { knowledge: 2, health: -2 },
           incomePct: 0.5,
         },
@@ -849,7 +838,7 @@ export const EVENTS: EventDef[] = [
     perYear: (s) => 0.12 + (s.stats.knowledge - 50) / 500,
     cooldown: 24,
     repeatable: true,
-    when: (s) => s.flags.employed,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: { text: "책임도 월급도 늘었다.", stats: { happiness: 5 }, incomePct: 1.12, promote: true },
   },

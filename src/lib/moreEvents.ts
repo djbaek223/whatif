@@ -3,6 +3,7 @@
 // Jobs, pay and homes go through the engine's hire / switchJob / buyHome effects, never fixed names or numbers.
 import type { EventDef } from "./events";
 import type { LifeState } from "./types";
+import { employee, ownsBusiness } from "./work";
 
 const year = (s: LifeState) => Math.floor(s.mi / 12);
 const month = (s: LifeState) => (s.mi % 12) + 1;
@@ -134,7 +135,7 @@ const ERA_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.8,
     once: true,
-    when: (s) => working(s) && !civil(s) && (year(s) === 1998 || (year(s) === 1997 && month(s) === 12)),
+    when: (s) => employee(s.flags) && !civil(s) && (year(s) === 1998 || (year(s) === 1997 && month(s) === 12)),
     intro: (s) => `외환위기로 ${s.flags.company || "회사"}가 구조조정 명단을 만든다는 소문이 돈다. 명예퇴직을 신청하면 위로금이 나온다.`,
     choices: [
       {
@@ -359,7 +360,7 @@ const ERA_EVENTS: EventDef[] = [
     maxAge: 70,
     perYear: 0.9,
     once: true,
-    when: (s) => inYears(2020)(s) && month(s) >= 3 && working(s),
+    when: (s) => inYears(2020)(s) && month(s) >= 3 && employee(s.flags),
     intro: "",
     effect: {
       text: (s) => `코로나19로 ${s.flags.company || "회사"}가 재택근무에 들어갔다. 화상회의 속 동료들의 얼굴이 낯설었다.`,
@@ -443,7 +444,7 @@ const ERA_EVENTS: EventDef[] = [
     maxAge: 68,
     perYear: 0.7,
     once: true,
-    when: (s) => inYears(2023, 2024)(s) && working(s),
+    when: (s) => inYears(2023, 2024)(s) && employee(s.flags),
     intro: "회사에 생성형 AI가 들어왔다. 보고서 초안을 몇 초 만에 써 준다. 누군가는 일자리를 걱정한다.",
     choices: [
       { id: "learn", label: "주말마다 AI 도구를 배운다", effect: { text: "AI로 일하는 법을 익혀 팀에서 가장 빨라졌다.", stats: { knowledge: 6, happiness: 2, health: -1 } } },
@@ -476,7 +477,7 @@ const CHAIN_EVENTS: EventDef[] = [
     maxAge: 58,
     perYear: 0.5,
     once: true,
-    when: (s) => ago(s, "reunion") >= 3 && ago(s, "reunion") <= 30 && s.wealth > 3500 && s.flags.education === "done" && !s.flags.retired,
+    when: (s) => ago(s, "reunion") >= 3 && ago(s, "reunion") <= 30 && s.wealth > 3500 && s.flags.education === "done" && !s.flags.retired && !ownsBusiness(s.flags),
     intro: (s) => `동창회에서 다시 만난 ${iGa(nameFor(s, "classmate"))} 연락을 해 왔다. 함께 가게를 차리자며, 각자 3천만원씩 내자고 한다.`,
     choices: [
       {
@@ -520,6 +521,38 @@ const CHAIN_EVENTS: EventDef[] = [
         failure: {
           text: (s) => `매출이 줄고 ${waGwa(nameFor(s, "classmate"))} 다툼이 잦아지더니, 결국 가게를 접었다.`,
           stats: { happiness: -10, relationships: -6 },
+          flags: { employed: false, job: "" },
+          income: 0,
+          wealth: -1500,
+          note: "가게 정리 손실",
+        },
+      },
+    },
+  },
+  // 창업(engine: startBusiness) → 1~2년 뒤 자리를 잡거나 문을 닫는다
+  {
+    id: "venture-result",
+    title: "가게의 운명",
+    category: "work",
+    keywords: ["창업", "매출"],
+    minAge: 18,
+    maxAge: 80,
+    perYear: 0.7,
+    when: (s) => ownsBusiness(s.flags) && ago(s, "venture") >= 12 && (s.marks?.["venture-ok"] ?? -1) < (s.marks?.venture ?? 0),
+    intro: "",
+    effect: {
+      text: "",
+      risk: {
+        chance: (s) => Math.min(0.65, 0.25 + (s.stats.knowledge + s.stats.relationships) / 500),
+        success: {
+          text: (s) => `${s.flags.company ? `${iGa(s.flags.company)} ` : "사업이 "}자리를 잡았다. 단골이 늘고 매달 수입이 안정되었다.`,
+          stats: { happiness: 10, knowledge: 3 },
+          incomePct: 2.2,
+          mark: "venture-ok",
+        },
+        failure: {
+          text: (s) => `매출이 끝내 살아나지 않았다. ${s.flags.company ? `${s.flags.company} 문을` : "결국 문을"} 닫았다.`,
+          stats: { happiness: -12, health: -3, knowledge: 4 },
           flags: { employed: false, job: "" },
           income: 0,
           wealth: -1500,
@@ -632,7 +665,7 @@ const CHAIN_EVENTS: EventDef[] = [
     maxAge: 40,
     perYear: 0.15,
     once: true,
-    when: working,
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: (s) => `${s.flags.company ? `${s.flags.company}의 ` : ""}선배 ${iGa(nameFor(s, "mentor"))} 멘토가 되어 주었다. 일하는 법을 많이 배웠다.`,
@@ -650,7 +683,7 @@ const CHAIN_EVENTS: EventDef[] = [
     maxAge: 55,
     perYear: 0.4,
     once: true,
-    when: (s) => ago(s, "mentor") >= 24 && working(s),
+    when: (s) => ago(s, "mentor") >= 24 && employee(s.flags),
     intro: (s) => `다른 회사로 옮긴 ${iGa(nameFor(s, "mentor"))} 함께 일하자고 연락해 왔다. 지금 연봉보다 더 주겠다고 한다.`,
     choices: [
       { id: "follow", label: "멘토를 따라간다", effect: { text: "", switchJob: { payPct: 1.15 }, stats: { happiness: 4, relationships: 2 } } },
@@ -1105,7 +1138,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 60,
     perYear: 0.2,
     cooldown: 24,
-    when: working,
+    when: (s) => employee(s.flags),
     intro: "금요일 퇴근 직전, 팀장이 이번 주말에 나와 줄 수 있냐고 묻는다. 주말에는 선약이 있다.",
     choices: [
       { id: "go", label: "선약을 미루고 출근한다", effect: { text: "주말을 반납했다. 팀장이 월요일에 커피를 샀다.", stats: { happiness: -3, health: -2, relationships: 1 }, wealth: 20, note: "휴일 근무 수당" } },
@@ -1123,7 +1156,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 55,
     perYear: 0.2,
     cooldown: 24,
-    when: working,
+    when: (s) => employee(s.flags),
     intro: "회식 1차가 끝났다. 다들 노래방으로 2차를 간다고 한다.",
     choices: [
       { id: "go", label: "끝까지 간다", effect: { text: "새벽까지 노래를 불렀다. 다음 날 출근길이 지옥이었다.", stats: { relationships: 3, health: -2 }, wealth: -5 } },
@@ -1141,7 +1174,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 60,
     perYear: 0.15,
     cooldown: 36,
-    when: working,
+    when: (s) => employee(s.flags),
     intro: "동료가 낸 실수를 상사가 누구 짓이냐고 묻는다. 동료가 애원하는 눈빛을 보낸다.",
     choices: [
       { id: "cover", label: "같이 책임지겠다고 한다", effect: { text: "함께 꾸중을 들었다. 동료는 그 일을 오래 기억했다.", stats: { relationships: 4, happiness: -2 } } },
@@ -1175,7 +1208,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 45,
     perYear: 0.2,
     cooldown: 24,
-    when: working,
+    when: (s) => employee(s.flags),
     intro: "월급이 들어왔다. 장바구니에 몇 달째 담아 둔 물건이 있다.",
     choices: [
       { id: "buy", label: "나를 위한 선물로 산다", effect: { text: "택배 상자를 뜯으며 한 달의 피로가 풀렸다.", wealth: -150, stats: { happiness: 5 } } },
@@ -1282,7 +1315,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 52,
     perYear: 0.15,
     once: true,
-    when: (s) => working(s) && (married(s) || s.flags.children > 0),
+    when: (s) => employee(s.flags) && (married(s) || s.flags.children > 0),
     intro: "승진 시험이 한 달 남았는데, 가족과 잡아 둔 여름휴가와 겹친다.",
     choices: [
       { id: "study", label: "휴가를 미루고 공부한다", effect: { text: "가족만 휴가를 보내고 독서실에 다녔다.", stats: { knowledge: 5, relationships: -3, happiness: -2 }, risk: { chance: () => 0.6, success: { text: "승진 시험에 붙었다.", incomePct: 1.06, stats: { happiness: 5 } }, failure: { text: "아쉽게 떨어졌다.", stats: { happiness: -3 } } } } },
@@ -1300,7 +1333,7 @@ const SMALL_DILEMMAS: EventDef[] = [
     maxAge: 55,
     perYear: 0.12,
     cooldown: 48,
-    when: (s) => working(s) && year(s) >= 2016,
+    when: (s) => employee(s.flags) && year(s) >= 2016,
     intro: "동료가 퇴근 후 배달 부업으로 한 달에 꽤 번다고 한다.",
     choices: [
       { id: "gig", label: "나도 해 본다", effect: { text: "반년 동안 퇴근 후 배달을 뛰었다. 통장은 불었고 몸은 지쳤다.", wealth: 300, note: "부업 수입", stats: { health: -3, happiness: -1 } } },
@@ -1513,7 +1546,7 @@ const AGE_FILL: EventDef[] = [
     maxAge: 58,
     perYear: (s) => 0.04 + Math.max(0, s.stats.knowledge - 55) / 600,
     cooldown: 60,
-    when: (s) => working(s) && !/대표|사업가/.test(s.flags.job),
+    when: (s) => employee(s.flags),
     intro: "",
     effect: { text: (s) => `${s.flags.company ? `${s.flags.company} ` : ""}연말 시상식에서 우수 사원상을 받았다.`, stats: { happiness: 5, relationships: 2 }, wealth: 200, note: "포상금" },
   },
@@ -1526,13 +1559,83 @@ const AGE_FILL: EventDef[] = [
     maxAge: 58,
     perYear: 0.1,
     cooldown: 48,
-    when: (s) => working(s) && !/대표|사업가/.test(s.flags.job),
+    when: (s) => employee(s.flags),
     intro: "",
     effect: {
       text: "새 팀장이 왔다. 회의가 짧아지고 퇴근이 빨라졌다.",
       alt: ["새 팀장이 왔다. 보고서 양식이 세 번 바뀌었다.", "조직 개편으로 팀이 바뀌었다. 낯선 자리에서 다시 시작했다."],
       stats: { happiness: 1 },
     },
+  },
+  // 가게나 사업을 하는 사람의 하루: 회사원의 회식·야근·승진 대신
+  {
+    id: "shop-regular",
+    title: "단골손님",
+    category: "work",
+    keywords: ["단골", "손님"],
+    temper: { warm: 0.5, outgoing: 0.3 },
+    minAge: 20,
+    maxAge: 80,
+    perYear: 0.25,
+    cooldown: 24,
+    when: (s) => ownsBusiness(s.flags),
+    intro: "",
+    effect: {
+      text: "매일 같은 시간에 오는 단골이 생겼다. 이름 대신 늘 시키는 메뉴로 서로를 기억했다.",
+      alt: ["단골손님이 친구들을 데리고 왔다. 그날 매출이 평소의 두 배였다.", "문 닫을 무렵 들른 단골이 '덕분에 하루를 버틴다'고 했다."],
+      stats: { happiness: 4, relationships: 3 },
+    },
+  },
+  {
+    id: "shop-review",
+    title: "리뷰 한 줄",
+    category: "work",
+    keywords: ["리뷰", "평판"],
+    minAge: 20,
+    maxAge: 80,
+    perYear: (s) => (year(s) >= 2012 ? 0.2 : 0.05),
+    cooldown: 30,
+    when: (s) => ownsBusiness(s.flags),
+    intro: "",
+    effect: {
+      text: "별점 하나짜리 리뷰가 올라왔다. 밤새 답글을 썼다 지웠다.",
+      alt: ["동네 맛집 블로그에 소개되었다. 한동안 줄이 생겼다.", "단체 주문이 갑자기 취소되어 재료를 고스란히 버렸다."],
+      stats: { happiness: -2, knowledge: 1 },
+    },
+  },
+  {
+    id: "shop-staff",
+    title: "아르바이트생",
+    category: "work",
+    keywords: ["직원", "인건비"],
+    minAge: 20,
+    maxAge: 80,
+    perYear: 0.2,
+    cooldown: 36,
+    when: (s) => ownsBusiness(s.flags),
+    intro: "",
+    effect: {
+      text: "믿고 맡기던 아르바이트생이 그만뒀다. 한동안 혼자 가게를 지켰다.",
+      alt: ["처음으로 직원을 한 명 뽑았다. 월급날이 이제 남의 일이 아니었다.", "최저임금 인상 소식에 계산기를 오래 두드렸다."],
+      stats: { health: -2, happiness: -1 },
+    },
+  },
+  {
+    id: "shop-rent",
+    title: "임대료 인상",
+    category: "money",
+    keywords: ["임대료", "건물주"],
+    minAge: 22,
+    maxAge: 80,
+    perYear: 0.12,
+    cooldown: 48,
+    when: (s) => ownsBusiness(s.flags),
+    intro: "건물주가 재계약을 앞두고 임대료를 30% 올리겠다고 한다.",
+    choices: [
+      { id: "pay", label: "올려 주고 버틴다", effect: { text: "임대료를 올려 주고 계속 장사했다. 남는 게 줄었다.", stats: { happiness: -3 }, incomePct: 0.85 } },
+      { id: "move", label: "근처 싼 자리로 옮긴다", effect: { text: "골목 안쪽 자리로 가게를 옮겼다. 단골 몇은 따라와 주었다.", stats: { happiness: -1, health: -2 }, wealth: -800, note: "이전 비용" } },
+      { id: "close", label: "이참에 가게를 접는다", effect: { text: "재계약하지 않고 가게를 정리했다.", stats: { happiness: -6 }, flags: { employed: false, job: "" }, income: 0 } },
+    ],
   },
   {
     id: "midlife-void",

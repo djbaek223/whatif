@@ -9,7 +9,8 @@
     "lint": "eslint",
     "simulate": "tsx scripts/simulate.ts",
     "typecheck": "tsc --noEmit",
-    "validate:events": "tsx scripts/validate-events.ts"
+    "validate:events": "tsx scripts/validate-events.ts",
+    "check:memory": "tsx scripts/check-memory.ts"
   },
   "dependencies": {
     "next": "16.4.2",

@@ -1,7 +1,7 @@
 // Achievements: milestones read off the life's state after every step, kept on the life so the ending can show them.
 import { tierOf } from "./catalog";
 import { ageOf } from "./events";
-import { BUSINESS } from "./scene";
+import { ownsBusiness } from "./work";
 import type { LifeState } from "./types";
 
 export interface BadgeDef {
@@ -24,7 +24,7 @@ export const BADGES: BadgeDef[] = [
   { id: "first-job", icon: "💼", name: "첫 출근", desc: "처음으로 일을 시작했다", test: (s) => working(s) },
   { id: "big-corp", icon: "🏢", name: "대기업 입성", desc: "대기업·IT 대기업·외국계에 들어갔다", test: (s) => working(s) && ["large", "it", "foreign"].includes(tierOf(s.flags.company) ?? "") },
   { id: "public", icon: "🏛️", name: "안정 지향", desc: "공무원이나 공기업에 들어갔다", test: (s) => working(s) && ["civil", "public"].includes(tierOf(s.flags.company) ?? "") },
-  { id: "boss", icon: "🏪", name: "사장님", desc: "내 가게나 회사를 차렸다", test: (s) => working(s) && BUSINESS.test(s.flags.job) },
+  { id: "boss", icon: "🏪", name: "사장님", desc: "내 가게나 회사를 차렸다", test: (s) => ownsBusiness(s.flags) },
   { id: "promoted", icon: "📈", name: "승진", desc: "직함이 한 단계 올랐다", test: (s) => working(s) && /대리|과장|차장|부장|임원|이사|선임|책임|수석|팀장|[1-7]급/.test(s.flags.job) },
   { id: "graduate", icon: "🎓", name: "학사모", desc: "대학을 마쳤다", test: (s) => s.flags.education === "graduate" || (s.flags.education === "done" && /대학/.test(s.flags.school ?? "")) },
   { id: "grad-school", icon: "🧪", name: "연구의 길", desc: "대학원에 들어갔다", test: (s) => s.flags.education === "graduate" },
