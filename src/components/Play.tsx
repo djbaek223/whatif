@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type RefObject, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
 import { sceneOf, type SceneState } from "@/lib/scene";
@@ -75,6 +75,8 @@ export function PlayView({
   // Per choice: whether the sheet is pulled down, and whether its big-moment card has been shown.
   const [collapsedKey, setCollapsedKey] = useState<string | null>(null);
   const collapsed = choosing && collapsedKey === pendingKey;
+  const sheetRef = useSheetDrag(choosing && !collapsed, () => setCollapsedKey(pendingKey));
+  const pillDrag = useSwipeUp(() => setCollapsedKey(null));
   const [introSeen, setIntroSeen] = useState<string | null>(null);
   const showIntro = choosing && big && introSeen !== pendingKey;
   useEffect(() => {
@@ -189,6 +191,7 @@ export function PlayView({
                 <button
                   type="button"
                   onClick={() => setCollapsedKey(null)}
+                  {...pillDrag}
                   aria-expanded={false}
                   className="flex w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
                 >
@@ -201,6 +204,7 @@ export function PlayView({
               </div>
             )}
             <section
+              ref={sheetRef}
               aria-label="선택의 순간"
               className={`sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-5 shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
                 pending.rare ? "border-2 border-b-0 border-amber-400 dark:border-amber-500 lg:border-b-2" : "lg:border-stone-200 dark:lg:border-stone-800"
@@ -754,6 +758,98 @@ function usePlayFx(life: LifeState) {
  * Keeps the page pinned to the newest content as the feed and the bottom panel grow.
  * Scrolling up pauses it; coming back near the bottom (or pressing the button) resumes it.
  */
+const DISMISS_PX = 90;
+const FLICK_PX_PER_MS = 0.5;
+
+/**
+ * On phones, pulling the choice sheet down puts it away, like the 내리기 button. The pull only starts
+ * when the sheet is scrolled to its top, so reading a long scene still scrolls as usual.
+ */
+function useSheetDrag(active: boolean, onDismiss: () => void) {
+  const ref = useRef<HTMLElement | null>(null);
+  const dismiss = useEffectEvent(onDismiss);
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || !el) return;
+    let startY = 0;
+    let startT = 0;
+    let dy = 0;
+    let armed = false;
+    let dragging = false;
+    const phone = () => !window.matchMedia("(min-width: 1024px)").matches;
+    const reset = () => {
+      el.style.transition = "transform 0.2s ease-out";
+      el.style.transform = "";
+      const clear = () => (el.style.transition = "");
+      el.addEventListener("transitionend", clear, { once: true });
+    };
+    const onStart = (e: TouchEvent) => {
+      const t = e.target as HTMLElement;
+      armed = phone() && e.touches.length === 1 && el.scrollTop <= 0 && !t.closest("textarea, input");
+      dragging = false;
+      dy = 0;
+      startY = e.touches[0].clientY;
+      startT = e.timeStamp;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!armed) return;
+      dy = e.touches[0].clientY - startY;
+      if (!dragging) {
+        // A first move upward is a scroll, not a pull.
+        if (dy < -4 || el.scrollTop > 0) return void (armed = false);
+        if (dy < 6) return;
+        dragging = true;
+        el.style.animation = "none";
+        el.style.transition = "none";
+      }
+      e.preventDefault();
+      el.style.transform = `translateY(${Math.max(0, dy)}px)`;
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (!dragging) return;
+      dragging = armed = false;
+      const fast = dy / Math.max(1, e.timeStamp - startT) > FLICK_PX_PER_MS && dy > 30;
+      if (dy > DISMISS_PX || fast) {
+        el.style.transform = "";
+        el.style.transition = "";
+        el.style.animation = "";
+        dismiss();
+      } else reset();
+    };
+    el.addEventListener("touchstart", onStart, { passive: true });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+      el.style.transform = el.style.transition = el.style.animation = "";
+    };
+  }, [active]);
+  return ref;
+}
+
+/** A swipe up on the "선택 대기" pill opens the sheet again; a tap still works too. */
+function useSwipeUp(onSwipe: () => void) {
+  const start = useRef<number | null>(null);
+  return {
+    onTouchStart: (e: ReactTouchEvent) => {
+      start.current = e.touches[0].clientY;
+    },
+    onTouchMove: (e: ReactTouchEvent) => {
+      if (start.current !== null && start.current - e.touches[0].clientY > 24) {
+        start.current = null;
+        onSwipe();
+      }
+    },
+    onTouchEnd: () => {
+      start.current = null;
+    },
+  };
+}
+
 function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
   const [following, setFollowing] = useState(true);
   const followingRef = useRef(true);
