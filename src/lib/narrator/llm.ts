@@ -2,7 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { promptFor, systemFor } from "./prompts";
 import { NARRATE_TIMEOUT_MS, type NarrateRequest } from "./schema";
-import { inRegion } from "../region";
+import { inRegion, langFor } from "../region";
 
 // Both providers speak the OpenAI-compatible chat completions API.
 // WHATIF_PROVIDER picks one: "deepseek" (default, cheapest) or "openai" (GPT-6 Luna).
@@ -65,7 +65,7 @@ async function complete(messages: { role: "system" | "user" | "assistant"; conte
  * Asks for JSON matching the schema; retries once with the validation error when the reply doesn't fit,
  * but only while the player is still likely to be waiting. Logs each call's time and token use.
  */
-async function ask<S extends z.ZodType>(kind: NarrateRequest["kind"], schema: S, system: string, prompt: string, us: boolean, abort?: AbortSignal): Promise<z.infer<S> | null> {
+async function ask<S extends z.ZodType>(kind: NarrateRequest["kind"], schema: S, system: string, prompt: string, en: boolean, abort?: AbortSignal): Promise<z.infer<S> | null> {
   const budget = NARRATE_TIMEOUT_MS[kind];
   const signal = abort ? AbortSignal.any([abort, AbortSignal.timeout(budget)]) : AbortSignal.timeout(budget);
   const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
@@ -86,23 +86,28 @@ async function ask<S extends z.ZodType>(kind: NarrateRequest["kind"], schema: S,
       if (parsed.success) return parsed.data;
       problem = parsed.error.message;
     } catch {
-      problem = us ? (content ? "Not valid JSON." : "The reply was empty.") : content ? "올바른 JSON이 아닙니다." : "빈 응답이었습니다.";
+      problem = en ? (content ? "Not valid JSON." : "The reply was empty.") : content ? "올바른 JSON이 아닙니다." : "빈 응답이었습니다.";
     }
     console.warn(`[narrate] ${kind} #${attempt} didn't fit the schema: ${problem.slice(0, 200)}`);
     // A second try takes about as long as the first. If it can't finish in time, let the player move on now.
     if (Date.now() - started > budget / 2) return null;
-    messages.push({ role: "assistant", content: content || "{}" }, { role: "user", content: us ? `That reply doesn't fit the schema (${problem.slice(0, 300)}). Send only JSON that fits the schema.` : `방금 답이 스키마에 맞지 않습니다 (${problem.slice(0, 300)}). 스키마에 맞는 JSON만 다시 주세요.` });
+    messages.push({ role: "assistant", content: content || "{}" }, { role: "user", content: en ? `That reply doesn't fit the schema (${problem.slice(0, 300)}). Send only JSON that fits the schema.` : `방금 답이 스키마에 맞지 않습니다 (${problem.slice(0, 300)}). 스키마에 맞는 JSON만 다시 주세요.` });
   }
   return null;
 }
 
 /** `signal` is the player's request: when they stop waiting, the provider call stops too. */
 export async function narrate(req: NarrateRequest, signal?: AbortSignal): Promise<unknown> {
-  // The region decides the language of the system prompt and schema; the server answers lives from both countries.
-  // Built before the first await: the region is module state, and other requests run between awaits.
-  const { schema, prompt, system } = inRegion(req.region, () => {
-    const p = promptFor(req);
-    return { ...p, system: systemFor(p.schema) };
-  });
-  return ask(req.kind, schema, system, prompt, req.region === "us", signal);
+  // The language decides the system prompt and schema, the country the facts; the server answers every combination.
+  // Built before the first await: the region and language are module state, and other requests run between awaits.
+  const en = (req.lang ?? langFor(req.region)) === "en";
+  const { schema, prompt, system } = inRegion(
+    req.region,
+    () => {
+      const p = promptFor(req);
+      return { ...p, system: systemFor(p.schema) };
+    },
+    en ? "en" : "ko",
+  );
+  return ask(req.kind, schema, system, prompt, en, signal);
 }

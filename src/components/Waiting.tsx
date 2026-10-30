@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { newsList } from "@/lib/news";
 import { Spinner } from "./ui";
 import { L } from "@/lib/i18n";
-import { isUS } from "@/lib/region";
+import { isEn } from "@/lib/region";
 import { ymText } from "@/lib/format";
 
 /** The few real headlines just before a month, oldest first, to show while the opening is written. */
@@ -30,7 +30,7 @@ export function OpeningWait({ date, ai }: { date: string; ai: boolean }) {
     <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20 text-center" role="status">
       <Spinner className="h-10 w-10 border-stone-300 border-t-indigo-500 dark:border-stone-700 dark:border-t-indigo-400" />
       <h1 className="text-lg font-semibold">{L("그날로 돌아가는 중...")}</h1>
-      <p className="text-sm text-stone-500 dark:text-stone-400">{isUS() ? `Picturing the air of ${ymText(date)}.` : `${ymText(date)}의 공기를 떠올리고 있어요.`}</p>
+      <p className="text-sm text-stone-500 dark:text-stone-400">{isEn() ? `Picturing the air of ${ymText(date)}.` : `${ymText(date)}의 공기를 떠올리고 있어요.`}</p>
       {item && (
         <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white px-4 py-3.5 text-left dark:border-stone-800 dark:bg-stone-900">
           <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">{L("그때 세상은 ·")} {item.when}</p>

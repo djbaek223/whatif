@@ -27,9 +27,9 @@ import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } fro
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth, monthName } from "./format";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
-import { futureCandidates, lastRealNewsMi, newsBetween, type NewsItem } from "./news";
+import { futureCandidates, lastRealNewsMi, newsBetween, newsText, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
-import { inRegion, isUS, region, type Region } from "./region";
+import { inRegion, isEn, isUS, langFor, region, type Lang, type Region } from "./region";
 import { Rng, newSeed } from "./rng";
 import { DEGREE_LABELS } from "./types";
 import type {
@@ -55,7 +55,7 @@ import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema
 import { schoolYears } from "./onboarding";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
-import { L } from "./i18n";
+import { L, T, V } from "./i18n";
 
 export { formatWealth };
 
@@ -72,7 +72,7 @@ export function presentMi(now = new Date()): number {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function formatMi(mi: number): string {
-  if (isUS()) return `${MONTHS[mi % 12]} ${Math.floor(mi / 12)}`;
+  if (isEn()) return `${MONTHS[mi % 12]} ${Math.floor(mi / 12)}`;
   return `${Math.floor(mi / 12)}년 ${(mi % 12) + 1}월`;
 }
 
@@ -87,7 +87,8 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.ro
 
 /** Where a young person stands at school by age (만 나이): 초등학교 at 7, 중학교 at 13, 고등학교 at 16. Adults get "". */
 export function lifeStage(age: number): string {
-  if (isUS()) return age < 5 ? "preschooler" : age < 11 ? "elementary schooler" : age < 14 ? "middle schooler" : age < 18 ? "high schooler" : "";
+  if (isUS() && isEn()) return age < 5 ? "preschooler" : age < 11 ? "elementary schooler" : age < 14 ? "middle schooler" : age < 18 ? "high schooler" : "";
+  if (isUS()) return age < 5 ? "미취학 아동" : age < 11 ? "초등학생" : age < 14 ? "중학생" : age < 18 ? "고등학생" : "";
   if (age < 7) return L("미취학 아동");
   if (age < 13) return L("초등학생");
   if (age < 16) return L("중학생");
@@ -174,13 +175,13 @@ function uniDates(profile: Profile, mi: number, age: number): { entered?: number
 
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음|\b(job hunting|unemployed|between jobs|laid off|none|looking for work|on leave)\b/i;
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
-const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
+const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직|associate|office worker|employee|new hire)$/i;
 
-export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region } = {}): LifeState {
-  return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts));
+export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region; lang?: Lang } = {}): LifeState {
+  return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts), opts.lang);
 }
 
-function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region }): LifeState {
+function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region; lang?: Lang }): LifeState {
   const mi = turningPointMi(tp);
   const age = ageAt(profile.birthDate, mi);
   const init = fitInitialToAge(opening.initial, age, mi, profile);
@@ -241,6 +242,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
   const life: LifeState = {
     version: 1,
     ...(opts.region === "us" ? { region: "us" as const } : {}),
+    ...(opts.lang && opts.lang !== langFor(opts.region) ? { lang: opts.lang } : {}),
     profile,
     turningPoint: tp,
     persona: opening.persona,
@@ -546,7 +548,7 @@ function doEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>, o
   if (spec.level === "abroad") out.texts.push(L`${p.place} 박사 과정에 합격했다. 학비는 면제되고 생활비 장학금(월 150만원)을 받는다.`);
   else {
     const half = ageOf(s) <= 24 ? L(" 절반은 부모님이 보태 주셨다.") : "";
-    const name = `${p.place}${spec.level === "university" && major ? ` ${major}` : ""}`;
+    const name = `${V(p.place)}${spec.level === "university" && major ? ` ${major}` : ""}`;
     // Admitted ahead of the school year: the first day is the coming March (or September).
     const ahead = s.flags.entered !== undefined && s.flags.entered > s.mi;
     out.texts.push(L`${ahead ? L`${name}에 합격했다. ${formatMi(s.flags.entered!)}에 입학한다.` : L`${name}에 입학했다.`} 등록금은 연 ${won(p.tuition)}.${half}`);
@@ -667,7 +669,7 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   const out: string[] = [];
   const wasOwn = ownsBusiness(a);
   const isOwn = ownsBusiness(b);
-  const workName = (f: LifeFlags) => (f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
+  const workName = (f: LifeFlags) => (f.company && !f.job.includes(f.company) ? `${V(f.company)} ${V(f.job)}` : V(f.job));
   if (b.retired && !a.retired) out.push(L`은퇴${a.employed ? L` (${workName(a)}에서)` : ""}`);
   else if (isOwn && (!wasOwn || a.company !== b.company)) out.push(L`창업: ${b.job}${b.company ? L` (${b.company} 운영)` : ""}${a.employed && !wasOwn ? L`, ${workName(a)} 퇴사` : ""}`);
   else if (b.employed && !isOwn && (!a.employed || wasOwn || a.company !== b.company))
@@ -680,7 +682,7 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
     else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(L`학업 마침${a.school ? `: ${a.school}` : ""}`);
   }
   if (degreeOf(b) !== degreeOf(a) && DEGREE_RANK[degreeOf(b)] >= DEGREE_RANK.college)
-    out.push(L`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${a.school ?? b.school})` : ""}`);
+    out.push(L`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${V(a.school ?? b.school)})` : ""}`);
   if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(L`${(b.retakes ?? 1) >= 2 ? L("삼수") : L("재수")} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
   if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(L`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
   if (b.partner !== a.partner)
@@ -1212,7 +1214,7 @@ function drift(s: LifeState, months: number) {
     f.retired = true;
     f.job = L("은퇴");
     s.income = Math.max(s.income, f.partner === "married" ? 260 : 160); // a couple draws two checks
-    s.log.push({ mi: s.mi, kind: "event", text: "Turned 67 and started collecting Social Security." });
+    s.log.push({ mi: s.mi, kind: "event", text: T("Turned 67 and started collecting Social Security.") });
   }
   if (f.education === "graduate" && s.mi >= f.eduUntil + 24) f.education = "done";
   if (f.education === "school" && age >= 16) {
@@ -1245,8 +1247,8 @@ const SEASON: Record<number, string[]> = {
 function statusLine(s: LifeState, rng: Rng): Pick<LogEntry, "text" | "facts"> {
   const f = s.flags;
   if (f.employed && !f.retired && f.education === "done" && s.mi >= f.busyUntil && f.company && rng.chance(0.3)) {
-    if (ownsBusiness(f)) return { text: L("가게 문을 열고 닫는 하루가 이어졌다."), facts: [`${f.company} ${f.job}`, L`월수입 ${won(s.income)}`] };
-    return { text: L("출퇴근이 이어졌다."), facts: [`${f.company} ${f.job}`, L`연봉 ${won(s.income * 12)}`] };
+    if (ownsBusiness(f)) return { text: L("가게 문을 열고 닫는 하루가 이어졌다."), facts: [`${V(f.company)} ${V(f.job)}`, L`월수입 ${won(s.income)}`] };
+    return { text: L("출퇴근이 이어졌다."), facts: [`${V(f.company)} ${V(f.job)}`, L`연봉 ${won(s.income * 12)}`] };
   }
   return { text: statusSentence(s, rng) };
 }
@@ -1288,7 +1290,7 @@ function statusSentence(s: LifeState, rng: Rng): string {
 
 /** Appends 로 or 으로 to a Korean noun, by its final consonant. An English text takes the word as it is. */
 function withRo(word: string): string {
-  if (isUS()) return word;
+  if (isEn()) return word;
   // Read past a closing bracket ("배달의민족(우아한형제들)" ends on 들); Latin letters and digits by how they're said.
   const tail = word.replace(/\)+$/, "").trim();
   const last = tail.at(-1) ?? "";
@@ -1304,7 +1306,7 @@ function withRo(word: string): string {
 
 /** Appends 을 or 를 to a Korean noun, by its final consonant. An English text takes the word as it is. */
 function eulReul(word: string): string {
-  if (isUS()) return word;
+  if (isEn()) return word;
   const code = (word.replace(/\)+$/, "").trim().at(-1) ?? "").charCodeAt(0) - 0xac00;
   if (code >= 0 && code <= 11171) return `${word}${code % 28 === 0 ? "를" : "을"}`;
   return `${word}을(를)`;
@@ -1337,11 +1339,12 @@ function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): Lo
     }
   }
   return items.map((x) => {
-    const tag = isUS() ? `${L(x.cat)} · ${monthName((x.mi % 12) + 1)}` : `${x.cat} · ${(x.mi % 12) + 1}월`;
+    const tag = isEn() ? `${L(x.cat)} · ${monthName((x.mi % 12) + 1)}` : `${x.cat} · ${(x.mi % 12) + 1}월`;
+    const text = newsText(x.text);
     const impact = x.impact?.(s);
-    if (!impact) return { mi: s.mi, kind: "news", text: x.text, tag };
+    if (!impact) return { mi: s.mi, kind: "news", text, tag };
     const applied = applyTop(s, impact, rng);
-    return { mi: s.mi, kind: "news", tag, ...applied, text: x.text, reaction: applied.text };
+    return { mi: s.mi, kind: "news", tag, ...applied, text, reaction: applied.text };
   });
 }
 
@@ -1523,8 +1526,8 @@ function statusLabelHere(s: LifeState): string {
   else if (f.education === "university") parts.push(f.school ? L`${f.school} 재학` : L("대학생"));
   else if (f.education === "graduate") parts.push(f.school ? L`${f.school} 재학` : L("대학원생"));
   else if (f.retired) parts.push(L("은퇴"));
-  else if (ownsBusiness(f)) parts.push(f.company ? `${f.job}(${f.company})` : f.job);
-  else if (f.employed) parts.push(f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
+  else if (ownsBusiness(f)) parts.push(f.company ? `${V(f.job)}(${V(f.company)})` : V(f.job));
+  else if (f.employed) parts.push(f.company && !f.job.includes(f.company) ? `${V(f.company)} ${V(f.job)}` : V(f.job));
   else parts.push(L("구직 중"));
   const partner = { none: "", dating: L("연애 중"), married: L("기혼"), divorced: L("이혼"), widowed: L("사별") }[f.partner];
   if (partner) parts.push(partner);
@@ -1605,12 +1608,13 @@ function lifeSummaryHere(s: LifeState, recent = 12): string {
 }
 
 // ── Entry points ───────────────────────────────────────
-// Each runs in the life's own region (region.ts), so texts, money and rules follow the country the life began in.
+// Each runs in the life's own region and language (region.ts), so rules follow the country the life began in
+// and texts the language it was started in.
 
 const inLife =
   <A extends unknown[], R>(fn: (s: LifeState, ...rest: A) => R) =>
   (s: LifeState, ...rest: A): R =>
-    inRegion(s.region, () => fn(s, ...rest));
+    inRegion(s.region, () => fn(s, ...rest), s.lang);
 
 export const resolveChoice = inLife(resolveChoiceHere);
 export const dropPending = inLife(dropPendingHere);

@@ -5,6 +5,7 @@ import { PROFILE_TTL_DAYS, writeDraft } from "@/lib/localData";
 import {
   ageIn,
   EMPTY_TP,
+  countryName,
   fillTemplate,
   josa,
   kindDef,
@@ -20,9 +21,9 @@ import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
 import { Button, Card, FieldError, Input, Select, Textarea } from "./ui";
-import { L } from "@/lib/i18n";
+import { L, T } from "@/lib/i18n";
 import { ageText, ymText, ymdText, cap } from "@/lib/format";
-import { isUS } from "@/lib/region";
+import { countryFor, isEn, isUS, lang, setRegion, type Region } from "@/lib/region";
 
 export const EMPTY_PROFILE: Profile = {
   name: "",
@@ -85,7 +86,7 @@ const MIN_SITUATION = 5;
 const pad = (n: number) => String(n).padStart(2, "0");
 
 const US_NICKNAMES = ["NightOwl", "LateBloomer", "AlleyCat", "WeekendHiker", "Stargazer", "CoffeeBreak", "SlowTurtle", "BeachKid", "Bookworm", "CloudPiece", "SkyWhale", "SpringBear"];
-const nicknames = () => (isUS() ? US_NICKNAMES : ["새벽산책러", "늦깎이여행자", "골목고양이", "주말등산가", "별헤는밤", "커피한잔", "느린거북이", "바닷가소년", "책방주인", "구름조각", "밤하늘고래", "봄날의곰"]);
+const nicknames = () => (isEn() ? US_NICKNAMES : ["새벽산책러", "늦깎이여행자", "골목고양이", "주말등산가", "별헤는밤", "커피한잔", "느린거북이", "바닷가소년", "책방주인", "구름조각", "밤하늘고래", "봄날의곰"]);
 
 // Common Korean surnames; a 2-4 syllable Hangul name starting with one of these probably is a real name.
 const SURNAMES = "김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부";
@@ -139,6 +140,10 @@ export function Onboarding({
   const [toReview, setToReview] = useState(initial.toReview ?? false);
   const [quiz, setQuiz] = useState<string[] | null>(null);
   const root = useRef<HTMLDivElement>(null);
+
+  // Where they grew up decides the school system, the examples and later the whole life, so the questions follow it.
+  const country: Region = p.country ?? countryFor(lang());
+  setRegion(country);
 
   const cur = STEPS[step];
   const age = ageIn(p.birthDate, tp.date);
@@ -228,7 +233,7 @@ export function Onboarding({
         go(missing, true);
         return setTried(true);
       }
-      return onDone(p, tp, remember);
+      return onDone({ ...p, country }, tp, remember);
     }
     if (invalid(cur.id)) {
       setTried(true);
@@ -306,8 +311,15 @@ export function Onboarding({
       case "hometown":
         return (
           <>
-            {question(L("어디서 자랐나요?"), L("도시나 동네 이름이면 충분해요."))}
-            <Input data-autofocus aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={L("예: 대전")} maxLength={40} />
+            {question(L("어디서 자랐나요?"), L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요."))}
+            <div role="group" aria-label={L("자란 나라")} className="mb-3 grid grid-cols-2 gap-2">
+              {COUNTRIES.map((c) => (
+                <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
+                  <span aria-hidden>{c === "us" ? "🇺🇸" : "🇰🇷"}</span> {countryName(c)}
+                </Choice>
+              ))}
+            </div>
+            <Input data-autofocus aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
           </>
         );
       case "schools":
@@ -315,7 +327,7 @@ export function Onboarding({
           <>
             {question(L("어느 학교를 다녔나요?"), L("학교 이름을 적으면 아래 연표가 바로 채워져요."))}
             <div className="space-y-2">
-              <LabeledInput label={L("초등학교")} autoFocus value={p.elementary} onChange={setField("elementary")} placeholder={isUS() ? "e.g. Lincoln Elementary" : `예: ${p.hometown || "대전"} 문화초`} />
+              <LabeledInput label={L("초등학교")} autoFocus value={p.elementary} onChange={setField("elementary")} placeholder={isUS() ? T("e.g. Lincoln Elementary") : L`예: ${p.hometown || L("대전")} 문화초`} />
               <LabeledInput label={L("중학교")} value={p.middle} onChange={setField("middle")} placeholder={L("예: 문화중")} />
               <LabeledInput label={L("고등학교")} value={p.high} onChange={setField("high")} placeholder={L("예: 대전고")} />
             </div>
@@ -520,7 +532,7 @@ export function Onboarding({
             {mode === "template" ? (
               <div className="space-y-3 rounded-2xl bg-stone-50 p-4 leading-loose dark:bg-stone-800/50">
                 <p className="text-[15px] leading-[2.6]">
-                  {isUS() ? (
+                  {isEn() ? (
                     <>
                       {age !== null && age >= 0 && <b>At {age}, </b>}
                       <span>I was torn between </span>
@@ -685,6 +697,8 @@ function Progress({ step }: { step: number }) {
   );
 }
 
+const COUNTRIES: Region[] = ["kr", "us"];
+
 function Choice({ selected, onClick, small = false, children }: { selected: boolean; onClick: () => void; small?: boolean; children: ReactNode }) {
   return (
     <button
@@ -839,7 +853,7 @@ function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : ""],
     ["name", L("별명"), p.name],
     ["gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender)],
-    ["hometown", L("자란 곳"), p.hometown],
+    ["hometown", L("자란 곳"), [countryName(p.country ?? countryFor(lang())), p.hometown].filter(Boolean).join(" · ")],
     ["schools", L("학교"), [p.elementary, p.middle, p.high].filter(Boolean).join(" → ")],
     ["university", L("대학"), [p.university, p.major, p.university && p.universityYear ? L`${p.universityYear}년 입학` : ""].filter(Boolean).join(" · ")],
     ["family", L("가족"), p.family],

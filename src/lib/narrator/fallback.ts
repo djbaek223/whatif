@@ -6,7 +6,7 @@ import type { LifeState, Profile, TurningPoint } from "../types";
 import type { EndingResult, OpeningResult } from "./schema";
 import { josa } from "../onboarding";
 import { alternativePaths } from "./turningChoices";
-import { inRegion, isUS } from "../region";
+import { inRegion, isEn, langFor } from "../region";
 
 function mbtiStats(mbti: string) {
   const m = mbti.toUpperCase();
@@ -27,7 +27,7 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
   const actual = tp.actualChoice || "익숙한 길";
   const student = age < 20;
   const alternatives = alternativePaths(profile, tp);
-  if (isUS()) {
+  if (isEn()) {
     const who = profile.name || "You";
     return {
       persona: `${who} ${profile.mbti ? `is an ${profile.mbti} type. ` : "is hard to sum up in a sentence. "}${profile.personality}`.trim().slice(0, 300),
@@ -66,7 +66,7 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
 }
 
 export function fallbackEnding(s: LifeState): EndingResult {
-  if (s.region === "us") return inRegion("us", () => usEnding(s));
+  if ((s.lang ?? langFor(s.region)) === "en") return inRegion(s.region, () => usEnding(s), "en");
   const name = s.profile.name || "나";
   const first = s.choices[0];
   const outcomes = s.log

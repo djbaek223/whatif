@@ -531,7 +531,7 @@ export const CORE_EVENTS: EventDef[] = [
     maxAge: 60,
     perYear: 0.04,
     once: true,
-    when: (s) => employee(s.flags) && s.flags.job !== L("공무원"),
+    when: (s) => employee(s.flags) && !/^(공무원|government employee)$/i.test(s.flags.job),
     intro: (s) => L`${s.flags.company || L("회사")}가 구조조정을 발표하고 희망퇴직 신청을 받는다. 위로금은 연봉 1년 치 수준이다.`,
     choices: [
       {

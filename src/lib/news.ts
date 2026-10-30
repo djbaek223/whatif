@@ -4,7 +4,8 @@
 import type { Effect } from "./events";
 import type { LifeState } from "./types";
 import { employee, ownsBusiness } from "./work";
-import { isUS } from "./region";
+import { L, T } from "./i18n";
+import { isEn, isUS } from "./region";
 import { US_FUTURE, US_LAST_REAL_NEWS_MI, US_NEWS } from "../regions/us/news";
 
 export type NewsCat = "사회" | "정치" | "경제" | "스포츠" | "연예" | "세계" | "과학" | "가상";
@@ -33,45 +34,45 @@ function ageOfState(s: LifeState): number {
 
 // ── Impacts of the biggest shocks ─────────────────────────
 const imfCrisis = (s: LifeState): Effect | null => {
-  if (!adult(s)) return { text: "어른들의 표정이 어두워졌다. 집안 분위기도 무거워졌다.", stats: { happiness: -3 } };
+  if (!adult(s)) return { text: L("어른들의 표정이 어두워졌다. 집안 분위기도 무거워졌다."), stats: { happiness: -3 } };
   if (ownsBusiness(s.flags)) {
-    return { text: "손님이 눈에 띄게 줄었다. 문을 열어 두는 것만으로도 버거웠다.", stats: { happiness: -6 }, incomePct: 0.75 };
+    return { text: L("손님이 눈에 띄게 줄었다. 문을 열어 두는 것만으로도 버거웠다."), stats: { happiness: -6 }, incomePct: 0.75 };
   }
-  if (employee(s.flags) && s.flags.job !== "공무원") {
+  if (employee(s.flags) && !/^(공무원|government employee)$/i.test(s.flags.job)) {
     return {
-      text: "회사에도 구조조정 바람이 불었다.",
+      text: L("회사에도 구조조정 바람이 불었다."),
       risk: {
         chance: () => 0.75,
-        success: { text: "다행히 자리는 지켰지만 월급이 깎였다.", stats: { happiness: -5 }, incomePct: 0.9 },
-        failure: { text: "하루아침에 일자리를 잃었다.", stats: { happiness: -12, health: -3 }, flags: { employed: false, job: "" }, income: 0 },
+        success: { text: L("다행히 자리는 지켰지만 월급이 깎였다."), stats: { happiness: -5 }, incomePct: 0.9 },
+        failure: { text: L("하루아침에 일자리를 잃었다."), stats: { happiness: -12, health: -3 }, flags: { employed: false, job: "" }, income: 0 },
       },
     };
   }
-  return { text: "모아둔 돈의 가치가 줄어들었다.", stats: { happiness: -4 }, wealthPct: -0.1 };
+  return { text: L("모아둔 돈의 가치가 줄어들었다."), stats: { happiness: -4 }, wealthPct: -0.1 };
 };
 
 const financialCrisis = (s: LifeState): Effect | null =>
-  adult(s, 22) && s.wealth > 2000 ? { text: "펀드와 주식 계좌가 시퍼렇게 물들었다.", stats: { happiness: -3 }, wealthPct: -0.08 } : null;
+  adult(s, 22) && s.wealth > 2000 ? { text: L("펀드와 주식 계좌가 시퍼렇게 물들었다."), stats: { happiness: -3 }, wealthPct: -0.08 } : null;
 
 const pandemic = (s: LifeState): Effect | null => {
-  if (!adult(s)) return { text: "학교 대신 화면 속 수업을 들었다. 친구들 얼굴을 보기 어려웠다.", stats: { relationships: -4, happiness: -2 } };
+  if (!adult(s)) return { text: L("학교 대신 화면 속 수업을 들었다. 친구들 얼굴을 보기 어려웠다."), stats: { relationships: -4, happiness: -2 } };
   if (ownsBusiness(s.flags)) {
-    return { text: "손님이 뚝 끊겼다. 버티는 것 자체가 일이었다.", stats: { happiness: -6 }, incomePct: 0.8 };
+    return { text: L("손님이 뚝 끊겼다. 버티는 것 자체가 일이었다."), stats: { happiness: -6 }, incomePct: 0.8 };
   }
-  return { text: "마스크를 쓰고 사람을 피하는 생활이 시작되었다.", stats: { relationships: -4, happiness: -3 } };
+  return { text: L("마스크를 쓰고 사람을 피하는 생활이 시작되었다."), stats: { relationships: -4, happiness: -3 } };
 };
 
 const assetBoom = (s: LifeState): Effect | null => {
   if (!adult(s, 25)) return null;
-  if (s.flags.homeOwner) return { text: "집값이 크게 올라 자산이 불었다.", wealthPct: 0.15, stats: { happiness: 2 } };
-  return { text: "치솟는 집값에 '벼락거지'라는 말이 남 일 같지 않았다.", stats: { happiness: -4 } };
+  if (s.flags.homeOwner) return { text: L("집값이 크게 올라 자산이 불었다."), wealthPct: 0.15, stats: { happiness: 2 } };
+  return { text: L("치솟는 집값에 '벼락거지'라는 말이 남 일 같지 않았다."), stats: { happiness: -4 } };
 };
 
 const rateShock = (s: LifeState): Effect | null =>
-  s.flags.homeOwner && adult(s, 28) ? { text: "대출 이자가 눈에 띄게 늘었다.", stats: { happiness: -3 }, wealth: -300 } : null;
+  s.flags.homeOwner && adult(s, 28) ? { text: L("대출 이자가 눈에 띄게 늘었다."), stats: { happiness: -3 }, wealth: -300 } : null;
 
-const cheer = (text: string, happiness = 3): ((s: LifeState) => Effect) => () => ({ text, stats: { happiness } });
-const grief = (text: string, happiness = -3): ((s: LifeState) => Effect) => () => ({ text, stats: { happiness } });
+const cheer = (text: () => string, happiness = 3): ((s: LifeState) => Effect) => () => ({ text: text(), stats: { happiness } });
+const grief = (text: () => string, happiness = -3): ((s: LifeState) => Effect) => () => ({ text: text(), stats: { happiness } });
 
 export const NEWS: NewsItem[] = [
   // ── 1960년대 ──
@@ -118,7 +119,7 @@ export const NEWS: NewsItem[] = [
   n("1987-06", "정치", "6월 민주항쟁 끝에 6·29 선언으로 대통령 직선제가 약속되었다.", { big: true }),
   n("1987-11", "사회", "대한항공 858편이 폭파되었다."),
   n("1987-12", "정치", "16년 만의 직선제 대선에서 노태우 후보가 당선되었다."),
-  n("1988-09", "스포츠", "서울 올림픽이 개막했다. 굴렁쇠 소년과 '손에 손잡고'가 울려 퍼졌다.", { big: true, impact: cheer("올림픽 열기에 온 동네가 들떴다.", 3) }),
+  n("1988-09", "스포츠", "서울 올림픽이 개막했다. 굴렁쇠 소년과 '손에 손잡고'가 울려 퍼졌다.", { big: true, impact: cheer(() => L("올림픽 열기에 온 동네가 들떴다."), 3) }),
   n("1988-10", "사회", "탈주범 지강헌의 '유전무죄 무전유죄'가 화제가 되었다."),
   n("1989-01", "사회", "해외여행이 전면 자유화되었다."),
   n("1989-06", "세계", "중국 톈안먼 광장에서 시위대가 무력 진압되었다."),
@@ -139,7 +140,7 @@ export const NEWS: NewsItem[] = [
   n("1994-07", "정치", "김일성이 사망했다. 기록적인 폭염이 이어지던 여름이었다."),
   n("1994-10", "사회", "성수대교가 무너졌다.", { big: true }),
   n("1995-02", "연예", "드라마 '모래시계'가 방영되는 밤이면 거리가 텅 비었다."),
-  n("1995-06", "사회", "삼풍백화점이 무너졌다. 같은 달 첫 전국동시지방선거가 치러졌다.", { big: true, impact: grief("뉴스 속 무너진 건물이 오래 잊히지 않았다.") }),
+  n("1995-06", "사회", "삼풍백화점이 무너졌다. 같은 달 첫 전국동시지방선거가 치러졌다.", { big: true, impact: grief(() => L("뉴스 속 무너진 건물이 오래 잊히지 않았다.")) }),
   n("1995-11", "정치", "노태우 전 대통령이 비자금 사건으로 구속되었다."),
   n("1996-01", "연예", "서태지와 아이들이 은퇴를 발표했다."),
   n("1996-09", "연예", "H.O.T.가 데뷔했다. 1세대 아이돌 시대가 열렸다."),
@@ -149,9 +150,9 @@ export const NEWS: NewsItem[] = [
   n("1997-08", "사회", "대한항공 801편이 괌에서 추락했다. 같은 달 다이애나 왕세자비가 세상을 떠났다."),
   n("1997-11", "경제", "정부가 IMF에 구제금융을 신청했다. '국가 부도'라는 말이 뉴스를 뒤덮었다.", { big: true, impact: imfCrisis }),
   n("1997-12", "정치", "김대중 후보가 당선되며 첫 평화적 정권 교체가 이루어졌다."),
-  n("1998-01", "사회", "전국에서 금 모으기 운동이 벌어졌다.", { big: true, impact: () => ({ text: "장롱 속 돌반지를 꺼내 보았다.", stats: { relationships: 2 } }) }),
+  n("1998-01", "사회", "전국에서 금 모으기 운동이 벌어졌다.", { big: true, impact: () => ({ text: L("장롱 속 돌반지를 꺼내 보았다."), stats: { relationships: 2 } }) }),
   n("1998-06", "사회", "정주영 회장이 소 떼를 몰고 판문점을 넘었다."),
-  n("1998-07", "스포츠", "박세리가 US여자오픈에서 맨발 투혼 끝에 우승했다.", { big: true, impact: cheer("양말을 벗고 물에 들어가는 장면에 괜히 힘이 났다.", 2) }),
+  n("1998-07", "스포츠", "박세리가 US여자오픈에서 맨발 투혼 끝에 우승했다.", { big: true, impact: cheer(() => L("양말을 벗고 물에 들어가는 장면에 괜히 힘이 났다."), 2) }),
   n("1998-11", "사회", "금강산 관광이 시작되었다."),
   n("1999-02", "연예", "영화 '쉬리'가 개봉해 한국 영화 흥행 기록을 새로 썼다."),
   n("1999-04", "사회", "PC방마다 스타크래프트를 하는 사람들로 가득 찼다."),
@@ -168,7 +169,7 @@ export const NEWS: NewsItem[] = [
   n("2001-08", "경제", "IMF 구제금융을 조기에 모두 갚았다."),
   n("2001-09", "세계", "미국에서 9·11 테러가 일어났다.", { big: true }),
   n("2002-03", "연예", "드라마 '겨울연가'가 방영되었다. 훗날 일본에 한류 열풍을 일으켰다."),
-  n("2002-06", "스포츠", "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가 붉은 악마로 가득 찼다.", { big: true, impact: cheer("'대~한민국'을 외치며 모르는 사람과 얼싸안았다.", 5) }),
+  n("2002-06", "스포츠", "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가 붉은 악마로 가득 찼다.", { big: true, impact: cheer(() => L("'대~한민국'을 외치며 모르는 사람과 얼싸안았다."), 5) }),
   n("2002-06", "사회", "제2연평해전이 일어났다."),
   n("2002-09", "사회", "태풍 루사가 강원도와 영남을 휩쓸었다."),
   n("2002-10", "스포츠", "부산 아시안게임이 열렸다."),
@@ -201,7 +202,7 @@ export const NEWS: NewsItem[] = [
   n("2008-04", "과학", "이소연이 한국인 최초로 우주에 다녀왔다."),
   n("2008-06", "사회", "미국산 쇠고기 수입에 반대하는 촛불집회가 광화문을 메웠다."),
   n("2008-07", "사회", "금강산에서 관광객이 피격되어 관광이 중단되었다."),
-  n("2008-08", "스포츠", "베이징 올림픽에서 박태환이 수영 금메달을, 야구 대표팀이 전승 우승을 거뒀다.", { big: true, impact: cheer("야구 결승 마지막 병살 장면에서 소리를 질렀다.", 3) }),
+  n("2008-08", "스포츠", "베이징 올림픽에서 박태환이 수영 금메달을, 야구 대표팀이 전승 우승을 거뒀다.", { big: true, impact: cheer(() => L("야구 결승 마지막 병살 장면에서 소리를 질렀다."), 3) }),
   n("2008-09", "경제", "리먼 브라더스가 파산하며 글로벌 금융위기가 닥쳤다.", { big: true, impact: financialCrisis }),
   n("2008-11", "세계", "버락 오바마가 미국 첫 흑인 대통령으로 당선되었다."),
   n("2009-01", "연예", "소녀시대의 'Gee'가 거리마다 흘러나왔다."),
@@ -212,7 +213,7 @@ export const NEWS: NewsItem[] = [
   n("2009-08", "정치", "김대중 전 대통령이 서거했다. 신종플루가 퍼지며 손 소독제가 동났다."),
   n("2009-11", "과학", "아이폰이 국내에 출시되어 스마트폰 시대가 열렸다.", { big: true }),
   // ── 2010년대 ──
-  n("2010-02", "스포츠", "김연아가 밴쿠버 동계올림픽에서 세계 신기록으로 금메달을 땄다.", { big: true, impact: cheer("연아의 마지막 스핀에 숨을 죽였다.", 3) }),
+  n("2010-02", "스포츠", "김연아가 밴쿠버 동계올림픽에서 세계 신기록으로 금메달을 땄다.", { big: true, impact: cheer(() => L("연아의 마지막 스핀에 숨을 죽였다."), 3) }),
   n("2010-03", "사회", "천안함이 침몰해 장병 46명이 희생되었다.", { big: true }),
   n("2010-06", "스포츠", "남아공 월드컵에서 원정 첫 16강에 올랐다."),
   n("2010-10", "연예", "'슈퍼스타K2'에서 허각이 우승하며 오디션 열풍이 불었다."),
@@ -235,7 +236,7 @@ export const NEWS: NewsItem[] = [
   n("2013-11", "연예", "드라마 '응답하라 1994'가 인기를 끌었다."),
   n("2013-12", "사회", "고려대 '안녕들하십니까' 대자보가 대학가로 번졌다."),
   n("2014-02", "스포츠", "김연아가 소치 동계올림픽 은메달을 끝으로 은퇴했다."),
-  n("2014-04", "사회", "세월호가 침몰해 304명이 희생되었다. 온 나라가 노란 리본을 달았다.", { big: true, impact: grief("한동안 뉴스를 켜기가 힘들었다.", -4) }),
+  n("2014-04", "사회", "세월호가 침몰해 304명이 희생되었다. 온 나라가 노란 리본을 달았다.", { big: true, impact: grief(() => L("한동안 뉴스를 켜기가 힘들었다."), -4) }),
   n("2014-08", "연예", "영화 '명량'이 역대 최다 관객 기록을 세웠다."),
   n("2014-10", "사회", "단통법이 시행되었다. 판교 공연장 환풍구 붕괴 사고도 있었다."),
   n("2014-12", "사회", "'땅콩 회항' 사건으로 갑질이라는 말이 일상어가 되었다. 드라마 '미생'이 직장인들을 울렸다."),
@@ -260,7 +261,7 @@ export const NEWS: NewsItem[] = [
   n("2017-09", "정치", "북한이 6차 핵실험을 했다."),
   n("2017-11", "사회", "포항 지진으로 수능이 사상 처음 일주일 연기되었다."),
   n("2017-12", "경제", "비트코인 가격이 폭등하며 '가즈아'라는 말이 유행했다."),
-  n("2018-02", "스포츠", "평창 동계올림픽이 열렸다. 컬링 대표팀의 '영미!'가 유행어가 되었다.", { big: true, impact: cheer("컬링 규칙을 처음으로 제대로 알게 되었다.", 2) }),
+  n("2018-02", "스포츠", "평창 동계올림픽이 열렸다. 컬링 대표팀의 '영미!'가 유행어가 되었다.", { big: true, impact: cheer(() => L("컬링 규칙을 처음으로 제대로 알게 되었다."), 2) }),
   n("2018-02", "사회", "검찰 내부 폭로를 시작으로 미투 운동이 번졌다."),
   n("2018-04", "정치", "판문점에서 남북정상회담이 열려 두 정상이 도보다리를 걸었다.", { big: true }),
   n("2018-05", "연예", "BTS가 빌보드 200 1위에 올랐다."),
@@ -299,8 +300,8 @@ export const NEWS: NewsItem[] = [
   n("2022-06", "과학", "누리호 2차 발사가 성공했다. 드라마 '이상한 변호사 우영우'가 방영을 시작했다."),
   n("2022-07", "경제", "한국은행이 사상 첫 빅스텝을 밟는 등 금리가 가파르게 올랐다.", { impact: rateShock }),
   n("2022-08", "사회", "서울에 기록적인 폭우가 쏟아져 반지하 주택에서 희생자가 나왔다."),
-  n("2022-10", "사회", "이태원 참사로 159명이 희생되었다. 카카오 서비스가 데이터센터 화재로 멈췄다.", { big: true, impact: grief("한동안 사람 많은 곳에 가기가 꺼려졌다.") }),
-  n("2022-12", "스포츠", "카타르 월드컵에서 포르투갈을 꺾고 16강에 올랐다. '중꺾마'가 유행어가 되었다.", { big: true, impact: cheer("새벽에 터진 황희찬의 골에 잠이 다 깼다.", 3) }),
+  n("2022-10", "사회", "이태원 참사로 159명이 희생되었다. 카카오 서비스가 데이터센터 화재로 멈췄다.", { big: true, impact: grief(() => L("한동안 사람 많은 곳에 가기가 꺼려졌다.")) }),
+  n("2022-12", "스포츠", "카타르 월드컵에서 포르투갈을 꺾고 16강에 올랐다. '중꺾마'가 유행어가 되었다.", { big: true, impact: cheer(() => L("새벽에 터진 황희찬의 골에 잠이 다 깼다."), 3) }),
   n("2022-12", "과학", "ChatGPT가 공개되어 생성형 AI 열풍이 시작되었다."),
   n("2023-01", "사회", "실내 마스크 착용 의무가 풀렸다."),
   n("2023-03", "연예", "'더 글로리' 파트 2가 공개되어 화제가 되었다."),
@@ -317,7 +318,7 @@ export const NEWS: NewsItem[] = [
   n("2024-04", "정치", "22대 총선에서 야당이 압승했다."),
   n("2024-06", "사회", "화성 배터리 공장 화재로 노동자 23명이 희생되었다."),
   n("2024-07", "경제", "티몬·위메프가 판매 대금을 정산하지 못하는 사태가 터졌다."),
-  n("2024-08", "스포츠", "파리 올림픽에서 양궁이 전 종목을 석권했고, 안세영이 배드민턴 금메달을 땄다.", { big: true, impact: cheer("새벽마다 금메달 소식에 잠을 설쳤다.", 2) }),
+  n("2024-08", "스포츠", "파리 올림픽에서 양궁이 전 종목을 석권했고, 안세영이 배드민턴 금메달을 땄다.", { big: true, impact: cheer(() => L("새벽마다 금메달 소식에 잠을 설쳤다."), 2) }),
   n("2024-09", "스포츠", "프로야구가 처음으로 한 시즌 관중 1,000만 명을 넘었다. '흑백요리사'가 공개되었다."),
   n("2024-10", "연예", "한강 작가가 한국인 첫 노벨 문학상을 받았다. 로제의 'APT.'가 세계를 흔들었다.", { big: true }),
   n("2024-11", "세계", "트럼프가 다시 미국 대통령에 당선되었다."),
@@ -359,7 +360,7 @@ interface FutureNews {
   text: string;
 }
 
-const FUTURE: FutureNews[] = [
+export const FUTURE: FutureNews[] = [
   { from: 2027, cat: "과학", text: "AI 비서가 회의록과 보고서를 대신 쓰는 회사가 절반을 넘었다는 조사가 나왔다." },
   { from: 2027, cat: "사회", text: "출생아 수가 바닥을 찍고 소폭 반등했다는 통계가 발표되었다." },
   { from: 2027, cat: "연예", text: "K팝 그룹이 AI로 만든 가상 멤버를 공개해 논쟁이 붙었다." },
@@ -411,6 +412,9 @@ export function futureCandidates(year: number, seen: readonly string[]): { id: s
   });
 }
 
+/** A headline in the display language: Korea's are written in Korean, America's in English. */
+export const newsText = (text: string) => (isUS() ? T(text) : L(text));
+
 /** Real headlines whose month falls in (fromMi, toMi]. */
 export function newsBetween(fromMi: number, toMi: number): NewsItem[] {
   return newsList().filter((x) => x.mi > fromMi && x.mi <= toMi);
@@ -420,10 +424,10 @@ const MONTH_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
 
 /** Headlines near a year, biggest first, for the narrator. */
 export function newsHints(year: number, limit = 4, upToMi = Infinity): string[] {
-  const us = isUS();
+  const en = isEn();
   return newsList()
     .filter((x) => Math.floor(x.mi / 12) === year && x.mi <= upToMi)
     .sort((a, b) => Number(!!b.big) - Number(!!a.big))
     .slice(0, limit)
-    .map((x) => (us ? `${MONTH_EN[x.mi % 12]} ${year}: ${x.text}` : `${year}년 ${(x.mi % 12) + 1}월: ${x.text}`));
+    .map((x) => (en ? `${MONTH_EN[x.mi % 12]} ${year}: ${newsText(x.text)}` : `${year}년 ${(x.mi % 12) + 1}월: ${newsText(x.text)}`));
 }

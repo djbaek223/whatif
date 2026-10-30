@@ -8,7 +8,7 @@ import type { LifeState } from "./types";
 import { usMonthlyCosts } from "../regions/us/budget";
 import { formatWealth } from "./format";
 import { L } from "./i18n";
-import { isUS } from "./region";
+import { isEn, isUS } from "./region";
 
 export interface Expense {
   label: string;
@@ -91,7 +91,7 @@ export function tuitionOnly(s: LifeState): number {
 export const costBreakdown = (items: Expense[]) =>
   [...items]
     .sort((a, b) => b.amount - a.amount)
-    .map((e) => `${e.label} ${isUS() ? formatWealth(e.amount) : `${e.amount.toLocaleString()}만원`}`)
+    .map((e) => `${e.label} ${isEn() ? formatWealth(e.amount) : `${e.amount.toLocaleString()}만원`}`)
     .join(" · ");
 
 /** A feed line when fixed costs move by 20만원 or more a month, naming what changed. Null otherwise. */
@@ -114,6 +114,6 @@ export function costChange(before: Record<string, number> | undefined, items: Ex
     : b > a
       ? L("매달 고정으로 나가는 돈이 늘었다.")
       : L("매달 고정으로 나가는 돈이 줄었다.");
-  const facts = [isUS() ? `Monthly costs ${formatWealth(a)} → ${formatWealth(b)}` : `월 지출 ${a.toLocaleString()} → ${b.toLocaleString()}만원`, ...moved.map(({ l, d }) => `${l} ${d > 0 ? "+" : ""}${isUS() ? formatWealth(d) : d.toLocaleString()}`)];
+  const facts = [isEn() ? `Monthly costs ${formatWealth(a)} → ${formatWealth(b)}` : `월 지출 ${a.toLocaleString()} → ${b.toLocaleString()}만원`, ...moved.map(({ l, d }) => `${l} ${d > 0 ? "+" : ""}${isEn() ? formatWealth(d) : d.toLocaleString()}`)];
   return { text, facts };
 }

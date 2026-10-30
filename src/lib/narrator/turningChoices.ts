@@ -4,11 +4,15 @@ import { ageAt } from "../events";
 import { heuristicInitial, turningPointMi } from "../engine";
 import type { OpeningChoice, Preset, Profile, TurningPoint } from "../types";
 import type { OpeningResult } from "./schema";
-import { isUS } from "../region";
+import { L } from "../i18n";
+import { inRegion, isEn, isUS, lang, langFor, region } from "../region";
 import { kindDef } from "../onboarding";
 import * as US from "../../regions/us/turningChoices";
 
 type Path = OpeningResult["choices"][number];
+
+// The player's own words are read in the language they are written in, whichever country the life is in.
+const korean = (s: string) => /[가-힣]/.test(s);
 
 export type TpTheme = "exam" | "job" | "love" | "career" | "move" | "invest" | "other";
 
@@ -34,14 +38,10 @@ const THEME_WORDS: [TpTheme, RegExp][] = [
 
 /** The kind picked on the form, or the one the user's words point to most. */
 export function themeOf(tp: TurningPoint): TpTheme {
-  if (isUS()) {
-    const picked = kindDef(tp.kind)?.id;
-    if (picked && picked !== "other") return picked;
-    return bestTheme(`${tp.situation} ${tp.actualChoice} ${tp.regret}`, US.THEME_WORDS);
-  }
-  const picked = tp.kind ? (KIND_LABELS[tp.kind] ?? (Object.values(KIND_LABELS).includes(tp.kind as TpTheme) ? (tp.kind as TpTheme) : undefined)) : undefined;
+  const picked = tp.kind ? (KIND_LABELS[tp.kind] ?? kindDef(tp.kind)?.id ?? (Object.values(KIND_LABELS).includes(tp.kind as TpTheme) ? (tp.kind as TpTheme) : undefined)) : undefined;
   if (picked && picked !== "other") return picked;
-  return bestTheme(`${tp.situation} ${tp.actualChoice} ${tp.regret}`, THEME_WORDS);
+  const text = `${tp.situation} ${tp.actualChoice} ${tp.regret}`;
+  return bestTheme(text, korean(text) || !text.trim() ? THEME_WORDS : US.THEME_WORDS);
 }
 
 function bestTheme(text: string, words: [TpTheme, RegExp][]): TpTheme {
@@ -66,7 +66,7 @@ const PRESET_WORDS: [Preset, RegExp][] = [
 ];
 
 export function presetOf(text: string): Preset | null {
-  if (isUS()) return US.presetOf(text);
+  if (!korean(text)) return US.presetOf(text);
   for (const [preset, re] of PRESET_WORDS) if (re.test(text)) return preset;
   return null;
 }
@@ -108,7 +108,7 @@ function negative(future: string): string {
 
 /** The two paths the user was torn between, when the situation names them. */
 export function pathsIn(situation: string): [string, string] | null {
-  if (isUS()) return US.pathsIn(situation);
+  if (!korean(situation)) return US.pathsIn(situation);
   const clean = (x: string) => x.replace(LEAD, "").trim();
   const ok = (a: string, b: string) => a.length >= 2 && b.length >= 2 && a !== b;
   const m = situation.match(PAIR_PATTERNS[0]);
@@ -150,7 +150,7 @@ const CORE: [string, RegExp][] = [
   ["상경", /상경|서울/],
   ["남기", /남(?:아|았|는|기|을)/],
 ];
-const negated = (s: string) => (isUS() ? US.negated(s) : /(않|안\s|못\s|말았|포기|접었|접고)/.test(s));
+const negated = (s: string) => (korean(s) ? /(않|안\s|못\s|말았|포기|접었|접고)/.test(s) : US.negated(s));
 const cores = (s: string) => new Set(CORE.filter(([, re]) => re.test(s)).map(([k]) => k));
 
 /** Whether two phrases name the same path ("지방대 진학" and "재수하지 않고 지방대에 갔다"). */
@@ -181,7 +181,7 @@ function hasBatchim(word: string): boolean | null {
 
 /** "재수" → "재수를 택한다"; a phrase that is already a sentence ("서울로 간다") stays as it is. */
 export function asChoice(phrase: string): string {
-  if (isUS()) return US.asChoice(phrase);
+  if (!korean(phrase)) return US.asChoice(phrase);
   const p = phrase.trim().replace(/[.。]$/, "");
   if (/(다|자|기로)$/.test(p)) return p;
   const b = hasBatchim(p);
@@ -204,64 +204,64 @@ type Candidate = OpeningChoice & { when?: (c: Ctx) => boolean };
 
 function pool(theme: TpTheme, c: Ctx): Candidate[] {
   if (isUS()) return US.usPool(theme, c);
-  const uni = c.university || "원하던 대학";
-  const town = c.hometown.trim().split(/\s/)[0] || "고향";
+  const uni = c.university || L("원하던 대학");
+  const town = c.hometown.trim().split(/\s/)[0] || L("고향");
   const inSeoul = /서울/.test(town);
   switch (theme) {
     case "exam":
       return [
-        { label: "특목고·자사고 입시에 도전한다", preset: "study", education: "same", when: (x) => x.age <= 16 },
-        { label: "집 가까운 학교에서 내신에 집중한다", preset: "family", education: "same", when: (x) => x.age <= 16 },
-        { label: "재수해서 원하던 대학에 다시 도전한다", preset: "study", education: "highschool", when: (x) => x.age >= 17 && x.age <= 21 },
-        { label: `점수에 맞춰 ${uni}에 바로 들어간다`, preset: "study", education: "university", when: (x) => x.age >= 17 && x.age <= 21 },
-        { label: "전공을 바꿔 정말 하고 싶던 공부를 한다", preset: "study", education: "university", when: (x) => x.age >= 17 && x.age <= 25 },
-        { label: "대학 대신 일찍 일을 시작한다", preset: "career", jobTitle: "사회초년생", education: "done", when: (x) => x.age >= 17 && x.age <= 24 },
-        { label: "해외로 유학을 떠난다", preset: "move", education: "university", when: (x) => x.age >= 15 && x.age <= 25 },
-        { label: "대학원에 진학해 공부를 이어간다", preset: "study", education: "graduate", when: (x) => x.age >= 21 },
-        { label: "공무원 시험을 준비한다", preset: "career", jobTitle: "공무원", education: "done", when: (x) => x.age >= 20 },
+        { label: L("특목고·자사고 입시에 도전한다"), preset: "study", education: "same", when: (x) => x.age <= 16 },
+        { label: L("집 가까운 학교에서 내신에 집중한다"), preset: "family", education: "same", when: (x) => x.age <= 16 },
+        { label: L("재수해서 원하던 대학에 다시 도전한다"), preset: "study", education: "highschool", when: (x) => x.age >= 17 && x.age <= 21 },
+        { label: L`점수에 맞춰 ${uni}에 바로 들어간다`, preset: "study", education: "university", when: (x) => x.age >= 17 && x.age <= 21 },
+        { label: L("전공을 바꿔 정말 하고 싶던 공부를 한다"), preset: "study", education: "university", when: (x) => x.age >= 17 && x.age <= 25 },
+        { label: L("대학 대신 일찍 일을 시작한다"), preset: "career", jobTitle: "사회초년생", education: "done", when: (x) => x.age >= 17 && x.age <= 24 },
+        { label: L("해외로 유학을 떠난다"), preset: "move", education: "university", when: (x) => x.age >= 15 && x.age <= 25 },
+        { label: L("대학원에 진학해 공부를 이어간다"), preset: "study", education: "graduate", when: (x) => x.age >= 21 },
+        { label: L("공무원 시험을 준비한다"), preset: "career", jobTitle: "공무원", education: "done", when: (x) => x.age >= 20 },
       ];
     case "job":
       return [
-        { label: "1년 더 준비해서 대기업 공채에 도전한다", preset: "career", place: "대기업", education: "done" },
-        { label: "합격한 회사에 일단 입사한다", preset: "career", education: "done" },
-        { label: "공무원 시험으로 방향을 바꾼다", preset: "career", jobTitle: "공무원", education: "done" },
-        { label: "작은 스타트업에 합류해 빨리 배운다", preset: "career", place: "스타트업", education: "done" },
-        { label: "대학원에 가서 전문성을 쌓는다", preset: "study", education: "graduate" },
-        { label: "워킹홀리데이로 해외에서 일해 본다", preset: "move", when: (x) => x.age <= 30 },
+        { label: L("1년 더 준비해서 대기업 공채에 도전한다"), preset: "career", place: "대기업", education: "done" },
+        { label: L("합격한 회사에 일단 입사한다"), preset: "career", education: "done" },
+        { label: L("공무원 시험으로 방향을 바꾼다"), preset: "career", jobTitle: "공무원", education: "done" },
+        { label: L("작은 스타트업에 합류해 빨리 배운다"), preset: "career", place: "스타트업", education: "done" },
+        { label: L("대학원에 가서 전문성을 쌓는다"), preset: "study", education: "graduate" },
+        { label: L("워킹홀리데이로 해외에서 일해 본다"), preset: "move", when: (x) => x.age <= 30 },
       ];
     case "career":
       return [
-        { label: "지금 회사에 남아 자리를 지킨다", preset: "family", when: (x) => x.employed },
-        { label: "더 큰 회사로 이직한다", preset: "career", when: (x) => x.employed },
-        { label: "모아 둔 돈으로 내 사업을 시작한다", preset: "risk", jobTitle: "사업가" },
-        { label: "회사를 다니며 부업으로 먼저 시험해 본다", preset: "career", when: (x) => x.employed },
-        { label: "잠시 쉬면서 다음 길을 고민한다", preset: "rest" },
-        { label: "대학원에 가서 다른 분야로 옮긴다", preset: "study", education: "graduate" },
+        { label: L("지금 회사에 남아 자리를 지킨다"), preset: "family", when: (x) => x.employed },
+        { label: L("더 큰 회사로 이직한다"), preset: "career", when: (x) => x.employed },
+        { label: L("모아 둔 돈으로 내 사업을 시작한다"), preset: "risk", jobTitle: "사업가" },
+        { label: L("회사를 다니며 부업으로 먼저 시험해 본다"), preset: "career", when: (x) => x.employed },
+        { label: L("잠시 쉬면서 다음 길을 고민한다"), preset: "rest" },
+        { label: L("대학원에 가서 다른 분야로 옮긴다"), preset: "study", education: "graduate" },
       ];
     case "love":
       return [
-        { label: "용기를 내 그 사람에게 마음을 전한다", preset: "love", when: (x) => !x.partnered },
-        { label: "그 사람과 결혼한다", preset: "love", when: (x) => x.age >= 24 },
-        { label: "헤어지고 내 길에 집중한다", preset: "study" },
-        { label: "결혼은 미루고 조금 더 기다린다", preset: "career", when: (x) => x.age >= 24 },
-        { label: "그 사람을 따라 낯선 도시로 간다", preset: "move" },
-        { label: "가족의 반대를 받아들인다", preset: "family" },
+        { label: L("용기를 내 그 사람에게 마음을 전한다"), preset: "love", when: (x) => !x.partnered },
+        { label: L("그 사람과 결혼한다"), preset: "love", when: (x) => x.age >= 24 },
+        { label: L("헤어지고 내 길에 집중한다"), preset: "study" },
+        { label: L("결혼은 미루고 조금 더 기다린다"), preset: "career", when: (x) => x.age >= 24 },
+        { label: L("그 사람을 따라 낯선 도시로 간다"), preset: "move" },
+        { label: L("가족의 반대를 받아들인다"), preset: "family" },
       ];
     case "move":
       return [
         { label: inSeoul ? "서울을 떠나 지방에서 새로 시작한다" : `${town}을 떠나 서울로 올라간다`, preset: "move" },
-        { label: `${town}에 남아 가족 곁을 지킨다`, preset: "family" },
-        { label: "해외로 이민을 떠난다", preset: "move", when: (x) => x.age >= 22 },
-        { label: "해외에서 공부하며 기회를 찾는다", preset: "study", education: "graduate", when: (x) => x.age >= 21 && x.age <= 35 },
-        { label: "워킹홀리데이로 1년 살아 본다", preset: "move", when: (x) => x.age <= 30 },
+        { label: L`${town}에 남아 가족 곁을 지킨다`, preset: "family" },
+        { label: L("해외로 이민을 떠난다"), preset: "move", when: (x) => x.age >= 22 },
+        { label: L("해외에서 공부하며 기회를 찾는다"), preset: "study", education: "graduate", when: (x) => x.age >= 21 && x.age <= 35 },
+        { label: L("워킹홀리데이로 1년 살아 본다"), preset: "move", when: (x) => x.age <= 30 },
       ];
     case "invest":
       return [
-        { label: "대출을 받아서라도 집을 산다", preset: "risk" },
-        { label: "전세로 버티며 돈을 모은다", preset: "family" },
-        { label: "모아 둔 돈을 주식에 건다", preset: "risk" },
-        { label: "투자는 접고 일에 집중한다", preset: "career", when: (x) => x.employed },
-        { label: "집값이 싼 지역으로 옮겨 내 집을 마련한다", preset: "move" },
+        { label: L("대출을 받아서라도 집을 산다"), preset: "risk" },
+        { label: L("전세로 버티며 돈을 모은다"), preset: "family" },
+        { label: L("모아 둔 돈을 주식에 건다"), preset: "risk" },
+        { label: L("투자는 접고 일에 집중한다"), preset: "career", when: (x) => x.employed },
+        { label: L("집값이 싼 지역으로 옮겨 내 집을 마련한다"), preset: "move" },
       ];
     case "other":
       return [];
@@ -273,32 +273,32 @@ function byAge(c: Ctx): Candidate[] {
   if (isUS()) return US.usByAge(c);
   if (c.age < 13)
     return [
-      { label: "공부에 재미를 붙여 본다", preset: "study" },
-      { label: "좋아하는 운동이나 악기를 시작한다", preset: "health" },
-      { label: "다른 동네 학교로 전학 간다", preset: "move" },
+      { label: L("공부에 재미를 붙여 본다"), preset: "study" },
+      { label: L("좋아하는 운동이나 악기를 시작한다"), preset: "health" },
+      { label: L("다른 동네 학교로 전학 간다"), preset: "move" },
     ];
   if (c.age < 17)
     return [
-      { label: "공부에 모든 걸 걸어 본다", preset: "study", education: "same" },
-      { label: "좋아하던 운동이나 음악에 깊이 빠져 본다", preset: "rest" },
-      { label: "친구들 곁에 남겠다고 부모님을 설득한다", preset: "family" },
+      { label: L("공부에 모든 걸 걸어 본다"), preset: "study", education: "same" },
+      { label: L("좋아하던 운동이나 음악에 깊이 빠져 본다"), preset: "rest" },
+      { label: L("친구들 곁에 남겠다고 부모님을 설득한다"), preset: "family" },
     ];
   if (c.student)
     return [
-      { label: "원하던 공부에 끝까지 매달린다", preset: "study", education: "highschool" },
-      { label: "일찍 사회에 나가 돈을 번다", preset: "career", jobTitle: "사회초년생", education: "done" },
-      { label: "낯선 도시의 학교로 떠난다", preset: "move", education: c.university ? "university" : "same" },
+      { label: L("원하던 공부에 끝까지 매달린다"), preset: "study", education: "highschool" },
+      { label: L("일찍 사회에 나가 돈을 번다"), preset: "career", jobTitle: "사회초년생", education: "done" },
+      { label: L("낯선 도시의 학교로 떠난다"), preset: "move", education: c.university ? "university" : "same" },
     ];
   if (c.age < 30)
     return [
-      { label: "더 큰 회사, 더 큰 무대로 간다", preset: "career", place: "대기업" },
-      { label: "하고 싶던 일에 모험을 건다", preset: "risk", jobTitle: "창업가" },
-      { label: "그 사람에게 마음을 전한다", preset: "love" },
+      { label: L("더 큰 회사, 더 큰 무대로 간다"), preset: "career", place: "대기업" },
+      { label: L("하고 싶던 일에 모험을 건다"), preset: "risk", jobTitle: "창업가" },
+      { label: L("그 사람에게 마음을 전한다"), preset: "love" },
     ];
   return [
-    { label: "모든 걸 걸고 새로운 일을 시작한다", preset: "risk", jobTitle: "사업가" },
-    { label: "가족과 보내는 시간을 택한다", preset: "family" },
-    { label: "삶의 터전을 옮긴다", preset: "move" },
+    { label: L("모든 걸 걸고 새로운 일을 시작한다"), preset: "risk", jobTitle: "사업가" },
+    { label: L("가족과 보내는 시간을 택한다"), preset: "family" },
+    { label: L("삶의 터전을 옮긴다"), preset: "move" },
   ];
 }
 
@@ -340,11 +340,16 @@ export function alternativePaths(profile: Profile, tp: TurningPoint): Path[] {
     hometown: profile.hometown,
   };
   const actual = tp.actualChoice.trim();
+  // Which paths count as the same is read in the country's own language, so a life shown in the other language
+  // gets the same paths (in its words) and plays out the same.
+  const native = langFor(region());
+  const inNative = <T,>(fn: () => T): T => (lang() === native ? fn() : inRegion(region(), fn, native));
   const picked: OpeningChoice[] = [];
+  const pickedNative: string[] = [];
   // Paths already on the table: the one actually taken, both the user named, and those picked so far.
   const pair = pathsIn(tp.situation);
   const named = [actual, ...(pair ?? [])].filter(Boolean);
-  const taken = (label: string) => named.some((n) => samePath(label, n)) || picked.some((p) => samePath(p.label, label));
+  const taken = (label: string) => named.some((n) => samePath(label, n)) || pickedNative.some((p) => samePath(p, label));
 
   // 1. The other path the user wrote down ("A와 B 사이에서"); both when no actual choice is given,
   //    and the second-named when we can't tell which one they took.
@@ -360,20 +365,31 @@ export function alternativePaths(profile: Profile, tp: TurningPoint): Path[] {
       place: /대기업/.test(phrase) ? "대기업" : /스타트업|startup/i.test(phrase) ? (isUS() ? "startup" : "스타트업") : "",
       education: preset === "study" ? (/대학원|석사|박사|grad school|master|PhD|law school|med school/i.test(phrase) ? "graduate" : /재수|삼수|수능|gap year|reapply/i.test(phrase) ? "highschool" : ctx.student && ctx.age >= 17 ? "university" : "same") : "same",
     });
+    pickedNative.push(inNative(() => asChoice(phrase)));
   }
 
   // 2. Paths that fit the kind of turning point, leaning toward what the regret hints at.
   const theme = themeOf(tp);
   const wish = presetOf(tp.regret);
   const actualPreset = presetOf(actual);
-  const fits = pool(theme, ctx).filter((c) => !c.when || c.when(ctx));
+  const candidates = () => [...pool(theme, ctx).filter((c) => !c.when || c.when(ctx)), ...byAge(ctx)];
+  const all = candidates();
+  const nativeLabels = inNative(() => candidates().map((c) => c.label));
+  const fits = all.length - byAge(ctx).length;
   const seed = hash(`${tp.date}|${tp.situation}|${actual}`);
   const rank = (c: Candidate, i: number) =>
-    (wish && c.preset === wish ? -10 : 0) + (actualPreset && c.preset === actualPreset ? 5 : 0) + (picked.some((p) => p.preset === c.preset) ? 3 : 0) + ((i + seed) % fits.length) / 10;
-  const ordered = fits.map((c, i) => [c, rank(c, i)] as const).sort((x, y) => x[1] - y[1]).map(([c]) => c);
-  for (const c of [...ordered, ...byAge(ctx)]) {
+    (wish && c.preset === wish ? -10 : 0) + (actualPreset && c.preset === actualPreset ? 5 : 0) + (picked.some((p) => p.preset === c.preset) ? 3 : 0) + ((i + seed) % fits) / 10;
+  const ordered = all
+    .slice(0, fits)
+    .map((c, i) => [i, rank(c, i)] as const)
+    .sort((x, y) => x[1] - y[1])
+    .map(([i]) => i);
+  for (const i of [...ordered, ...[...all.keys()].slice(fits)]) {
     if (picked.length >= 2) break;
-    if (!taken(c.label)) picked.push(c);
+    if (!taken(nativeLabels[i])) {
+      picked.push(all[i]);
+      pickedNative.push(nativeLabels[i]);
+    }
   }
   return picked.slice(0, 2).map(({ label, preset, jobTitle, place, education }) => ({ label, preset, jobTitle: jobTitle ?? "", place: place ?? "", original: false, education: education ?? "same" }));
 }
@@ -383,7 +399,7 @@ const THEME_NAMES: Record<TpTheme, string> = { exam: "입시", job: "취업", lo
 /** What the rules read from the turning point, handed to the AI so its paths start from the same place. */
 export function pathHints(profile: Profile, tp: TurningPoint) {
   const road = roadNotTaken(tp);
-  return { kind: (isUS() ? US.US_KIND_NAMES : THEME_NAMES)[themeOf(tp)], roadNotTaken: road ? asChoice(road) : null, examples: alternativePaths(profile, tp).map((c) => c.label) };
+  return { kind: (isEn() ? US.US_KIND_NAMES : THEME_NAMES)[themeOf(tp)], roadNotTaken: road ? asChoice(road) : null, examples: alternativePaths(profile, tp).map((c) => c.label) };
 }
 
 /** Fills the AI's paths up to three with rule-based ones when it returned fewer. */

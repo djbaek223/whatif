@@ -7,7 +7,7 @@ import { onCampus, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 import { formatWealth } from "./format";
 import { L } from "./i18n";
-import { isUS } from "./region";
+import { isEn, isUS } from "./region";
 
 const year = (s: LifeState) => Math.floor(s.mi / 12);
 const month = (s: LifeState) => (s.mi % 12) + 1;
@@ -26,14 +26,23 @@ const NAMES = ["민수", "지영", "현우", "수진", "성호", "은정", "재�
 const FAMILY = ["김", "이", "박", "최", "정", "강", "조", "윤"];
 const US_NAMES = ["Mike", "Jessica", "Chris", "Ashley", "Matt", "Sarah", "Josh", "Emily", "Dave", "Megan", "Ryan", "Nicole"];
 const US_FAMILY = ["Johnson", "Miller", "Garcia", "Davis", "Martinez", "Wilson", "Anderson", "Taylor"];
+// The same people written for the other language: a Korean name in English letters, an American one in Hangul.
+const NAMES_EN = ["Minsu", "Jiyoung", "Hyunwoo", "Sujin", "Sungho", "Eunjung", "Jaehoon", "Mikyung", "Donghyun", "Hyewon", "Junho", "Sunyoung"];
+const FAMILY_EN = ["Kim", "Lee", "Park", "Choi", "Jung", "Kang", "Cho", "Yoon"];
+const US_NAMES_KO = ["마이크", "제시카", "크리스", "애슐리", "매트", "세라", "조시", "에밀리", "데이브", "메건", "라이언", "니콜"];
+const US_FAMILY_KO = ["존슨", "밀러", "가르시아", "데이비스", "마르티네스", "윌슨", "앤더슨", "테일러"];
 
 /** A stable name for someone in this life (the classmate, the mentor), so later events and the narrator name the same person. */
 function nameFor(s: LifeState, role: string): string {
   let h = 0;
   for (const ch of `${s.profile.birthDate}|${s.turningPoint.date}|${s.profile.name}|${role}`) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0;
   h = Math.abs(h);
-  if (isUS()) return `${US_NAMES[Math.floor(h / US_FAMILY.length) % US_NAMES.length]} ${US_FAMILY[h % US_FAMILY.length]}`;
-  return `${FAMILY[h % FAMILY.length]}${NAMES[Math.floor(h / FAMILY.length) % NAMES.length]}`;
+  if (isUS()) {
+    const [first, last] = [Math.floor(h / US_FAMILY.length) % US_NAMES.length, h % US_FAMILY.length];
+    return isEn() ? `${US_NAMES[first]} ${US_FAMILY[last]}` : `${US_NAMES_KO[first]} ${US_FAMILY_KO[last]}`;
+  }
+  const [last, first] = [h % FAMILY.length, Math.floor(h / FAMILY.length) % NAMES.length];
+  return isEn() ? `${NAMES_EN[first]} ${FAMILY_EN[last]}` : `${FAMILY[last]}${NAMES[first]}`;
 }
 
 const hasFinal = (word: string) => {
@@ -41,8 +50,8 @@ const hasFinal = (word: string) => {
   return code >= 0 && code <= 11171 && code % 28 !== 0;
 };
 /** 이/가 and 와/과 after a Korean name, by its final consonant. */
-const iGa = (word: string) => (isUS() ? word : `${word}${hasFinal(word) ? "이" : "가"}`);
-const waGwa = (word: string) => (isUS() ? word : `${word}${hasFinal(word) ? "과" : "와"}`);
+const iGa = (word: string) => (isEn() ? word : `${word}${hasFinal(word) ? "이" : "가"}`);
+const waGwa = (word: string) => (isEn() ? word : `${word}${hasFinal(word) ? "과" : "와"}`);
 
 // ── 시대: 그 해에만 일어나는 일 ─────────────────────────
 const ERA_EVENTS: EventDef[] = [
@@ -295,7 +304,7 @@ const ERA_EVENTS: EventDef[] = [
     perYear: 0.8,
     once: true,
     when: (s) => (year(s) === 2008 && month(s) >= 10) || (year(s) === 2009 && month(s) <= 3),
-    intro: (s) => L`리먼 사태로 주가가 폭락했다. 들어둔 펀드가 반 토막이 났다는 문자가 왔다. 지금 자산은 ${isUS() ? formatWealth(s.wealth) : `${Math.round(s.wealth).toLocaleString()}만원`}이다.`,
+    intro: (s) => L`리먼 사태로 주가가 폭락했다. 들어둔 펀드가 반 토막이 났다는 문자가 왔다. 지금 자산은 ${isEn() ? formatWealth(s.wealth) : `${Math.round(s.wealth).toLocaleString()}만원`}이다.`,
     choices: [
       { id: "sell", get label() { return L("더 떨어지기 전에 판다"); }, effect: { get text() { return L("손해를 보고 펀드를 정리했다. 잠은 편히 잤다."); }, wealthPct: -0.12, stats: { happiness: -4 } } },
       {

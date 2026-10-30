@@ -1,6 +1,6 @@
 // "knowledge" is shown as 교육 (schooling and learning); the key stays so saved lives and the narrator schema keep working.
 import { L } from "./i18n";
-import type { Region } from "./region";
+import type { Lang, Region } from "./region";
 export type StatKey = "health" | "happiness" | "knowledge" | "relationships";
 export type Stats = Record<StatKey, number>;
 
@@ -28,6 +28,7 @@ export interface Profile {
   mbti: string;
   personality: string;
   currentLife: string;
+  country?: Region; // where they grew up, chosen with the hometown: the rules, events and news of the life (missing = kr)
 }
 
 export interface TurningPoint {
@@ -234,6 +235,7 @@ export interface ChoiceRecord {
 export interface LifeState {
   version: 1;
   region?: Region; // the country this life is lived in; missing means Korea (lives saved before regions existed)
+  lang?: Lang; // the language it is shown in; missing means the region's own (region.ts langFor)
   profile: Profile;
   turningPoint: TurningPoint;
   persona: string;
