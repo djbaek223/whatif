@@ -119,7 +119,7 @@ export const ClassifySchema = z.object({
   choiceId: z.string().describe("사용자의 글과 가장 가까운 선택지 id"),
   change: z.enum(CHANGES).describe("사용자의 글이 말하는 큰 상태 변화. allowed_changes 안에서만 고르고, 큰 변화가 없으면 none"),
   jobTitle: z.string().describe("change가 startBusiness면 새 직업 이름 (예: 카페 사장), 아니면 빈 문자열"),
-  place: z.string().describe("change가 hire/switchJob/startBusiness면 사용자가 말한 회사·가게 이름, 없으면 빈 문자열"),
+  place: z.string().describe("사용자가 말한 회사·가게·학교 이름 (예: '삼성전자', '서울대', '미국 대학원'). change와 상관없이 글에 있으면 적고, 없으면 빈 문자열"),
 });
 export type ClassifyResult = z.infer<typeof ClassifySchema>;
 

@@ -207,8 +207,8 @@ export default function Game() {
     const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })), allowed: allowedChanges(life) });
     const id = life.pending.options.some((o) => o.id === res?.choiceId) ? res!.choiceId : life.pending.options[0].id;
     setBusy(false);
-    // What the player wrote decides the life change; without the narrator, the engine reads it from the words.
-    choose(id, text, res?.change && res.change !== "none" ? { change: res.change, title: res.jobTitle, place: res.place } : null);
+    // What the player wrote decides the life change and where it happens; without the narrator, the engine reads both from the words.
+    choose(id, text, res ? { change: res.change, title: res.jobTitle, place: res.place } : null);
   }
 
   // Auto play: one turn per tick until the player turns it off. A choice or the present-day card pauses it,
