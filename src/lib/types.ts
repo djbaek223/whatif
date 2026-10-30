@@ -147,6 +147,7 @@ export interface PendingChoice {
   rare?: boolean; // shown on a special card and kept for the ending
   tone?: string; // AI moments: 유쾌함, 뭉클함, 긴장감, 담담함
   small?: boolean; // a small two-way dilemma rather than a life fork
+  slot?: boolean; // a pool event the narrator rewrites for this life; options are the pool's until then (none for a rare passive moment)
 }
 
 /** What an event is about, for spreading events evenly over a life: daily life, people, work, money, health, the times, luck. */
@@ -172,6 +173,16 @@ export interface RareMoment {
   age: number;
   title: string;
   text: string;
+}
+
+/** A short moment with no choice, written ahead by the narrator and used when the pool schedules an everyday event. */
+export interface Episode {
+  title: string;
+  type: Category;
+  text: string;
+  stats: Partial<Stats>;
+  money: number; // 만원
+  keywords: string[];
 }
 
 export type LogKind = "era" | "news" | "turn" | "event" | "choice" | "outcome" | "milestone" | "present" | "death";
@@ -228,6 +239,9 @@ export interface LifeState {
   recent?: string[]; // "category:keyword,keyword" of recent moments, so the narrator avoids repeats
   rares?: RareMoment[];
   badges?: { id: string; mi: number; age: number }[]; // achievements, in the order they were earned
+  hybrid?: boolean; // false: every event plays from the pool, as before the hybrid events (missing means on)
+  episodes?: { key: string; born: number; items: Episode[] }; // everyday moments written ahead (hybrid.ts)
+  threads?: { text: string; due: number }[]; // follow-ups the narrator left, told in a later moment once due
   memory?: string[]; // every lasting change to this life ("34세(2019년 3월): 카페 창업"), kept for good and given to the narrator
 }
 

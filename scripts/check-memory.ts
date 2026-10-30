@@ -80,11 +80,12 @@ for (const [text, expect] of [["회사를 그만두고 카페를 차린다", "st
   let life = employee;
   life = { ...life, pending: { eventId: "personal", title: "…", scene: "", options: [], freeText: true } };
   const filled = fillMoment(life, `personal@${life.mi}`, {
-    title: "골목 카페", type: "work", keywords: ["카페"], tone: "담담함", rarity: "common", scene: "…",
+    title: "골목 카페", type: "work", keywords: ["카페"], tone: "담담함", scene: "…",
     options: [
       { label: "골목에 카페를 연다", theme: "risk", change: "startBusiness", place: "연남동 작은 카페", jobTitle: "카페 사장", salary: 0, money: -3000, stats: { health: 0, happiness: 5, knowledge: 0, relationships: 0 }, chance: 1, outcome: "연남동에 작은 카페를 열었다.", failure: "" },
       { label: "회사에 남는다", theme: "career", change: "none", place: "", jobTitle: "", salary: 0, money: 0, stats: { health: 0, happiness: -2, knowledge: 0, relationships: 0 }, chance: 1, outcome: "회사에 남았다.", failure: "" },
     ],
+    followUp: "",
   });
   if (!filled) fail("moment with startBusiness was dropped");
   else {

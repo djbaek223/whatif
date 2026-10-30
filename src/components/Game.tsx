@@ -14,10 +14,10 @@ import {
   fillMoment,
   fillScene,
   isBigChoice,
-  lifeFacts,
   lifeSummary,
   pendingKeyOf,
   resolveChoice,
+  slotFallback,
   TURNING_POINT_ID,
   turningPointMi,
   type Intent,
@@ -26,6 +26,7 @@ import {
 import { clearDraft, dropLegacySaves, eraseAll, forgetProfile, loadProfile, readDraft, readProgress, saveProfile, writeProgress, type StoredProfile } from "@/lib/localData";
 import { aiAvailable, narrate } from "@/lib/narrator/client";
 import { fallbackEnding, fallbackOpening } from "@/lib/narrator/fallback";
+import { choiceRequest } from "@/lib/narrator/requests";
 import { pathHints, topUpChoices } from "@/lib/narrator/turningChoices";
 import type { ClassifyResult, EndingResult, MomentResult, OpeningResult, SceneResult } from "@/lib/narrator/schema";
 import { EMPTY_TP } from "@/lib/onboarding";
@@ -35,6 +36,10 @@ import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft 
 import { PlayView, type Speed } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
+
+// Everyday moments, small dilemmas, follow-ups and rare moments written for each life (hybrid.ts).
+// NEXT_PUBLIC_WHATIF_HYBRID=0 turns it off for new lives: every event then plays from the pool.
+const HYBRID = process.env.NEXT_PUBLIC_WHATIF_HYBRID !== "0";
 
 type Screen = "intro" | "profile" | "turning" | "loading" | "play" | "ending";
 
@@ -146,7 +151,7 @@ export default function Game() {
       : null;
     const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
     personalized.current = null;
-    setLife(withBadges(createLife(p, t, opening, { ai })));
+    setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID })));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -229,29 +234,24 @@ export default function Game() {
   // Ask the narrator to write the scene and personalize the options for each new choice event.
   // A "personal" moment has no options until the narrator writes them from this life's state, so it always waits.
   const pendingKey = life ? pendingKeyOf(life) : null;
-  const isMoment = life?.pending?.eventId === "personal";
+  // A rare moment the pool rolled has nothing to show until it is written (or falls back to the pool's outcome).
+  const isMoment = life?.pending?.eventId === "personal" || (!!life?.pending?.slot && life.pending.options.length === 0);
   const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(auto && autoDecide && !isBigChoice(life.pending)));
   const sceneLoading = wantsScene && sceneDone !== pendingKey;
 
   const personalize = useEffectEvent(async (key: string) => {
     if (!life?.pending || personalized.current === key) return;
     personalized.current = key;
-    const pending = life.pending;
-    const seeds = life.seeds ?? [];
-    const common = { summary: lifeSummary(life), facts: lifeFacts(life), persona: life.persona, eraHints: eraHints(life.mi) };
-    if (pending.eventId === "personal") {
-      const res = await narrate<MomentResult>({ kind: "moment", ...common, allowed: allowedChanges(life), recent: life.recent ?? [], seeds });
-      // An unwritten moment is dropped as if it never happened, so play goes on.
-      setLife((cur) => (cur && pendingKeyOf(cur) === key ? ((res && fillMoment(cur, key, res)) ?? dropPending(cur)) : cur));
-    } else {
-      const res = await narrate<SceneResult>({
-        kind: "scene",
-        ...common,
-        title: pending.title,
-        intro: pending.scene,
-        seeds,
-        options: pending.options.map(({ id, label, detail }) => ({ id, label, ...(detail ? { detail } : {}) })),
+    const req = choiceRequest(life);
+    if (req?.kind === "moment") {
+      const res = await narrate<MomentResult>(req);
+      // A pool moment the narrator couldn't write plays as the pool has it; a free one is dropped as if it never happened.
+      setLife((cur) => {
+        if (!cur || pendingKeyOf(cur) !== key) return cur;
+        return (res && fillMoment(cur, key, res)) ?? (cur.pending?.slot ? slotFallback(cur, key) : dropPending(cur));
       });
+    } else if (req) {
+      const res = await narrate<SceneResult>(req);
       if (res) setLife((cur) => (cur ? fillScene(cur, key, res) : cur));
     }
     setSceneDone(key);

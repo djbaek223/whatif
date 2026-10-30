@@ -16,6 +16,7 @@ import {
 } from "./catalog";
 import { EVENTS, ageAt, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth } from "./format";
+import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
 import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
 import { Rng, newSeed } from "./rng";
@@ -147,7 +148,7 @@ const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|�
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
 
-export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean } = {}): LifeState {
+export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean } = {}): LifeState {
   const mi = turningPointMi(tp);
   const age = ageAt(profile.birthDate, mi);
   const init = fitInitialToAge(opening.initial, age, mi, profile);
@@ -226,6 +227,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     traits: traitsFrom(profile, opening.persona),
     leanings: {},
     ai: opts.ai,
+    ...(opts.hybrid === false ? { hybrid: false } : {}),
     temper: temperFrom(profile, opening.persona),
     counts: {},
     marks: {},
@@ -774,6 +776,11 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
     if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: "창업 자금" };
     plan = undefined;
   }
+  // A pool moment played as written (auto-decide, or no narrator) is noted here, since it wasn't when it came up.
+  if (pending.slot) {
+    const ev = eventById(pending.eventId);
+    if (ev) noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
+  }
   const picked = freeText?.trim() || option?.label || optionId;
   s.choices.push({ mi: s.mi, age: ageOf(s), title: pending.title, picked });
   s.log.push({ mi: s.mi, kind: "choice", text: `${pending.title}: ${picked}` });
@@ -859,21 +866,33 @@ function customEffect(c: CustomOption): Effect {
 const THEME_SET = new Set<Theme>(["career", "study", "family", "love", "risk", "money", "health", "leisure"]);
 const CATEGORY_SET = new Set<Category>(["daily", "relation", "work", "money", "health", "era", "chance"]);
 
-/** Turns the AI's moment into a choice, dropping changes that don't fit this life and capping every number. */
+/** The big changes a narrator-written moment may make: none for a pool moment it rewrites, since those stay small. */
+export const momentChanges = (s: LifeState): CustomChange[] => (s.pending?.slot ? ["none"] : allowedChanges(s));
+
+/**
+ * Turns the AI's moment into a choice, dropping changes that don't fit this life, options that contradict it,
+ * and capping every number. Null when too little is left; the caller then plays the pool's version (slotFallback).
+ */
 export function fillMoment(state: LifeState, key: string, res: MomentResult): LifeState | null {
   if (!state.pending || pendingKeyOf(state) !== key) return null;
   const s = clone(state);
+  const slot = s.pending!.slot;
+  if (contradicts(s, res.title, res.scene)) return null;
   const rng = new Rng(s.rng ^ 0x9e37);
-  const allowed = new Set(allowedChanges(s));
+  const allowed = new Set(momentChanges(s));
   const yearPay = Math.max(s.income * 12, 3000);
   const cap = Math.max(800, Math.abs(s.wealth) * 0.4, yearPay * 1.5);
+  // A rare moment may bring in as much as the pool's own version of it (a lottery win), never more.
+  const poolMoney = slot && s.pending!.rare ? Math.abs(eventById(s.pending!.eventId)?.effect?.wealth ?? 0) : 0;
+  const gainCap = Math.max(cap * 0.5, poolMoney);
   const options: PendingOption[] = [];
   const custom: Record<string, CustomOption> = {};
   for (const o of res.options.slice(0, 4)) {
     if (!o.label?.trim() || !o.outcome?.trim()) continue;
     // An option built on a change this life can't make (a baby for someone single) contradicts the state: drop it.
-    if (!allowed.has(o.change as CustomChange)) continue;
-    const change = o.change as CustomChange;
+    const change = (o.change ?? "none") as CustomChange; // a pool moment's reply has no change field: it changes nothing big
+    if (!allowed.has(change)) continue;
+    if (contradicts(s, o.label, o.outcome, o.failure)) continue;
     const stats: Partial<Stats> = {};
     for (const k of ["health", "happiness", "knowledge", "relationships"] as StatKey[]) {
       const v = Math.round(o.stats?.[k] ?? 0);
@@ -883,14 +902,14 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
     const c: CustomOption = {
       outcome: o.outcome.trim().slice(0, 200),
       stats,
-      money: Math.round(Math.max(-cap, Math.min(cap * 0.5, o.money || 0)) / 10) * 10,
+      money: Math.round(Math.max(-cap, Math.min(gainCap, o.money || 0)) / 10) * 10,
       change,
       chance: Math.max(0.15, Math.min(1, o.chance ?? 1)),
       failure: (o.failure || "").trim().slice(0, 160),
     };
     const place = o.place?.trim().slice(0, 30);
     if (change === "startBusiness") {
-      c.title = (o.jobTitle.trim() || businessTitle(`${o.label} ${o.outcome}`)).slice(0, 20);
+      c.title = (o.jobTitle?.trim() || businessTitle(`${o.label} ${o.outcome}`)).slice(0, 20);
       if (place) c.place = place;
     }
     // The narrator may pick the employer, but a reach for a top league is a gamble for someone who isn't ready.
@@ -906,8 +925,8 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
     options.push({ id, label: o.label.trim().slice(0, 40), theme, ...(plan ? { plan, detail: planDetail(plan) } : {}) });
   }
   if (options.length < 2) return null;
-  // Rare moments stay rare: at most two in a life, whatever the narrator says.
-  const rare = res.rarity === "rare" && (s.rares?.length ?? 0) < 2;
+  // Rarity is the engine's: only a moment it rolled as rare (1% a year at most) is shown as one.
+  const rare = !!s.pending!.rare;
   const tone = res.tone?.trim().slice(0, 8) || undefined;
   s.pending = {
     ...s.pending!,
@@ -918,10 +937,42 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
     ...(rare ? { rare } : {}),
     ...(tone ? { tone } : {}),
   };
+  delete s.pending.slot;
   const keywords = (res.keywords ?? []).map((k) => k.trim().slice(0, 12)).filter(Boolean);
   noteRecent(s, CATEGORY_SET.has(res.type as Category) ? res.type : "daily", keywords.length ? keywords : [s.pending.title], tone);
   const last = s.log.at(-1);
   if (last?.kind === "event" && last.mi === s.mi && last.text === state.pending.title) last.text = s.pending.title;
+  // The follow-up this moment was asked to tell is told; a new one waits 6-18 months.
+  closeThread(s);
+  addThread(s, res.followUp, 6 + Math.floor(rng.next() * 13));
+  stockEpisodes(s, res.episodes);
+  return s;
+}
+
+/**
+ * Plays the pool's version of a moment the narrator didn't write (or wrote in a way that contradicts the life):
+ * its own options, or for a rare passive moment its own outcome.
+ */
+export function slotFallback(state: LifeState, key: string): LifeState {
+  if (!state.pending?.slot || pendingKeyOf(state) !== key) return state;
+  const s = clone(state);
+  const ev = eventById(s.pending!.eventId);
+  if (ev) noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
+  if (s.pending!.options.length) {
+    delete s.pending!.slot;
+    return s;
+  }
+  // A rare moment with no choices in the pool: it happens as written there.
+  const last = s.log.at(-1);
+  if (last?.kind === "event" && last.mi === s.mi && last.text === s.pending!.title) s.log.pop();
+  s.pending = null;
+  if (ev?.effect) {
+    const rng = new Rng(s.rng);
+    const applied = applyTop(s, ev.effect, rng);
+    s.log.push({ mi: s.mi, kind: "event", ...applied, rare: true });
+    noteRare(s, ev.title, applied.text);
+    s.rng = rng.state;
+  }
   return s;
 }
 
@@ -957,7 +1008,9 @@ export function fillScene(state: LifeState, key: string, res: SceneResult): Life
     const plan = o.plan && place && o.plan.kind !== "cost" && o.plan.kind !== "home" ? withPlace(o.plan, place) : o.plan;
     return { ...o, label: r.label?.trim() || o.label, plan, detail: planDetail(plan) };
   });
-  return { ...state, pending: { ...state.pending, scene: res.scene || state.pending.scene, options } };
+  const s: LifeState = { ...state, pending: { ...state.pending, scene: res.scene || state.pending.scene, options } };
+  if (res.episodes?.length) stockEpisodes(s, res.episodes);
+  return s;
 }
 
 export const pendingKeyOf = (s: LifeState) => (s.pending ? `${s.pending.eventId}@${s.mi}` : null);
@@ -1214,14 +1267,34 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
       if (ev.cooldown) s.cooldowns[ev.id] = s.mi + ev.cooldown;
       if (ev.small) s.cooldowns[SMALL_CLOCK] = s.mi + SMALL_GAP;
       s.counts = { ...s.counts, [ev.id]: (s.counts?.[ev.id] ?? 0) + 1 };
-      if (ev.id !== "personal") noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
       happened = true;
+      // Hybrid: the pool picked the moment; the narrator may write it for this life (see hybrid.ts).
+      const slot = hybridOn(s) && aiWritable(ev);
       if (ev.choices) {
         s.pending = pendingFor(ev, s, rng);
+        // The pool's options stay as the fallback; the moment is noted as recent once it is known which one plays.
+        if (slot) s.pending.slot = true;
+        else if (ev.id !== "personal") noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
         entries.push({ mi: s.mi, kind: "event", text: ev.title });
         stop = "choice";
         break;
       }
+      if (ev.effect && slot && ev.rare) {
+        // A rare moment the engine rolled (still 1% a year at most) is written for this life and asked as a choice.
+        s.pending = { eventId: ev.id, title: ev.title, scene: labelOf(ev.intro, s), options: [], freeText: false, rare: true, slot: true };
+        entries.push({ mi: s.mi, kind: "event", text: ev.title });
+        stop = "choice";
+        break;
+      }
+      const episode = ev.effect && slot ? takeEpisode(s) : null;
+      if (episode) {
+        const applied = applyTop(s, { text: episode.text, stats: episode.stats, ...(episode.money ? { wealth: episode.money } : {}) }, rng);
+        entries.push({ mi: s.mi, kind: "event", ...applied });
+        noteRecent(s, episode.type, episode.keywords.length ? episode.keywords : [episode.title]);
+        passive = true;
+        continue;
+      }
+      if (ev.id !== "personal") noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
       if (ev.effect) {
         const applied = applyTop(s, ev.effect, rng);
         entries.push({ mi: s.mi, kind: "event", ...applied, ...(ev.rare ? { rare: true } : {}) });
