@@ -52,7 +52,7 @@ export const SceneSchema = z.object({
     }),
   ),
 });
-export type SceneResult = z.infer<typeof SceneSchema>;
+export type SceneResult = z.infer<typeof SceneSchema> & { episodes?: EpisodeResult[] };
 
 const CHANGES = ["none", "hire", "switchJob", "quitJob", "startBusiness", "closeBusiness", "enrollUniversity", "enrollGraduate", "buyHome", "addChild", "startDating", "marry", "retire"] as const;
 const THEMES = ["career", "study", "family", "love", "risk", "money", "health", "leisure"] as const;
@@ -64,7 +64,6 @@ export const MomentSchema = z.object({
   type: z.enum(CATEGORIES).describe("이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연"),
   keywords: z.array(z.string()).describe("이 순간의 핵심 키워드 2~3개, 각각 한두 단어 (예: 동업, 대학 동기)"),
   tone: z.string().describe("이 장면의 톤 하나: 유쾌함, 뭉클함, 긴장감, 담담함 중에서"),
-  rarity: z.enum(["common", "rare"]).describe("평생 한 번 있을까 말까 한 드문 일이면 rare, 대부분은 common"),
   scene: z.string().describe("이 사람의 현재 상태, 성향, 지난 선택에서 자연스럽게 생긴 갈림길을 2인칭으로 그리는 2~4문장"),
   options: z
     .array(
@@ -85,8 +84,36 @@ export const MomentSchema = z.object({
       }),
     )
     .describe("2~4개. 이 사람다운 선택과 반대되는 선택을 함께"),
+  followUp: z.string().describe("이 일이 몇 달~1년 뒤 다시 이어질 수 있다면 그 실마리 한 줄 (예: 동업을 제안한 대학 동기 민수가 다시 연락해 올 수 있다). 없으면 빈 문자열"),
 });
-export type MomentResult = z.infer<typeof MomentSchema>;
+
+/** A moment the pool scheduled: it changes nothing big, so its options carry no change, workplace or pay. */
+export const SlotMomentSchema = MomentSchema.extend({
+  options: z
+    .array(MomentSchema.shape.options.element.omit({ change: true, place: true, jobTitle: true, salary: true }))
+    .describe("2~4개. 이 사람다운 선택과 반대되는 선택을 함께"),
+});
+
+type MomentOption = z.infer<typeof MomentSchema>["options"][number];
+type BigFields = "change" | "place" | "jobTitle" | "salary";
+export type MomentResult = Omit<z.infer<typeof MomentSchema>, "options"> & {
+  options: (Omit<MomentOption, BigFields> & Partial<Pick<MomentOption, BigFields>>)[];
+  episodes?: EpisodeResult[];
+};
+
+const EpisodeSchema = z.object({
+  title: z.string().describe("10자 이내 제목"),
+  type: z.enum(["daily", "relation", "work", "money", "health", "chance"]),
+  text: z.string().describe("선택 없이 지나가는 일, 과거형 1~2문장"),
+  stats: z.object({ health: z.number().int(), happiness: z.number().int(), knowledge: z.number().int(), relationships: z.number().int() }).describe("각각 -4~4, 대부분 0"),
+  money: z.number().int().describe("만원. 대부분 0"),
+  keywords: z.array(z.string()).describe("핵심 키워드 1~2개"),
+});
+export type EpisodeResult = z.infer<typeof EpisodeSchema>;
+
+/** Adds the everyday moments for the coming months to a scene or moment reply, so they come with a call that is made anyway. */
+export const withEpisodes = <S extends z.ZodObject>(schema: S) =>
+  schema.extend({ episodes: z.array(EpisodeSchema).describe("앞으로 몇 달 사이 이 사람에게 있을 법한 작은 일상 장면 3개. 서로 다른 type") });
 
 export const ClassifySchema = z.object({
   choiceId: z.string().describe("사용자의 글과 가장 가까운 선택지 id"),
@@ -104,6 +131,16 @@ export const EndingSchema = z.object({
 });
 export type EndingResult = z.infer<typeof EndingSchema>;
 
+/** What the engine fixed about a moment the narrator writes: its kind and weight, with the pool's version as a reference. */
+export interface MomentSlot {
+  title: string;
+  intro: string;
+  category: string;
+  keywords: string[];
+  small: boolean; // a small two-way dilemma
+  rare: boolean; // the engine rolled a rare moment (1% a year or less)
+}
+
 export type NarrateRequest =
   | { kind: "opening"; profile: unknown; turningPoint: unknown; eraHints: string[]; age: number; hints?: { kind: string; roadNotTaken: string | null; examples: string[] } }
   | {
@@ -116,8 +153,21 @@ export type NarrateRequest =
       options: { id: string; label: string; detail?: string }[];
       eraHints: string[];
       seeds?: string[];
+      episodes?: boolean; // also write everyday moments ahead
     }
-  | { kind: "moment"; summary: string; facts: string; persona: string; allowed: string[]; recent: string[]; seeds: string[]; eraHints: string[] }
+  | {
+      kind: "moment";
+      summary: string;
+      facts: string;
+      persona: string;
+      allowed: string[];
+      recent: string[];
+      seeds: string[];
+      eraHints: string[];
+      slot?: MomentSlot; // the pool event the engine scheduled; missing for a free "personal" moment
+      thread?: string; // a follow-up that is due
+      episodes?: boolean;
+    }
   | { kind: "classify"; text: string; options: { id: string; label: string }[]; allowed?: string[] }
   | { kind: "ending"; summary: string; persona: string; profile: unknown; turningPoint: unknown; deathAge: number };
 

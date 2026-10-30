@@ -65,7 +65,8 @@ export interface EventDef {
 const knowledgeOdds = (base: number) => (s: LifeState) =>
   Math.min(0.9, Math.max(0.1, base + (s.stats.knowledge - 50) / 100));
 
-export const EVENTS: EventDef[] = [
+/** The life forks and life-stage events. These always play as written; the rest of the pool may be written by the narrator (see hybrid.ts). */
+export const CORE_EVENTS: EventDef[] = [
   // ── 교육 ──────────────────────────────────────────
   {
     id: "csat",
@@ -924,9 +925,9 @@ export const EVENTS: EventDef[] = [
     intro: "",
     choices: [],
   },
-  ...LIFE_EVENTS,
-  ...MORE_EVENTS,
 ];
+
+export const EVENTS: EventDef[] = [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS];
 
 export function ageOf(s: LifeState): number {
   return ageAt(s.profile.birthDate, s.mi);
