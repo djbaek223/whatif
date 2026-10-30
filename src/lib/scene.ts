@@ -3,6 +3,7 @@
 import { tierOf } from "./catalog";
 import { ageOf } from "./events";
 import type { LifeState } from "./types";
+import { inService, retaking } from "./timeline";
 import { ownsBusiness } from "./work";
 
 export type Era = "old" | "apartment" | "highrise" | "future";
@@ -52,9 +53,9 @@ const moodOf = (happiness: number): Mood => (happiness >= 60 ? "happy" : happine
 
 function outfitOf(s: LifeState, age: number): Outfit {
   const f = s.flags;
-  if (f.military && s.mi < f.busyUntil && age < 26) return "military";
+  if (inService(s)) return "military";
   if (f.education === "school") return age < 13 ? "kid" : "uniform";
-  if (f.education === "highschool") return "uniform";
+  if (f.education === "highschool") return retaking(s) ? "casual" : "uniform";
   if (f.education === "university" || f.education === "graduate") return "casual";
   if (f.retired || (!f.employed && age >= 65)) return "retired";
   if (!f.employed) return "casual";

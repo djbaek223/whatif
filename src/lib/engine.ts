@@ -39,6 +39,8 @@ import type {
   TurningPoint,
 } from "./types";
 import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema";
+import { schoolYears } from "./onboarding";
+import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
 
 export { formatWealth };
@@ -138,10 +140,14 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
   };
 }
 
-/** When the university the player is in at the start ends: from the entrance year if given, otherwise around 23. */
-function uniUntil(profile: Profile, mi: number, age: number): number {
-  const uni = universitySpan(profile);
-  return uni && mi >= uni.from && mi < uni.to ? uni.to : mi + Math.max(12, (23 - age) * 12);
+/** The university course the player is in at the start: the entrance year if given, else the usual year for their birth date. */
+function uniDates(profile: Profile, mi: number, age: number): { entered?: number; until: number } {
+  const given = universitySpan(profile);
+  const usual = schoolYears(profile.birthDate)?.stages.find((x) => x.key === "university");
+  const uni = given ?? (usual ? { from: monthIndex(usual.from, 3), to: monthIndex(usual.to, 2) } : null);
+  if (uni && mi >= uni.from && mi <= uni.to) return { entered: uni.from, until: uni.to };
+  // A late or unusual student: about four years from the last March, ending in February.
+  return { until: nextMarch(mi + Math.max(12, (23 - age) * 12)) - 1 };
 }
 
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음/;
@@ -163,9 +169,11 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     ? init.company?.trim() || (GENERIC_JOB.test(jobTitle) || !jobTitle ? pickCompany(rng, tier, Math.floor(mi / 12), `${profile.major} ${jobTitle}`) : "")
     : "";
   const school = init.school?.trim() || (init.education === "university" || init.education === "graduate" ? profile.university.trim() : "");
+  const uni = init.education === "university" ? uniDates(profile, mi, age) : null;
   const flags: LifeFlags = {
     education: init.education,
-    eduUntil: init.education === "university" ? uniUntil(profile, mi, age) : init.education === "graduate" ? mi + 24 : mi,
+    eduUntil: uni ? uni.until : init.education === "graduate" ? mi + 24 : mi,
+    ...(uni?.entered !== undefined ? { entered: uni.entered, eduFrom: uni.entered } : {}),
     employed,
     job: employed ? (GENERIC_JOB.test(jobTitle) || !jobTitle ? titleFor(tier, workYears) : jobTitle) : "",
     company: company || undefined,
@@ -252,6 +260,8 @@ function presetEffect(choice: OpeningChoice, s: LifeState): Effect {
   const effect = basePresetEffect(choice, s);
   const edu = choice.education;
   if (!edu || edu === "same" || edu === s.flags.education || !eduFits(edu, s)) return effect;
+  // Going back to the exam (재수, 반수) waits for next year's exam season; university is the March after it.
+  if (edu === "highschool" && ageOf(s) >= 18) return { ...effect, retake: true, busyMonths: undefined };
   const years = edu === "university" ? 4 : edu === "graduate" ? 2 : 0;
   const enroll: Effect["enroll"] =
     edu === "university" ? { level: "university", pick: choice.original ? "profile" : "fit" } : edu === "graduate" ? { level: "graduate" } : undefined;
@@ -276,7 +286,7 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
       return s.flags.education === "done"
         ? { text: "다시 공부를 시작했다.", stats: { knowledge: 10, happiness: -3 }, flags: { education: "graduate", employed: false, job: "" }, eduYears: 2, income: 60, enroll: { level: "graduate" } }
         : // A retake waits for next year's exam season instead of meeting the exam right away.
-          { text: "공부에 모든 것을 걸었다.", stats: { knowledge: 12, happiness: -4, health: -2 }, busyMonths: s.flags.education === "highschool" ? 10 : 0 };
+          { text: "공부에 모든 것을 걸었다.", stats: { knowledge: 12, happiness: -4, health: -2 }, ...(s.flags.education === "highschool" && ageOf(s) >= 18 ? { retake: true } : {}) };
     case "career": {
       const title = job && !GENERIC_JOB.test(job) ? job : undefined;
       const tier = guessTier(`${choice.place ?? ""} ${job ?? ""}`);
@@ -470,7 +480,10 @@ function doEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>, o
   if (spec.level === "abroad") out.texts.push(`${p.place} 박사 과정에 합격했다. 학비는 면제되고 생활비 장학금(월 150만원)을 받는다.`);
   else {
     const half = ageOf(s) <= 24 ? " 절반은 부모님이 보태 주셨다." : "";
-    out.texts.push(`${p.place}${spec.level === "university" && major ? ` ${major}` : ""}에 입학했다. 등록금은 연 ${won(p.tuition)}.${half}`);
+    const name = `${p.place}${spec.level === "university" && major ? ` ${major}` : ""}`;
+    // Admitted ahead of the school year: the first day is the coming March (or September).
+    const ahead = s.flags.entered !== undefined && s.flags.entered > s.mi;
+    out.texts.push(`${ahead ? `${name}에 합격했다. ${formatMi(s.flags.entered!)}에 입학한다.` : `${name}에 입학했다.`} 등록금은 연 ${won(p.tuition)}.${half}`);
   }
 }
 
@@ -520,8 +533,11 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
     s.flags.company = undefined;
     s.flags.selfEmployed = undefined;
   }
-  if (effect.eduYears) s.flags.eduUntil = s.mi + effect.eduYears * 12;
+  if (s.flags.education !== "highschool") s.flags.retaking = undefined;
+  if (effect.eduYears) startCourse(s.flags, s.mi, effect.eduYears);
   if (effect.busyMonths) s.flags.busyUntil = Math.max(s.flags.busyUntil, s.mi + effect.busyMonths);
+  if (effect.retake) out.texts.push(startRetake(s));
+  if (effect.enlist) out.texts.push(...enlist(s));
   if (effect.addChild) {
     s.flags.children += 1;
     s.flags.kidsBorn = [...(s.flags.kidsBorn ?? []), s.mi];
@@ -587,9 +603,12 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   else if (b.employed && b.job !== a.job && b.company === a.company) out.push(`직함 변경: ${b.job}`);
   else if (!b.employed && a.employed && !b.retired) out.push(wasOwn ? `폐업: ${a.company || a.job} 정리` : `퇴사: ${workName(a)}`);
   if (b.education !== a.education || b.school !== a.school) {
-    if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school) out.push(`입학: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}`);
+    if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school)
+      out.push(b.entered !== undefined && b.entered > s.mi ? `합격: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}, ${formatMi(b.entered)} 입학` : `입학: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}`);
     else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(`학업 마침${a.school ? `: ${a.school}` : ""}`);
   }
+  if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(`${(b.retakes ?? 1) >= 2 ? "삼수" : "재수"} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
+  if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
   if (b.partner !== a.partner)
     out.push({ none: "연인과 헤어짐", dating: "연애 시작", married: "결혼", divorced: "이혼", widowed: "배우자와 사별" }[b.partner]);
   if (b.children > a.children) out.push(`${ORDINAL[b.children] ?? `${b.children}째`} 아이 출생`);
@@ -1069,8 +1088,9 @@ function drift(s: LifeState, months: number) {
     if (f.mortgage) f.mortgage = Math.max(0, Math.round(f.mortgage - Math.max(30, f.mortgage / 240) * months));
   }
   // Tuition while enrolled; parents cover half until 24.
+  // No tuition before the first March or while on military leave.
   const enrolled = (f.education === "university" || f.education === "graduate") && s.mi <= f.eduUntil;
-  if (enrolled && f.tuition) s.wealth -= Math.round((f.tuition / 12) * months * (age <= 24 ? 0.5 : 1));
+  if (enrolled && f.tuition && s.mi >= (f.eduFrom ?? 0) && !inService(s)) s.wealth -= Math.round((f.tuition / 12) * months * (age <= 24 ? 0.5 : 1));
   if (!enrolled && f.tuition) f.tuition = undefined;
   if (f.employed) f.workMonths = (f.workMonths ?? 0) + months;
   // Yearly raise.
@@ -1082,7 +1102,10 @@ function drift(s: LifeState, months: number) {
     f.education = "highschool";
     f.school = s.profile.high.trim() || undefined;
   }
-  if (f.education === "highschool" && age >= 21) f.education = "done";
+  if (f.education === "highschool" && (f.retaking === undefined ? age >= 21 : age >= 23)) {
+    f.education = "done";
+    f.retaking = undefined;
+  }
 }
 
 const SEASON: Record<number, string[]> = {
@@ -1114,7 +1137,7 @@ function statusSentence(s: LifeState, rng: Rng): string {
   const f = s.flags;
   const age = ageOf(s);
   const pick = (...lines: string[]) => rng.pick(lines);
-  if (s.mi < f.busyUntil && f.military && age < 26) return pick("군 복무를 하며 시간을 보냈다.", "점호와 근무 사이로 계절이 지나갔다.", "전역 날짜가 조금씩 가까워졌다.");
+  if (inService(s)) return pick("군 복무를 하며 시간을 보냈다.", "점호와 근무 사이로 계절이 지나갔다.", "전역 날짜가 조금씩 가까워졌다.");
   if (s.mi < f.busyUntil) return pick("목표를 위해 하루하루를 버텼다.", "책상 앞에서 계절이 바뀌었다.");
   const season = SEASON[(s.mi % 12) + 1];
   if (season && rng.chance(0.35)) return rng.pick(season);
@@ -1359,9 +1382,12 @@ export function autoPick(s: LifeState): string | null {
 export function statusLabel(s: LifeState): string {
   const f = s.flags;
   const parts: string[] = [];
-  if (s.mi < f.busyUntil && f.military && ageOf(s) < 26) parts.push("군 복무 중");
+  if (inService(s)) parts.push("군 복무 중");
   else if (f.education === "school") parts.push(lifeStage(ageOf(s)) || "학생");
+  else if (retaking(s)) parts.push((f.retakes ?? 1) >= 2 ? "삼수생" : "재수생");
   else if (f.education === "highschool") parts.push("고등학생");
+  else if (f.education === "university" && f.entered !== undefined && s.mi < f.entered) parts.push(f.school ? `${f.school} 입학 예정` : "입학 예정");
+  else if (f.education === "university" && f.eduFrom !== undefined && s.mi < f.eduFrom) parts.push(f.school ? `${f.school} 휴학` : "휴학");
   else if (f.education === "university") parts.push(f.school ? `${f.school} 재학` : "대학생");
   else if (f.education === "graduate") parts.push(f.school ? `${f.school} 재학` : "대학원생");
   else if (f.retired) parts.push("은퇴");
@@ -1388,7 +1414,7 @@ export function lifeFacts(s: LifeState): string {
   const age = ageOf(s);
   const kidAges = (f.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
   const study =
-    f.education === "school" ? `${lifeStage(age) || "학생"}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? "고등학생" : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
+    f.education === "school" ? `${lifeStage(age) || "학생"}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? (retaking(s) ? "재수생 (고등학교 졸업, 다음 수능 준비)" : "고등학생") : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
   const since = s.marks?.venture !== undefined ? Math.max(0, s.mi - s.marks.venture) : null;
   const work = f.retired
     ? `은퇴함, 연금 월 ${won(s.income)}`
@@ -1406,6 +1432,7 @@ export function lifeFacts(s: LifeState): string {
     `시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
     `성향: ${s.profile.mbti || "MBTI 미입력"}. ${s.profile.personality || ""}`.trim(),
     `학업: ${study}`,
+    ...timelineFacts(s).map((t) => `날짜: ${t}`),
     `일: ${work}`,
     `연애·결혼: ${partner}`,
     `자녀: ${kids}`,

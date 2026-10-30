@@ -3,6 +3,7 @@ import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
+import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 
 type Dyn<T> = T | ((s: LifeState) => T);
@@ -16,8 +17,10 @@ export interface Effect {
   income?: number; // sets monthly income (만원)
   incomePct?: number; // multiplies monthly income
   flags?: Partial<LifeFlags>;
-  eduYears?: number; // schooling length from now
+  eduYears?: number; // course length; classes start the next March (university) or term (graduate), see timeline.ts
   busyMonths?: number;
+  enlist?: boolean; // army service for as long as it lasted that year, with any course put on leave
+  retake?: boolean; // another year for next year's exam (재수, 삼수)
   addChild?: boolean;
   intense?: number; // months of month-by-month turns after this
   risk?: { chance: (s: LifeState) => number; success: Effect; failure: Effect };
@@ -72,17 +75,18 @@ export const CORE_EVENTS: EventDef[] = [
     id: "csat",
     title: "수능과 진로",
     minAge: 17,
-    maxAge: 20,
+    maxAge: 21,
     perYear: 1,
-    once: true,
-    when: (s) => s.flags.education === "highschool" && s.mi % 12 >= 9, // results season, Oct-Dec
-    intro: "수능 성적표가 나왔다. 앞으로의 진로를 정해야 한다.",
+    // Comes back after a retake: the next exam season, a year on (see timeline.ts). At most three tries.
+    when: (s) => s.flags.education === "highschool" && s.mi % 12 >= 9 && (s.flags.retaking === undefined || s.mi >= s.flags.retaking),
+    intro: (s) => (retaking(s) ? `${(s.flags.retakes ?? 1) >= 2 ? "삼수" : "재수"} 끝에 다시 본 수능 성적표가 나왔다. 이번에는 정해야 한다.` : "수능 성적표가 나왔다. 앞으로의 진로를 정해야 한다."),
     choices: [
       {
         id: "university",
         label: "성적에 맞춰 대학에 진학한다",
+        when: (s) => !retaking(s),
         effect: {
-          text: "대학 생활이 시작되었다.",
+          text: "성적에 맞춰 원서를 냈다.",
           stats: { knowledge: 5, happiness: 3 },
           flags: { education: "university" },
           eduYears: 4,
@@ -90,30 +94,39 @@ export const CORE_EVENTS: EventDef[] = [
         },
       },
       {
-        id: "retake",
-        label: "재수를 한다",
+        id: "retake-apply",
+        label: "다시 본 성적으로 대학에 지원한다",
+        when: retaking,
         effect: {
-          text: "1년을 더 공부하기로 했다.",
-          stats: { happiness: -8 },
-          intense: 6,
-          busyMonths: 11,
+          text: "1년을 버틴 성적표를 들고 원서를 냈다.",
           risk: {
             chance: knowledgeOdds(0.5),
             success: {
               text: "재수 끝에 원하던 대학에 붙었다.",
               stats: { knowledge: 10, happiness: 12 },
               flags: { education: "university" },
-              eduYears: 5,
+              eduYears: 4,
               enroll: { level: "university", pick: "better" },
             },
             failure: {
-              text: "성적이 기대만큼 오르지 않았지만, 대학에는 진학했다.",
+              text: "성적이 기대만큼 오르지 않았지만, 대학에는 진학하기로 했다.",
               stats: { knowledge: 4, happiness: -5 },
               flags: { education: "university" },
-              eduYears: 5,
+              eduYears: 4,
               enroll: { level: "university", pick: "fit" },
             },
           },
+        },
+      },
+      {
+        id: "retake",
+        label: (s) => (retaking(s) ? "한 번 더 도전한다 (삼수)" : "재수를 한다"),
+        when: (s) => (s.flags.retakes ?? 0) < 2,
+        effect: {
+          text: "1년을 더 공부하기로 했다.",
+          stats: { happiness: -8 },
+          intense: 6,
+          retake: true,
         },
       },
       {
@@ -132,31 +145,34 @@ export const CORE_EVENTS: EventDef[] = [
     id: "military",
     title: "입대 영장",
     minAge: 19,
-    maxAge: 24,
-    perYear: 0.5,
-    once: true,
-    when: (s) => s.profile.gender === "남" && !s.flags.military,
-    intro: "입영 통지서가 날아왔다.",
+    maxAge: 28,
+    // Once deferred, the notice comes back for sure when school ends or a year or two has passed.
+    perYear: (s) => (s.marks?.["army-delay"] !== undefined ? 2 : 0.5),
+    when: (s) => {
+      if (s.profile.gender !== "남" || s.flags.military) return false;
+      const delayed = s.marks?.["army-delay"];
+      if (delayed === undefined) return true;
+      return s.flags.education === "university" ? s.mi >= s.flags.eduUntil : s.mi - delayed >= 18;
+    },
+    intro: (s) => (s.marks?.["army-delay"] !== undefined ? "미뤄 둔 입영 통지서가 다시 날아왔다. 이번에는 가야 한다." : "입영 통지서가 날아왔다."),
     choices: [
       {
         id: "enlist",
         label: "지금 입대한다",
         effect: {
-          text: "머리를 깎고 훈련소에 들어갔다. 18개월의 군 생활이 시작되었다.",
+          text: "머리를 깎고 훈련소에 들어갔다.",
           stats: { health: 3, relationships: 3, happiness: -6 },
-          flags: { military: true },
-          busyMonths: 18,
+          enlist: true,
         },
       },
       {
         id: "delay",
         label: "학업이나 일을 이유로 미룬다",
-        when: (s) => s.flags.education === "university" || s.flags.employed,
+        when: (s) => (s.flags.education === "university" || s.flags.employed) && s.marks?.["army-delay"] === undefined && ageOf(s) < 26,
         effect: {
           text: "입대를 미뤘다. 언젠가는 가야 한다.",
           stats: { happiness: 2 },
-          flags: { military: true },
-          busyMonths: 0,
+          mark: "army-delay",
         },
       },
     ],
@@ -168,7 +184,7 @@ export const CORE_EVENTS: EventDef[] = [
     maxAge: 35,
     perYear: 1,
     once: true,
-    when: (s) => s.flags.education === "university" && s.mi >= s.flags.eduUntil,
+    when: (s) => s.flags.education === "university" && s.mi >= s.flags.eduUntil && !inService(s),
     intro: (s) => `${s.flags.school ? `${s.flags.school} ` : ""}졸업장을 받았다. 무엇을 할지 정해야 한다.`,
     choices: [
       {

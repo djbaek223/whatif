@@ -28,7 +28,7 @@ export const BADGES: BadgeDef[] = [
   { id: "promoted", icon: "📈", name: "승진", desc: "직함이 한 단계 올랐다", test: (s) => working(s) && /대리|과장|차장|부장|임원|이사|선임|책임|수석|팀장|[1-7]급/.test(s.flags.job) },
   { id: "graduate", icon: "🎓", name: "학사모", desc: "대학을 마쳤다", test: (s) => s.flags.education === "graduate" || (s.flags.education === "done" && /대학/.test(s.flags.school ?? "")) },
   { id: "grad-school", icon: "🧪", name: "연구의 길", desc: "대학원에 들어갔다", test: (s) => s.flags.education === "graduate" },
-  { id: "soldier", icon: "🪖", name: "만기 전역", desc: "군 복무를 마쳤다", test: (s, age) => s.flags.military && s.mi >= s.flags.busyUntil && age >= 19 },
+  { id: "soldier", icon: "🪖", name: "만기 전역", desc: "군 복무를 마쳤다", test: (s, age) => (s.flags.serviceUntil !== undefined ? s.mi >= s.flags.serviceUntil : s.flags.military && s.mi >= s.flags.busyUntil && age >= 19) && s.profile.gender === "남" },
   { id: "love", icon: "💕", name: "설렘", desc: "누군가와 사귀기 시작했다", test: (s) => s.flags.partner === "dating" || s.flags.partner === "married" },
   { id: "wedding", icon: "💍", name: "결혼", desc: "평생을 약속했다", test: (s) => s.flags.partner === "married" },
   { id: "parent", icon: "👶", name: "부모가 되다", desc: "첫 아이가 태어났다", test: (s) => s.flags.children >= 1 },
