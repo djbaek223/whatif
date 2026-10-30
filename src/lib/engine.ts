@@ -23,11 +23,12 @@ import {
 } from "./catalog";
 import { ADULT_AGE, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
-import { EVENTS, ageAt, ageOf, eventById, type Effect, type EventDef } from "./events";
+import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth } from "./format";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
 import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
+import { inRegion, isUS, type Region } from "./region";
 import { Rng, newSeed } from "./rng";
 import { DEGREE_LABELS } from "./types";
 import type {
@@ -53,6 +54,7 @@ import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema
 import { schoolYears } from "./onboarding";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
+import { L } from "./i18n";
 
 export { formatWealth };
 
@@ -66,7 +68,10 @@ export function presentMi(now = new Date()): number {
   return monthIndex(now.getFullYear(), now.getMonth() + 1);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export function formatMi(mi: number): string {
+  if (isUS()) return `${MONTHS[mi % 12]} ${Math.floor(mi / 12)}`;
   return `${Math.floor(mi / 12)}년 ${(mi % 12) + 1}월`;
 }
 
@@ -81,10 +86,10 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.ro
 
 /** Where a young person stands at school by age (만 나이): 초등학교 at 7, 중학교 at 13, 고등학교 at 16. Adults get "". */
 export function lifeStage(age: number): string {
-  if (age < 7) return "미취학 아동";
-  if (age < 13) return "초등학생";
-  if (age < 16) return "중학생";
-  if (age < 19) return "고등학생";
+  if (age < 7) return L("미취학 아동");
+  if (age < 13) return L("초등학생");
+  if (age < 16) return L("중학생");
+  if (age < 19) return L("고등학생");
   return "";
 }
 
@@ -138,12 +143,12 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
   if (age < 19 || (uni && mi < uni.from && age < 23)) return { ...none, education: "highschool", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
   if (age < 23 && hasUni && !uni)
     return { ...none, school: profile.university, education: "university", employed: false, jobTitle: "", monthlyIncome: 50, partner: "none", children: 0, wealth: 200 };
-  if (age < 26) return { ...none, education: "done", employed: true, jobTitle: "사원", monthlyIncome: 230, partner: "none", children: 0, wealth: 800 };
+  if (age < 26) return { ...none, education: "done", employed: true, jobTitle: L("사원"), monthlyIncome: 230, partner: "none", children: 0, wealth: 800 };
   return {
     ...none,
     education: "done",
     employed: true,
-    jobTitle: "회사원",
+    jobTitle: L("회사원"),
     monthlyIncome: Math.min(550, 250 + (age - 26) * 12),
     partner: age >= 33 ? "married" : "none",
     children: age >= 36 ? 1 : 0,
@@ -165,7 +170,11 @@ const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|�
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
 
-export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean } = {}): LifeState {
+export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region } = {}): LifeState {
+  return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts));
+}
+
+function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region }): LifeState {
   const mi = turningPointMi(tp);
   const age = ageAt(profile.birthDate, mi);
   const init = fitInitialToAge(opening.initial, age, mi, profile);
@@ -214,17 +223,18 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
   // Three suggested paths; the fourth is the user's own words, as in every later choice.
   const options = opening.choices.slice(0, 3).map((c, i) => ({
     id: String(i),
-    label: c.original ? `${c.label} (원래의 길)` : c.label,
+    label: c.original ? L`${c.label} (원래의 길)` : c.label,
   }));
   const pending: PendingChoice = {
     eventId: TURNING_POINT_ID,
-    title: "그날로 돌아왔다",
+    title: L("그날로 돌아왔다"),
     scene: opening.situation,
     options,
     freeText: true,
   };
   const life: LifeState = {
     version: 1,
+    ...(opts.region === "us" ? { region: "us" as const } : {}),
     profile,
     turningPoint: tp,
     persona: opening.persona,
@@ -257,7 +267,7 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     recent: [],
     rares: [],
   };
-  life.memory = [`${stamp(life)}: 변곡점에서 출발 (${statusLabel(life)})`];
+  life.memory = [L`${stamp(life)}: 변곡점에서 출발 (${statusLabel(life)})`];
   life.expense = Object.fromEntries(monthlyCosts(life).map((e) => [e.label, e.amount]));
   return life;
 }
@@ -298,24 +308,24 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
   const age = ageOf(s);
   // A child or teen can't take a job, stake savings or marry; the same leanings play out at their age.
   if (!canLeaveSchool(age, s.mi)) {
-    if (preset === "career") return { text: "꿈꾸던 일을 향해 일찍부터 준비를 시작했다.", stats: { knowledge: 5, happiness: 4 } };
-    if (preset === "risk") return { text: "남들과 다른 길에 과감히 도전했다.", stats: { happiness: 6, knowledge: 5, relationships: -2 } };
-    if (preset === "love" && age < 16) return { text: "마음 가는 친구에게 먼저 다가갔다.", stats: { happiness: 6, relationships: 10 } };
-    if (preset === "rest") return { text: "잠시 멈춰 쉬기로 했다.", stats: { happiness: 8, knowledge: 2 } };
+    if (preset === "career") return { text: L("꿈꾸던 일을 향해 일찍부터 준비를 시작했다."), stats: { knowledge: 5, happiness: 4 } };
+    if (preset === "risk") return { text: L("남들과 다른 길에 과감히 도전했다."), stats: { happiness: 6, knowledge: 5, relationships: -2 } };
+    if (preset === "love" && age < 16) return { text: L("마음 가는 친구에게 먼저 다가갔다."), stats: { happiness: 6, relationships: 10 } };
+    if (preset === "rest") return { text: L("잠시 멈춰 쉬기로 했다."), stats: { happiness: 8, knowledge: 2 } };
   }
   switch (preset) {
     case "original":
-      return { text: "결국 원래의 길을 다시 걸었다.", stats: { happiness: -2 } };
+      return { text: L("결국 원래의 길을 다시 걸었다."), stats: { happiness: -2 } };
     case "study":
       return s.flags.education === "done"
-        ? { text: "다시 공부를 시작했다.", stats: { knowledge: 10, happiness: -3 }, flags: { education: "graduate", employed: false, job: "" }, eduYears: 2, income: 60, enroll: { level: "graduate" } }
+        ? { text: L("다시 공부를 시작했다."), stats: { knowledge: 10, happiness: -3 }, flags: { education: "graduate", employed: false, job: "" }, eduYears: 2, income: 60, enroll: { level: "graduate" } }
         : // A retake waits for next year's exam season instead of meeting the exam right away.
-          { text: "공부에 모든 것을 걸었다.", stats: { knowledge: 12, happiness: -4, health: -2 }, ...(s.flags.education === "highschool" && ageOf(s) >= 18 ? { retake: true } : {}) };
+          { text: L("공부에 모든 것을 걸었다."), stats: { knowledge: 12, happiness: -4, health: -2 }, ...(s.flags.education === "highschool" && ageOf(s) >= 18 ? { retake: true } : {}) };
     case "career": {
       const title = job && !GENERIC_JOB.test(job) ? job : undefined;
       const tier = guessTier(`${choice.place ?? ""} ${job ?? ""}`);
       return {
-        text: "일에서 새로운 길을 택했다.",
+        text: L("일에서 새로운 길을 택했다."),
         stats: { knowledge: 3, happiness: 4 },
         flags: { education: s.flags.education === "highschool" ? "done" : s.flags.education },
         ...(s.flags.employed && !title ? { switchJob: { payPct: 1.15 } } : { hire: { tier, title } }),
@@ -329,45 +339,45 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
         const named = businessTitle(`${choice.label} ${job ?? ""}`);
         const place = choice.place?.trim();
         return {
-          text: s.flags.employed && !ownsBusiness(s.flags) ? "사표를 내고 내 일을 시작했다." : "내 일을 시작했다.",
+          text: s.flags.employed && !ownsBusiness(s.flags) ? L("사표를 내고 내 일을 시작했다.") : L("내 일을 시작했다."),
           stats: { happiness: 6, knowledge: 3 },
           wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))),
-          note: "창업 자금",
+          note: L("창업 자금"),
           flags: { education: s.flags.education === "highschool" ? "done" : s.flags.education },
           startBusiness: { title: generic ? named : job, name: place && !GENERIC_PLACE.test(place) ? place : undefined, income: 220 },
           intense: 6,
         };
       }
       return {
-        text: "큰 모험을 시작했다.",
+        text: L("큰 모험을 시작했다."),
         wealth: -1000,
-        note: "초기 자금",
+        note: L("초기 자금"),
         risk: {
           chance: () => 0.35,
           success: {
-            text: `모험이 성공으로 이어졌다. 월수입이 ${Math.round(Math.max(450, s.income * 1.6)).toLocaleString()}만원이 되었다.`,
+            text: L`모험이 성공으로 이어졌다. 월수입이 ${won(Math.max(450, s.income * 1.6))}이 되었다.`,
             stats: { happiness: 15, knowledge: 6 },
-            flags: { employed: true, job: job || "사업가", company: choice.place || undefined },
+            flags: { employed: true, job: job || L("사업가"), company: choice.place || undefined },
             income: Math.max(450, s.income * 1.6),
           },
-          failure: { text: "모험은 실패로 끝났지만 많은 걸 배웠다.", stats: { happiness: -10, knowledge: 8 }, wealth: -1500, note: "정리하며 남은 손실" },
+          failure: { text: L("모험은 실패로 끝났지만 많은 걸 배웠다."), stats: { happiness: -10, knowledge: 8 }, wealth: -1500, note: L("정리하며 남은 손실") },
         },
       };
     }
     case "love":
       return {
-        text: "마음이 이끄는 쪽을 택했다.",
+        text: L("마음이 이끄는 쪽을 택했다."),
         stats: { happiness: 8, relationships: 10 },
         flags: { partner: s.flags.partner === "dating" && age >= 20 ? "married" : "dating" },
       };
     case "move":
-      return { text: "익숙한 곳을 떠났다.", stats: { happiness: 5, relationships: -6, knowledge: 4 } };
+      return { text: L("익숙한 곳을 떠났다."), stats: { happiness: 5, relationships: -6, knowledge: 4 } };
     case "family":
-      return { text: "가족 곁을 택했다.", stats: { relationships: 12, happiness: 3 }, incomePct: 0.9 };
+      return { text: L("가족 곁을 택했다."), stats: { relationships: 12, happiness: 3 }, incomePct: 0.9 };
     case "health":
-      return { text: "몸과 마음을 먼저 돌보기로 했다.", stats: { health: 12, happiness: 5 } };
+      return { text: L("몸과 마음을 먼저 돌보기로 했다."), stats: { health: 12, happiness: 5 } };
     case "rest":
-      return { text: "잠시 멈춰 쉬기로 했다.", stats: { happiness: 8, knowledge: 2 }, wealth: -300, note: "쉬는 동안의 생활비" };
+      return { text: L("잠시 멈춰 쉬기로 했다."), stats: { happiness: 8, knowledge: 2 }, wealth: -300, note: L("쉬는 동안의 생활비") };
   }
 }
 
@@ -380,7 +390,7 @@ interface Applied {
 }
 
 const won = (manwon: number) => formatWealth(Math.round(manwon));
-const ORDINAL = ["", "첫째", "둘째", "셋째", "넷째", "다섯째"];
+const ORDINAL = () => ["", L("첫째"), L("둘째"), L("셋째"), L("넷째"), L("다섯째")];
 const yearsWorked = (s: LifeState) => Math.floor((s.flags.workMonths ?? 0) / 12);
 
 /** Hiring tier from the education stat, for "find any job" outcomes, within what the degree allows. */
@@ -401,12 +411,12 @@ function autoTier(s: LifeState, rng: Rng): CompanyTier {
 /** The league this person can actually join when aiming at this one. */
 const reachable = (s: LifeState, tier: CompanyTier) => fitTier(tier, degreeOf(s.flags), s.profile.major);
 
-const shortTown = (s: LifeState) => (s.profile.hometown || "서울").trim().split(/\s/)[0].replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "") || "서울";
+const shortTown = (s: LifeState) => (s.profile.hometown || L("서울")).trim().split(/\s/)[0].replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "") || L("서울");
 
 function planHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, plan?: OptionPlan): Required<Pick<OptionPlan, "place" | "tier" | "salary">> {
   const tier = (plan?.tier as CompanyTier | undefined) ?? (spec.tier === "auto" ? autoTier(s, rng) : reachable(s, spec.tier));
   let place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`));
-  if (tier === "civil" && !plan?.place) place = `${shortTown(s)}${place === "시청" ? "" : " "}${place}`;
+  if (tier === "civil" && !plan?.place) place = `${shortTown(s)}${place === L("시청") ? "" : " "}${place}`;
   return { place, tier, salary: plan?.salary ?? Math.round((salaryFor(rng, tier, yearsWorked(s)) * degreePay(tier, degreeOf(s.flags))) / 50) * 50 };
 }
 
@@ -458,17 +468,17 @@ function planHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>, 
 function doHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, out: Applied, plan?: OptionPlan) {
   const p = planHire(s, rng, spec, plan);
   const title = spec.title ?? titleFor(p.tier as CompanyTier, yearsWorked(s));
-  if (ownsBusiness(s.flags)) out.texts.push(`${eulReul(s.flags.company || "하던 일")} 정리했다.`);
+  if (ownsBusiness(s.flags)) out.texts.push(L`${eulReul(s.flags.company || L("하던 일"))} 정리했다.`);
   s.flags = { ...s.flags, employed: true, selfEmployed: false, job: title, company: p.place };
   s.income = Math.round(p.salary / 12);
   out.texts.push(
     p.tier === "civil"
-      ? `${p.place}에 ${withRo(title)} 발령받았다. 연봉 ${won(p.salary)}.`
+      ? L`${p.place}에 ${withRo(title)} 발령받았다. 연봉 ${won(p.salary)}.`
       : p.tier === "professor"
-        ? `${p.place} ${withRo(title)} 임용되었다. 연봉 ${won(p.salary)}.`
+        ? L`${p.place} ${withRo(title)} 임용되었다. 연봉 ${won(p.salary)}.`
         : p.tier === "doctor"
-          ? `${p.place}에서 ${withRo(title)} 일하게 되었다. 연봉 ${won(p.salary)}.`
-          : `${p.place}에 ${withRo(title)} 입사했다. 연봉 ${won(p.salary)}.`,
+          ? L`${p.place}에서 ${withRo(title)} 일하게 되었다. 연봉 ${won(p.salary)}.`
+          : L`${p.place}에 ${withRo(title)} 입사했다. 연봉 ${won(p.salary)}.`,
   );
   out.payShown = true;
 }
@@ -482,40 +492,40 @@ function doSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"]>
   const title = keepTitle ? s.flags.job : titleFor(p.tier as CompanyTier, yearsWorked(s));
   s.flags = { ...s.flags, job: title, company: p.place };
   s.income = Math.round(p.salary / 12);
-  out.texts.push(`${withRo(p.place)} 이직했다 (${title}). 연봉 ${won(before)} → ${won(p.salary)}.`);
+  out.texts.push(L`${withRo(p.place)} 이직했다 (${title}). 연봉 ${won(before)} → ${won(p.salary)}.`);
   out.payShown = true;
 }
 
 /** Opens a shop or business of one's own. The old employer is left behind; the venture's fate comes later (moreEvents: venture-result). */
 function doStartBusiness(s: LifeState, spec: NonNullable<Effect["startBusiness"]>, out: Applied) {
-  const title = spec.title?.trim() || "사업가";
+  const title = spec.title?.trim() || L("사업가");
   const name = spec.name?.trim() || undefined;
   s.flags = { ...s.flags, employed: true, selfEmployed: true, retired: false, job: title, company: name };
   s.income = Math.round(spec.income ?? 220);
   s.marks = { ...s.marks, venture: s.mi };
-  out.texts.push(`${name ? `${eulReul(name)} 열었다.` : `${withRo(title)} 첫발을 뗐다.`} 자리 잡기 전까지 수입은 월 ${won(s.income)} 남짓이다.`);
+  out.texts.push(L`${name ? L`${eulReul(name)} 열었다.` : L`${withRo(title)} 첫발을 뗐다.`} 자리 잡기 전까지 수입은 월 ${won(s.income)} 남짓이다.`);
   out.payShown = true;
 }
 
-const LADDERS = [
-  ["사원", "대리", "과장", "차장", "부장", "상무"],
-  ["팀원", "팀장", "본부장"],
-  ["9급 공무원", "8급 공무원", "7급 공무원", "6급 공무원", "5급 공무원", "4급 공무원"],
-  ["연구원", "선임연구원", "책임연구원", "수석연구원"],
-  ["조교수", "부교수", "정교수"],
-  ["전공의", "전문의", "과장", "병원장"],
+const LADDERS = () => [
+  [L("사원"), L("대리"), L("과장"), L("차장"), L("부장"), L("상무")],
+  [L("팀원"), L("팀장"), L("본부장")],
+  [L("9급 공무원"), L("8급 공무원"), L("7급 공무원"), L("6급 공무원"), L("5급 공무원"), L("4급 공무원")],
+  [L("연구원"), L("선임연구원"), L("책임연구원"), L("수석연구원")],
+  [L("조교수"), L("부교수"), L("정교수")],
+  [L("전공의"), L("전문의"), L("과장"), L("병원장")],
 ];
 
 function doPromote(s: LifeState, out: Applied) {
-  for (const ladder of LADDERS) {
+  for (const ladder of LADDERS()) {
     const i = ladder.indexOf(s.flags.job);
     if (i >= 0 && i < ladder.length - 1) {
       s.flags.job = ladder[i + 1];
-      out.texts.unshift(`${s.flags.company ? `${s.flags.company}에서 ` : ""}${withRo(s.flags.job)} 승진했다.`);
+      out.texts.unshift(L`${s.flags.company ? L`${s.flags.company}에서 ` : ""}${withRo(s.flags.job)} 승진했다.`);
       return;
     }
   }
-  out.texts.unshift("승진했다.");
+  out.texts.unshift(L("승진했다."));
 }
 
 function doEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>, out: Applied, plan?: OptionPlan) {
@@ -524,13 +534,13 @@ function doEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>, o
   s.flags.tuition = p.tuition;
   s.flags.program = programFor(spec.level, p.place, degreeOf(s.flags));
   const major = s.profile.major.trim();
-  if (spec.level === "abroad") out.texts.push(`${p.place} 박사 과정에 합격했다. 학비는 면제되고 생활비 장학금(월 150만원)을 받는다.`);
+  if (spec.level === "abroad") out.texts.push(L`${p.place} 박사 과정에 합격했다. 학비는 면제되고 생활비 장학금(월 150만원)을 받는다.`);
   else {
-    const half = ageOf(s) <= 24 ? " 절반은 부모님이 보태 주셨다." : "";
+    const half = ageOf(s) <= 24 ? L(" 절반은 부모님이 보태 주셨다.") : "";
     const name = `${p.place}${spec.level === "university" && major ? ` ${major}` : ""}`;
     // Admitted ahead of the school year: the first day is the coming March (or September).
     const ahead = s.flags.entered !== undefined && s.flags.entered > s.mi;
-    out.texts.push(`${ahead ? `${name}에 합격했다. ${formatMi(s.flags.entered!)}에 입학한다.` : `${name}에 입학했다.`} 등록금은 연 ${won(p.tuition)}.${half}`);
+    out.texts.push(L`${ahead ? L`${name}에 합격했다. ${formatMi(s.flags.entered!)}에 입학한다.` : L`${name}에 입학했다.`} 등록금은 연 ${won(p.tuition)}.${half}`);
   }
 }
 
@@ -541,9 +551,9 @@ function doBuyHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>,
   const down = p.price - p.loan;
   s.wealth -= fees;
   s.flags = { ...s.flags, homeOwner: true, homeArea: p.place, homeValue: p.price, mortgage: p.loan };
-  const kind = /빌라/.test(p.place) ? "" : " 아파트(84㎡)";
+  const kind = /빌라/.test(p.place) ? "" : L(" 아파트(84㎡)");
   out.texts.push(
-    `${p.place}${kind}를 ${won(p.price)}에 샀다. 모은 돈 ${won(down)}${p.loan ? `에 주택담보대출 ${won(p.loan)}(연 ${(MORTGAGE_RATE * 100).toFixed(1)}%)을 더했다` : "으로 대출 없이 샀다"}. 취득세·중개수수료·이사비로 ${won(fees)}이 나갔다.`,
+    L`${p.place}${kind}를 ${won(p.price)}에 샀다. 모은 돈 ${won(down)}${p.loan ? L`에 주택담보대출 ${won(p.loan)}(연 ${(MORTGAGE_RATE * 100).toFixed(1)}%)을 더했다` : L("으로 대출 없이 샀다")}. 취득세·중개수수료·이사비로 ${won(fees)}이 나갔다.`,
   );
 }
 
@@ -565,7 +575,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.wealth) s.wealth += effect.wealth;
   if (effect.wealthPct && s.wealth > 0) s.wealth += Math.round(s.wealth * effect.wealthPct);
   const spent = s.wealth - wealthBefore;
-  if (effect.note && spent) out.texts.push(spent < 0 ? `${effect.note}에 ${won(-spent)}이 들었다.` : `${effect.note}로 ${won(spent)}이 들어왔다.`);
+  if (effect.note && spent) out.texts.push(spent < 0 ? L`${effect.note}에 ${won(-spent)}이 들었다.` : L`${effect.note}로 ${won(spent)}이 들어왔다.`);
   if (effect.income !== undefined) s.income = Math.round(effect.income);
   if (effect.incomePct) s.income = Math.round(s.income * effect.incomePct);
   if (effect.flags) {
@@ -594,7 +604,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
     s.flags.children += 1;
     s.flags.kidsBorn = [...(s.flags.kidsBorn ?? []), s.mi];
     const n = s.flags.children;
-    out.texts.unshift(n === 1 ? "첫 아이가 태어났다." : `${ORDINAL[n] ?? "막내"}가 태어났다. 이제 아이가 ${n}명이다.`);
+    out.texts.unshift(n === 1 ? L("첫 아이가 태어났다.") : L`${ORDINAL()[n] ?? L("막내")}가 태어났다. 이제 아이가 ${n}명이다.`);
   }
   if (effect.hire) doHire(s, rng, effect.hire, out, plan);
   if (effect.switchJob) doSwitch(s, rng, effect.switchJob, out, plan);
@@ -607,7 +617,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
     const change = Math.round((before * effect.homeValuePct) / 100) * 100;
     s.flags.homeValue = before + change;
     s.wealth += change;
-    out.texts.push(`집 시세 ${won(before)} → ${won(s.flags.homeValue)}.`);
+    out.texts.push(L`집 시세 ${won(before)} → ${won(s.flags.homeValue)}.`);
   }
   if (effect.intense) s.intenseUntil = Math.max(s.intenseUntil, s.mi + effect.intense);
   if (effect.mark) s.marks = { ...s.marks, [effect.mark]: s.mi };
@@ -629,7 +639,7 @@ function applyTop(s: LifeState, effect: Effect, rng: Rng, plan?: OptionPlan): { 
   remember(s, before);
   if (s.income > income && !out.payShown) capPay(s, income);
   if (!out.payShown && s.flags.employed && income > 0 && s.income > 0 && s.income !== income)
-    out.texts.push(ownsBusiness(s.flags) ? `월수입 ${won(income)} → ${won(s.income)}.` : `연봉 ${won(income * 12)} → ${won(s.income * 12)}.`);
+    out.texts.push(ownsBusiness(s.flags) ? L`월수입 ${won(income)} → ${won(s.income)}.` : L`연봉 ${won(income * 12)} → ${won(s.income * 12)}.`);
   const money = s.wealth - wealth;
   return { text: out.texts.join(" "), delta: out.delta, ...(money ? { money } : {}) };
 }
@@ -639,7 +649,7 @@ const clone = (s: LifeState): LifeState => structuredClone(s);
 const MAX_MEMORY = 60;
 
 /** "34세(2019년 3월)": when something happened, as the narrator reads it. */
-const stamp = (s: LifeState) => `${ageOf(s)}세(${formatMi(s.mi)})`;
+const stamp = (s: LifeState) => L`${ageOf(s)}세(${formatMi(s.mi)})`;
 
 /** The lasting changes between two states, in plain words: jobs, a business, school, love, children, a home. */
 function changesBetween(a: LifeFlags, s: LifeState): string[] {
@@ -648,27 +658,27 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   const wasOwn = ownsBusiness(a);
   const isOwn = ownsBusiness(b);
   const workName = (f: LifeFlags) => (f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
-  if (b.retired && !a.retired) out.push(`은퇴${a.employed ? ` (${workName(a)}에서)` : ""}`);
-  else if (isOwn && (!wasOwn || a.company !== b.company)) out.push(`창업: ${b.job}${b.company ? ` (${b.company} 운영)` : ""}${a.employed && !wasOwn ? `, ${workName(a)} 퇴사` : ""}`);
+  if (b.retired && !a.retired) out.push(L`은퇴${a.employed ? L` (${workName(a)}에서)` : ""}`);
+  else if (isOwn && (!wasOwn || a.company !== b.company)) out.push(L`창업: ${b.job}${b.company ? L` (${b.company} 운영)` : ""}${a.employed && !wasOwn ? L`, ${workName(a)} 퇴사` : ""}`);
   else if (b.employed && !isOwn && (!a.employed || wasOwn || a.company !== b.company))
-    out.push(`${a.employed && !wasOwn ? "이직" : wasOwn ? "가게를 정리하고 취업" : "취업"}: ${workName(b)}`);
-  else if (b.employed && b.job !== a.job && b.company === a.company) out.push(`직함 변경: ${b.job}`);
-  else if (!b.employed && a.employed && !b.retired) out.push(wasOwn ? `폐업: ${a.company || a.job} 정리` : `퇴사: ${workName(a)}`);
+    out.push(`${a.employed && !wasOwn ? L("이직") : wasOwn ? L("가게를 정리하고 취업") : L("취업")}: ${workName(b)}`);
+  else if (b.employed && b.job !== a.job && b.company === a.company) out.push(L`직함 변경: ${b.job}`);
+  else if (!b.employed && a.employed && !b.retired) out.push(wasOwn ? L`폐업: ${a.company || a.job} 정리` : L`퇴사: ${workName(a)}`);
   if (b.education !== a.education || b.school !== a.school) {
     if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school)
-      out.push(b.entered !== undefined && b.entered > s.mi ? `합격: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}, ${formatMi(b.entered)} 입학` : `입학: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}`);
-    else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(`학업 마침${a.school ? `: ${a.school}` : ""}`);
+      out.push(b.entered !== undefined && b.entered > s.mi ? L`합격: ${b.school}${b.education === "graduate" ? L(" (대학원)") : ""}, ${formatMi(b.entered)} 입학` : L`입학: ${b.school}${b.education === "graduate" ? L(" (대학원)") : ""}`);
+    else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(L`학업 마침${a.school ? `: ${a.school}` : ""}`);
   }
   if (degreeOf(b) !== degreeOf(a) && DEGREE_RANK[degreeOf(b)] >= DEGREE_RANK.college)
-    out.push(`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${a.school ?? b.school})` : ""}`);
-  if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(`${(b.retakes ?? 1) >= 2 ? "삼수" : "재수"} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
-  if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
+    out.push(L`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${a.school ?? b.school})` : ""}`);
+  if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(L`${(b.retakes ?? 1) >= 2 ? L("삼수") : L("재수")} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
+  if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(L`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
   if (b.partner !== a.partner)
-    out.push({ none: "연인과 헤어짐", dating: "연애 시작", married: "결혼", divorced: "이혼", widowed: "배우자와 사별" }[b.partner]);
-  if (b.children > a.children) out.push(`${ORDINAL[b.children] ?? `${b.children}째`} 아이 출생`);
-  if (b.noKids && !a.noKids) out.push("아이를 갖지 않기로 함");
-  if (b.homeOwner && !a.homeOwner) out.push(`내 집 마련: ${b.homeArea ?? ""}`.trim());
-  if (b.pet && !a.pet) out.push("반려동물을 들임");
+    out.push({ none: L("연인과 헤어짐"), dating: L("연애 시작"), married: L("결혼"), divorced: L("이혼"), widowed: L("배우자와 사별") }[b.partner]);
+  if (b.children > a.children) out.push(L`${ORDINAL()[b.children] ?? L`${b.children}째`} 아이 출생`);
+  if (b.noKids && !a.noKids) out.push(L("아이를 갖지 않기로 함"));
+  if (b.homeOwner && !a.homeOwner) out.push(L`내 집 마련: ${b.homeArea ?? ""}`.trim());
+  if (b.pet && !a.pet) out.push(L("반려동물을 들임"));
   return out;
 }
 
@@ -684,7 +694,7 @@ const MAX_SEEDS = 8;
 /** Remembers a person or thread for the narrator to pick up later; the oldest ones drop off. */
 function addSeed(s: LifeState, seed: string) {
   if (!seed) return;
-  s.seeds = [...(s.seeds ?? []).filter((x) => x !== seed), `${ageOf(s)}세: ${seed}`].slice(-MAX_SEEDS);
+  s.seeds = [...(s.seeds ?? []).filter((x) => x !== seed), L`${ageOf(s)}세: ${seed}`].slice(-MAX_SEEDS);
 }
 
 const MAX_RECENT = 12;
@@ -716,18 +726,18 @@ function planFor(effect: Effect, s: LifeState, rng: Rng): OptionPlan | undefined
 /** One line under an option: where it leads and what it costs. */
 export function planDetail(p: OptionPlan | undefined): string | undefined {
   if (!p) return undefined;
-  const pre = p.risky ? "되면 " : "";
+  const pre = p.risky ? L("되면 ") : "";
   switch (p.kind) {
     case "hire":
-      return `${pre}${p.place} · 연봉 ${won(p.salary ?? 0)}`;
+      return L`${pre}${p.place} · 연봉 ${won(p.salary ?? 0)}`;
     case "switch":
-      return `${pre}${p.place} · 연봉 ${won(p.from ?? 0)} → ${won(p.salary ?? 0)}`;
+      return L`${pre}${p.place} · 연봉 ${won(p.from ?? 0)} → ${won(p.salary ?? 0)}`;
     case "enroll":
-      return `${pre}${p.place} · ${p.tuition ? `등록금 연 ${won(p.tuition)}` : "학비 면제"}`;
+      return `${pre}${p.place} · ${p.tuition ? L`등록금 연 ${won(p.tuition)}` : L("학비 면제")}`;
     case "home":
-      return `${pre}${p.place} · ${won(p.price ?? 0)}${p.loan ? ` (대출 ${won(p.loan)})` : ""}`;
+      return `${pre}${p.place} · ${won(p.price ?? 0)}${p.loan ? L` (대출 ${won(p.loan)})` : ""}`;
     case "cost":
-      return (p.cost ?? 0) < 0 ? `지출 약 ${won(-(p.cost ?? 0))}` : `수입 약 ${won(p.cost ?? 0)}`;
+      return (p.cost ?? 0) < 0 ? L`지출 약 ${won(-(p.cost ?? 0))}` : L`수입 약 ${won(p.cost ?? 0)}`;
     default:
       return undefined;
   }
@@ -815,14 +825,14 @@ function changesOf(e: Effect | undefined, s: LifeState): Set<CustomChange> {
 }
 
 const INTENT_TEXT: Partial<Record<CustomChange, string>> = {
-  quitJob: "회사를 그만뒀다.",
-  closeBusiness: "가게를 정리했다.",
-  retire: "일을 내려놓고 은퇴했다.",
-  marry: "결혼했다.",
-  startDating: "연애를 시작했다.",
+  get quitJob() { return L("회사를 그만뒀다."); },
+  get closeBusiness() { return L("가게를 정리했다."); },
+  get retire() { return L("일을 내려놓고 은퇴했다."); },
+  get marry() { return L("결혼했다."); },
+  get startDating() { return L("연애를 시작했다."); },
 };
 
-export function resolveChoice(state: LifeState, optionId: string, freeText?: string, intent?: Intent | null): LifeState {
+function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string, intent?: Intent | null): LifeState {
   const s = clone(state);
   const pending = s.pending;
   if (!pending) return s;
@@ -846,9 +856,9 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
   // even if the closest option was about staying at the company.
   const wish = freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null;
   if (wish && allowedChanges(s).includes(wish.change) && !changesOf(effect, s).has(wish.change)) {
-    const text = wish.change === "startBusiness" && employee(s.flags) ? "사표를 냈다." : (INTENT_TEXT[wish.change] ?? "");
+    const text = wish.change === "startBusiness" && employee(s.flags) ? L("사표를 냈다.") : (INTENT_TEXT[wish.change] ?? "");
     effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
-    if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: "창업 자금" };
+    if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: L("창업 자금") };
     plan = undefined;
   }
   // Where it happens is the player's too: "미국 대학 석사" studies in the US, not at the school the nearest option named.
@@ -890,7 +900,7 @@ function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: st
     // A country alone ("미국") is not a school; the engine picks one there.
     let place = korean ?? (ABROAD.test(text) ? pickAbroad(rng, text) : named && !new RegExp(`^(${ABROAD.source})$`).test(named) ? named : undefined);
     if (!place) return undefined;
-    if (level === "graduate" && !/대학원/.test(place)) place = `${place} 대학원`;
+    if (level === "graduate" && !/대학원/.test(place)) place = L`${place} 대학원`;
     return { kind: "enroll", risky, place, tuition: tuitionFor(place, level) };
   }
   if (!named || !(e?.hire || e?.switchJob)) return undefined;
@@ -903,14 +913,14 @@ function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: st
 
 /** Drops an outcome line that names the option's own school or company, once the player picked another. */
 function unnamed(effect: Effect, place: string): Effect {
-  const core = place.split(/\s/)[0].replace(/대학교$/, "대").replace(/학교$/, "");
+  const core = place.split(/\s/)[0].replace(/대학교$/, L("대")).replace(/학교$/, "");
   const clean = (x: Effect): Effect => (typeof x.text === "string" && x.text.includes(core) ? { ...x, text: "" } : x);
   const out = clean(effect);
   return out.risk ? { ...out, risk: { ...out.risk, success: clean(out.risk.success) } } : out;
 }
 
 /** Drops a choice that couldn't be written (an AI moment whose call failed), as if it never came up. */
-export function dropPending(state: LifeState): LifeState {
+function dropPendingHere(state: LifeState): LifeState {
   const s = clone(state);
   if (!s.pending) return s;
   const last = s.log.at(-1);
@@ -922,7 +932,7 @@ export function dropPending(state: LifeState): LifeState {
 // ── AI-written moments ─────────────────────────────────
 
 /** State changes an AI-written option may make, given where this life stands right now. */
-export function allowedChanges(s: LifeState): CustomChange[] {
+function allowedChangesHere(s: LifeState): CustomChange[] {
   const f = s.flags;
   const age = ageOf(s);
   const out: CustomChange[] = ["none"];
@@ -953,7 +963,7 @@ function changeEffect(c: CustomChange, o?: Pick<CustomOption, "title" | "place">
     case "startBusiness":
       return { startBusiness: { title: o?.title?.trim() || businessTitle(`${o?.place ?? ""}`), name: o?.place?.trim() || undefined }, intense: 6 };
     case "retire":
-      return { flags: { employed: false, retired: true, job: "은퇴" }, income: 130 };
+      return { flags: { employed: false, retired: true, job: L("은퇴") }, income: 130 };
     case "enrollUniversity":
       return { flags: { education: "university", employed: false, job: "" }, income: 0, eduYears: 4, enroll: { level: "university", pick: "fit" } };
     case "enrollGraduate":
@@ -974,7 +984,7 @@ function changeEffect(c: CustomChange, o?: Pick<CustomOption, "title" | "place">
 function customEffect(c: CustomOption): Effect {
   const base: Effect = { text: c.outcome, stats: c.stats, ...(c.money ? { wealth: c.money } : {}), ...changeEffect(c.change, c) };
   if (c.chance >= 0.99) return base;
-  return { text: "", risk: { chance: () => c.chance, success: base, failure: { text: c.failure || "생각대로 되지는 않았다.", stats: { happiness: -4 } } } };
+  return { text: "", risk: { chance: () => c.chance, success: base, failure: { text: c.failure || L("생각대로 되지는 않았다."), stats: { happiness: -4 } } } };
 }
 
 const THEME_SET = new Set<Theme>(["career", "study", "family", "love", "risk", "money", "health", "leisure"]);
@@ -987,7 +997,7 @@ export const momentChanges = (s: LifeState): CustomChange[] => (s.pending?.slot 
  * Turns the AI's moment into a choice, dropping changes that don't fit this life, options that contradict it,
  * and capping every number. Null when too little is left; the caller then plays the pool's version (slotFallback).
  */
-export function fillMoment(state: LifeState, key: string, res: MomentResult): LifeState | null {
+function fillMomentHere(state: LifeState, key: string, res: MomentResult): LifeState | null {
   if (!state.pending || pendingKeyOf(state) !== key) return null;
   const s = clone(state);
   const slot = s.pending!.slot;
@@ -1069,7 +1079,7 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
  * Plays the pool's version of a moment the narrator didn't write (or wrote in a way that contradicts the life):
  * its own options, or for a rare passive moment its own outcome.
  */
-export function slotFallback(state: LifeState, key: string): LifeState {
+function slotFallbackHere(state: LifeState, key: string): LifeState {
   if (!state.pending?.slot || pendingKeyOf(state) !== key) return state;
   const s = clone(state);
   const ev = eventById(s.pending!.eventId);
@@ -1114,7 +1124,7 @@ function withPlace(plan: OptionPlan, place: string, salary?: number): OptionPlan
 }
 
 /** Applies the narrator's rewrite of a fixed event: scene, labels and (optionally) a more fitting company or school name. */
-export function fillScene(state: LifeState, key: string, res: SceneResult): LifeState {
+function fillSceneHere(state: LifeState, key: string, res: SceneResult): LifeState {
   if (!state.pending || pendingKeyOf(state) !== key) return state;
   const byId = new Map(res.labels.map((l) => [l.id, l]));
   const options = state.pending.options.map((o) => {
@@ -1199,26 +1209,26 @@ function drift(s: LifeState, months: number) {
 }
 
 const SEASON: Record<number, string[]> = {
-  1: ["새해 첫날, 올해는 다를 거라고 다짐했다.", "설 연휴에 떡국을 먹으며 한 살을 더 먹었다."],
-  2: ["설 연휴, 고향 가는 길은 꽉 막혀 있었다."],
-  3: ["새 학기, 새 출발의 공기가 감돌았다."],
-  4: ["벚꽃이 흩날리는 길을 걸었다.", "봄비가 내리고 공기가 한결 부드러워졌다."],
-  5: ["가정의 달, 카네이션을 샀다."],
-  6: ["장마가 시작되었다."],
-  7: ["무더위에 에어컨 앞을 떠나지 못했다.", "여름휴가 계획을 세웠다."],
-  8: ["열대야에 잠을 설쳤다.", "매미 소리가 요란한 여름이었다."],
-  9: ["추석 연휴, 송편을 빚었다.", "아침저녁으로 바람이 선선해졌다."],
-  10: ["단풍이 물들기 시작했다.", "하늘이 유난히 높고 파랬다."],
-  11: ["첫 추위가 찾아왔다.", "김장철이 다가왔다."],
-  12: ["연말, 한 해를 돌아보았다.", "첫눈이 내렸다.", "거리에 캐럴이 울려 퍼졌다."],
+  get 1() { return [L("새해 첫날, 올해는 다를 거라고 다짐했다."), L("설 연휴에 떡국을 먹으며 한 살을 더 먹었다.")]; },
+  get 2() { return [L("설 연휴, 고향 가는 길은 꽉 막혀 있었다.")]; },
+  get 3() { return [L("새 학기, 새 출발의 공기가 감돌았다.")]; },
+  get 4() { return [L("벚꽃이 흩날리는 길을 걸었다."), L("봄비가 내리고 공기가 한결 부드러워졌다.")]; },
+  get 5() { return [L("가정의 달, 카네이션을 샀다.")]; },
+  get 6() { return [L("장마가 시작되었다.")]; },
+  get 7() { return [L("무더위에 에어컨 앞을 떠나지 못했다."), L("여름휴가 계획을 세웠다.")]; },
+  get 8() { return [L("열대야에 잠을 설쳤다."), L("매미 소리가 요란한 여름이었다.")]; },
+  get 9() { return [L("추석 연휴, 송편을 빚었다."), L("아침저녁으로 바람이 선선해졌다.")]; },
+  get 10() { return [L("단풍이 물들기 시작했다."), L("하늘이 유난히 높고 파랬다.")]; },
+  get 11() { return [L("첫 추위가 찾아왔다."), L("김장철이 다가왔다.")]; },
+  get 12() { return [L("연말, 한 해를 돌아보았다."), L("첫눈이 내렸다."), L("거리에 캐럴이 울려 퍼졌다.")]; },
 };
 
 /** The routine line for a quiet turn. A working life sometimes shows its job and pay as chips instead. */
 function statusLine(s: LifeState, rng: Rng): Pick<LogEntry, "text" | "facts"> {
   const f = s.flags;
   if (f.employed && !f.retired && f.education === "done" && s.mi >= f.busyUntil && f.company && rng.chance(0.3)) {
-    if (ownsBusiness(f)) return { text: "가게 문을 열고 닫는 하루가 이어졌다.", facts: [`${f.company} ${f.job}`, `월수입 ${won(s.income)}`] };
-    return { text: "출퇴근이 이어졌다.", facts: [`${f.company} ${f.job}`, `연봉 ${won(s.income * 12)}`] };
+    if (ownsBusiness(f)) return { text: L("가게 문을 열고 닫는 하루가 이어졌다."), facts: [`${f.company} ${f.job}`, L`월수입 ${won(s.income)}`] };
+    return { text: L("출퇴근이 이어졌다."), facts: [`${f.company} ${f.job}`, L`연봉 ${won(s.income * 12)}`] };
   }
   return { text: statusSentence(s, rng) };
 }
@@ -1227,39 +1237,40 @@ function statusSentence(s: LifeState, rng: Rng): string {
   const f = s.flags;
   const age = ageOf(s);
   const pick = (...lines: string[]) => rng.pick(lines);
-  if (inService(s)) return pick("군 복무를 하며 시간을 보냈다.", "점호와 근무 사이로 계절이 지나갔다.", "전역 날짜가 조금씩 가까워졌다.");
-  if (s.mi < f.busyUntil) return pick("목표를 위해 하루하루를 버텼다.", "책상 앞에서 계절이 바뀌었다.");
+  if (inService(s)) return pick(L("군 복무를 하며 시간을 보냈다."), L("점호와 근무 사이로 계절이 지나갔다."), L("전역 날짜가 조금씩 가까워졌다."));
+  if (s.mi < f.busyUntil) return pick(L("목표를 위해 하루하루를 버텼다."), L("책상 앞에서 계절이 바뀌었다."));
   const season = SEASON[(s.mi % 12) + 1];
   if (season && rng.chance(0.35)) return rng.pick(season);
   if (f.education === "school")
-    return age < 8 ? pick("동네 골목에서 해가 질 때까지 뛰어놀았다.", "그림책을 읽으며 자랐다.") : pick("학교와 집을 오가며 자랐다.", "쉬는 시간마다 운동장으로 뛰어나갔다.", "방학 숙제를 개학 전날 몰아서 했다.");
-  if (f.education === "highschool") return pick("야간 자율학습과 모의고사에 쫓기는 나날이었다.", "매점 빵 하나로 버티는 날이 많았다.", "독서실 책상 앞에서 졸다 깨기를 반복했다.");
-  if (f.education === "university") return pick("강의와 아르바이트 사이를 오갔다.", "학교 앞 밥집에서 동기들과 끼니를 때웠다.", "과제 마감에 쫓겨 밤을 새웠다.", "도서관 자리 맡기 경쟁이 치열했다.");
-  if (f.education === "graduate") return pick("연구실에서 밤을 새우는 날이 많았다.", "논문 마감이 다가왔다.", "교수님의 메일 한 통에 하루가 좌우되었다.");
+    return age < 8 ? pick(L("동네 골목에서 해가 질 때까지 뛰어놀았다."), L("그림책을 읽으며 자랐다.")) : pick(L("학교와 집을 오가며 자랐다."), L("쉬는 시간마다 운동장으로 뛰어나갔다."), L("방학 숙제를 개학 전날 몰아서 했다."));
+  if (f.education === "highschool") return pick(L("야간 자율학습과 모의고사에 쫓기는 나날이었다."), L("매점 빵 하나로 버티는 날이 많았다."), L("독서실 책상 앞에서 졸다 깨기를 반복했다."));
+  if (f.education === "university") return pick(L("강의와 아르바이트 사이를 오갔다."), L("학교 앞 밥집에서 동기들과 끼니를 때웠다."), L("과제 마감에 쫓겨 밤을 새웠다."), L("도서관 자리 맡기 경쟁이 치열했다."));
+  if (f.education === "graduate") return pick(L("연구실에서 밤을 새우는 날이 많았다."), L("논문 마감이 다가왔다."), L("교수님의 메일 한 통에 하루가 좌우되었다."));
   if (f.retired) {
-    if (f.children > 0) return pick("느긋한 하루가 이어졌다.", "자식들의 안부 전화를 기다렸다.", "공원 벤치에서 햇볕을 쬐었다.", "텃밭에 상추를 심었다.");
-    return pick("느긋한 하루가 이어졌다.", "공원 벤치에서 햇볕을 쬐었다.", "아침 산책이 하루의 시작이 되었다.");
+    if (f.children > 0) return pick(L("느긋한 하루가 이어졌다."), L("자식들의 안부 전화를 기다렸다."), L("공원 벤치에서 햇볕을 쬐었다."), L("텃밭에 상추를 심었다."));
+    return pick(L("느긋한 하루가 이어졌다."), L("공원 벤치에서 햇볕을 쬐었다."), L("아침 산책이 하루의 시작이 되었다."));
   }
   if (ownsBusiness(f)) {
     const since = s.marks?.venture;
-    if (f.company && since !== undefined && rng.chance(0.15)) return `${eulReul(f.company)} 연 지 ${Math.max(1, Math.round((s.mi - since) / 12))}년이 되어 갔다.`;
-    if (kidsUnder(s, 13)) return pick(`${withRo(f.job)} 일하며 ${f.children > 1 ? `아이 ${f.children}명을` : "아이를"} 키웠다.`, "문 닫고 돌아오면 아이는 벌써 잠들어 있었다.");
-    if (f.partner === "married") return pick(`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, "쉬는 날이면 배우자와 장을 보러 갔다.");
-    return pick(`${withRo(f.job)} 하루하루를 꾸렸다.`, "손님이 많은 날도, 파리만 날리는 날도 있었다.", "밤마다 장부를 펴고 이번 달 매출을 계산했다.", "쉬는 날 없이 일하는 주가 이어졌다.");
+    if (f.company && since !== undefined && rng.chance(0.15)) return L`${eulReul(f.company)} 연 지 ${Math.max(1, Math.round((s.mi - since) / 12))}년이 되어 갔다.`;
+    if (kidsUnder(s, 13)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("문 닫고 돌아오면 아이는 벌써 잠들어 있었다."));
+    if (f.partner === "married") return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("쉬는 날이면 배우자와 장을 보러 갔다."));
+    return pick(L`${withRo(f.job)} 하루하루를 꾸렸다.`, L("손님이 많은 날도, 파리만 날리는 날도 있었다."), L("밤마다 장부를 펴고 이번 달 매출을 계산했다."), L("쉬는 날 없이 일하는 주가 이어졌다."));
   }
   if (f.employed) {
-    if (f.company && rng.chance(0.15)) return `${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`;
-    if (kidsUnder(s, 13)) return pick(`${withRo(f.job)} 일하며 ${f.children > 1 ? `아이 ${f.children}명을` : "아이를"} 키웠다.`, "퇴근하면 육아로 두 번째 출근을 했다.", "주말이면 아이 손을 잡고 놀이공원에 갔다.");
-    if (f.children > 0) return pick(`${withRo(f.job)} 일하며 가족을 꾸렸다.`, "아이 학원비 고지서를 보며 한숨을 쉬었다.", "다 큰 아이와 어색한 저녁을 먹었다.");
-    if (f.partner === "married") return pick(`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, "주말이면 배우자와 장을 보러 갔다.");
-    if (f.pet) return pick(`${withRo(f.job)} 출퇴근을 반복했다.`, "퇴근하면 반려동물이 현관에서 기다렸다.");
-    return pick(`${withRo(f.job)} 출퇴근을 반복했다.`, "월요병과 불금 사이를 오갔다.", "점심 메뉴 고르는 게 하루의 고민이었다.", "월급날을 손꼽아 기다렸다.");
+    if (f.company && rng.chance(0.15)) return L`${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`;
+    if (kidsUnder(s, 13)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("퇴근하면 육아로 두 번째 출근을 했다."), L("주말이면 아이 손을 잡고 놀이공원에 갔다."));
+    if (f.children > 0) return pick(L`${withRo(f.job)} 일하며 가족을 꾸렸다.`, L("아이 학원비 고지서를 보며 한숨을 쉬었다."), L("다 큰 아이와 어색한 저녁을 먹었다."));
+    if (f.partner === "married") return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("주말이면 배우자와 장을 보러 갔다."));
+    if (f.pet) return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("퇴근하면 반려동물이 현관에서 기다렸다."));
+    return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("월요병과 불금 사이를 오갔다."), L("점심 메뉴 고르는 게 하루의 고민이었다."), L("월급날을 손꼽아 기다렸다."));
   }
-  return pick("다음 일을 고민하며 시간을 보냈다.", "채용 공고를 뒤적이며 하루를 보냈다.");
+  return pick(L("다음 일을 고민하며 시간을 보냈다."), L("채용 공고를 뒤적이며 하루를 보냈다."));
 }
 
-/** Appends 로 or 으로 to a Korean noun, by its final consonant. */
+/** Appends 로 or 으로 to a Korean noun, by its final consonant. An English text takes the word as it is. */
 function withRo(word: string): string {
+  if (isUS()) return word;
   // Read past a closing bracket ("배달의민족(우아한형제들)" ends on 들); Latin letters and digits by how they're said.
   const tail = word.replace(/\)+$/, "").trim();
   const last = tail.at(-1) ?? "";
@@ -1273,8 +1284,9 @@ function withRo(word: string): string {
   return /[A-Za-z245]/.test(last) ? `${word}로` : `${word}(으)로`;
 }
 
-/** Appends 을 or 를 to a Korean noun, by its final consonant. */
+/** Appends 을 or 를 to a Korean noun, by its final consonant. An English text takes the word as it is. */
 function eulReul(word: string): string {
+  if (isUS()) return word;
   const code = (word.replace(/\)+$/, "").trim().at(-1) ?? "").charCodeAt(0) - 0xac00;
   if (code >= 0 && code <= 11171) return `${word}${code % 28 === 0 ? "를" : "을"}`;
   return `${word}을(를)`;
@@ -1307,7 +1319,7 @@ function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): Lo
     }
   }
   return items.map((x) => {
-    const tag = `${x.cat} · ${(x.mi % 12) + 1}월`;
+    const tag = L`${x.cat} · ${(x.mi % 12) + 1}월`;
     const impact = x.impact?.(s);
     if (!impact) return { mi: s.mi, kind: "news", text: x.text, tag };
     const applied = applyTop(s, impact, rng);
@@ -1347,7 +1359,7 @@ const SMALL_GAP = 12; // months
 export type StopReason = "choice" | "death" | "present" | null;
 
 /** Advances one turn. Returns the new state and why the player should stop, if they should. */
-export function advanceTurn(state: LifeState): { state: LifeState; stop: StopReason } {
+function advanceTurnHere(state: LifeState): { state: LifeState; stop: StopReason } {
   if (state.dead || state.pending) return { state, stop: state.dead ? "death" : "choice" };
   const s = clone(state);
   const rng = new Rng(s.rng);
@@ -1370,14 +1382,14 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
   if (age >= 110 || rng.chance(1 - Math.pow(1 - q, months / 12))) {
     s.dead = true;
     s.deathAge = age;
-    entries.push({ mi: s.mi, kind: "death", text: `${age}세, 눈을 감았다.` });
+    entries.push({ mi: s.mi, kind: "death", text: L`${age}세, 눈을 감았다.` });
     stop = "death";
   } else {
     entries.push(...newsEntries(s, s.mi - months, months, rng));
     // At most one passive moment and one choice per turn, so small moments don't crowd out the big forks.
     let happened = false;
     let passive = false;
-    for (const ev of rng.shuffle(EVENTS)) {
+    for (const ev of rng.shuffle(eventsHere())) {
       if (ev.effect && !ev.choices && passive) continue;
       if (!eligible(ev, s, age) || !rng.chance(eventChance(ev, s, months))) continue;
       if (ev.once) s.done.push(ev.id);
@@ -1428,7 +1440,7 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
 
     if (!s.presentShown && s.mi >= presentMi()) {
       s.presentShown = true;
-      entries.push({ mi: s.mi, kind: "present", text: "지금, 현실의 나와 같은 시간에 도착했다." });
+      entries.push({ mi: s.mi, kind: "present", text: L("지금, 현실의 나와 같은 시간에 도착했다.") });
       if (!stop) stop = "present";
     }
   }
@@ -1447,7 +1459,7 @@ function noteCosts(s: LifeState): LogEntry | null {
 }
 
 /** Runs turns until something needs the player (a choice, the present day, or death). */
-export function advanceUntilStop(state: LifeState, maxTurns = 400): { state: LifeState; stop: StopReason } {
+function advanceUntilStopHere(state: LifeState, maxTurns = 400): { state: LifeState; stop: StopReason } {
   let cur = state;
   for (let i = 0; i < maxTurns; i++) {
     const r = advanceTurn(cur);
@@ -1467,7 +1479,7 @@ export function isBigChoice(p: PendingChoice): boolean {
 }
 
 /** Picks an option for auto-decide mode: weighted toward the first listed choices and toward what this person leans to. */
-export function autoPick(s: LifeState): string | null {
+function autoPickHere(s: LifeState): string | null {
   if (!s.pending || s.pending.options.length === 0) return null;
   const rng = new Rng(s.rng ^ 0x5bd1e995);
   const opts = s.pending.options;
@@ -1481,76 +1493,76 @@ export function autoPick(s: LifeState): string | null {
   return opts[0].id;
 }
 
-export function statusLabel(s: LifeState): string {
+function statusLabelHere(s: LifeState): string {
   const f = s.flags;
   const parts: string[] = [];
-  if (inService(s)) parts.push("군 복무 중");
-  else if (f.education === "school") parts.push(lifeStage(ageOf(s)) || "학생");
-  else if (retaking(s)) parts.push((f.retakes ?? 1) >= 2 ? "삼수생" : "재수생");
-  else if (f.education === "highschool") parts.push("고등학생");
-  else if (f.education === "university" && f.entered !== undefined && s.mi < f.entered) parts.push(f.school ? `${f.school} 입학 예정` : "입학 예정");
-  else if (f.education === "university" && f.eduFrom !== undefined && s.mi < f.eduFrom) parts.push(f.school ? `${f.school} 휴학` : "휴학");
-  else if (f.education === "university") parts.push(f.school ? `${f.school} 재학` : "대학생");
-  else if (f.education === "graduate") parts.push(f.school ? `${f.school} 재학` : "대학원생");
-  else if (f.retired) parts.push("은퇴");
+  if (inService(s)) parts.push(L("군 복무 중"));
+  else if (f.education === "school") parts.push(lifeStage(ageOf(s)) || L("학생"));
+  else if (retaking(s)) parts.push((f.retakes ?? 1) >= 2 ? L("삼수생") : L("재수생"));
+  else if (f.education === "highschool") parts.push(L("고등학생"));
+  else if (f.education === "university" && f.entered !== undefined && s.mi < f.entered) parts.push(f.school ? L`${f.school} 입학 예정` : L("입학 예정"));
+  else if (f.education === "university" && f.eduFrom !== undefined && s.mi < f.eduFrom) parts.push(f.school ? L`${f.school} 휴학` : L("휴학"));
+  else if (f.education === "university") parts.push(f.school ? L`${f.school} 재학` : L("대학생"));
+  else if (f.education === "graduate") parts.push(f.school ? L`${f.school} 재학` : L("대학원생"));
+  else if (f.retired) parts.push(L("은퇴"));
   else if (ownsBusiness(f)) parts.push(f.company ? `${f.job}(${f.company})` : f.job);
   else if (f.employed) parts.push(f.company && !f.job.includes(f.company) ? `${f.company} ${f.job}` : f.job);
-  else parts.push("구직 중");
-  const partner = { none: "", dating: "연애 중", married: "기혼", divorced: "이혼", widowed: "사별" }[f.partner];
+  else parts.push(L("구직 중"));
+  const partner = { none: "", dating: L("연애 중"), married: L("기혼"), divorced: L("이혼"), widowed: L("사별") }[f.partner];
   if (partner) parts.push(partner);
-  if (f.children > 0) parts.push(`자녀 ${f.children}명`);
-  if (f.homeOwner) parts.push(f.homeArea ? `자가(${f.homeArea})` : "자가");
+  if (f.children > 0) parts.push(L`자녀 ${f.children}명`);
+  if (f.homeOwner) parts.push(f.homeArea ? L`자가(${f.homeArea})` : L("자가"));
   return parts.join(" · ");
 }
 
 /** Pay as a person would say it: yearly salary at work, monthly otherwise. */
-export function payLabel(s: LifeState): string {
+function payLabelHere(s: LifeState): string {
   if (s.income <= 0) return "";
-  if (s.flags.employed && !s.flags.retired && !ownsBusiness(s.flags)) return `연봉 ${won(s.income * 12)}`;
-  return `월 ${won(s.income)}`;
+  if (s.flags.employed && !s.flags.retired && !ownsBusiness(s.flags)) return L`연봉 ${won(s.income * 12)}`;
+  return L`월 ${won(s.income)}`;
 }
 
 /** "월 305만원 (월세 95만원 · 생활비 220만원)", or who pays when nothing does yet. */
-export function costLine(s: LifeState): string {
+function costLineHere(s: LifeState): string {
   const items = monthlyCosts(s);
-  if (!items.length) return inService(s) ? "없음 (군 복무 중)" : "없음 (부모님이 부담)";
+  if (!items.length) return inService(s) ? L("없음 (군 복무 중)") : L("없음 (부모님이 부담)");
   return `${won(costTotal(items))} (${costBreakdown(items)})`;
 }
 
 /** Plain facts about this life right now, for the narrator. Everything it writes must agree with these. */
-export function lifeFacts(s: LifeState): string {
+function lifeFactsHere(s: LifeState): string {
   const f = s.flags;
   const age = ageOf(s);
   const kidAges = (f.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
   const study =
-    f.education === "school" ? `${lifeStage(age) || "학생"}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? (retaking(s) ? "재수생 (고등학교 졸업, 다음 수능 준비)" : "고등학생") : f.education === "university" ? `대학 재학 (${f.school || "학교 미정"}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? `대학원 재학 (${f.school || "학교 미정"})` : `학업 마침${f.school ? ` (최종 ${f.school})` : ""}`;
+    f.education === "school" ? L`${lifeStage(age) || L("학생")}${f.school ? ` (${f.school})` : ""}. 대학·취업·연애·결혼은 아직 해당 없음` : f.education === "highschool" ? (retaking(s) ? L("재수생 (고등학교 졸업, 다음 수능 준비)") : L("고등학생")) : f.education === "university" ? L`대학 재학 (${f.school || L("학교 미정")}${s.profile.major ? `, ${s.profile.major}` : ""})` : f.education === "graduate" ? L`대학원 재학 (${f.school || L("학교 미정")})` : L`학업 마침${f.school ? L` (최종 ${f.school})` : ""}`;
   const since = s.marks?.venture !== undefined ? Math.max(0, s.mi - s.marks.venture) : null;
   const work = f.retired
-    ? `은퇴함, 연금 월 ${won(s.income)}`
+    ? L`은퇴함, 연금 월 ${won(s.income)}`
     : ownsBusiness(f)
-      ? `자영업: ${f.job}${f.company ? `, ${f.company} 운영` : ""}${since !== null ? ` (시작한 지 ${since < 12 ? `${since}개월` : `${Math.floor(since / 12)}년`})` : ""}, 월수입 ${won(s.income)}. 회사에 다니지 않으므로 상사·회식·승진·육아휴직·이직 제안·희망퇴직 같은 직장 이야기는 해당 없음`
+      ? L`자영업: ${f.job}${f.company ? L`, ${f.company} 운영` : ""}${since !== null ? L` (시작한 지 ${since < 12 ? L`${since}개월` : L`${Math.floor(since / 12)}년`})` : ""}, 월수입 ${won(s.income)}. 회사에 다니지 않으므로 상사·회식·승진·육아휴직·이직 제안·희망퇴직 같은 직장 이야기는 해당 없음`
       : f.employed
-      ? `${f.company ? `${f.company} ` : ""}${f.job}로 일하는 중, ${payLabel(s)}, 경력 ${yearsWorked(s)}년`
+      ? L`${f.company ? `${f.company} ` : ""}${f.job}로 일하는 중, ${payLabel(s)}, 경력 ${yearsWorked(s)}년`
       : f.education === "done" && age >= 18
-        ? "일자리 없음 (구직 중). 회사에 다니지 않으므로 휴직·승진·회사 이야기는 해당 없음"
-        : "아직 일하지 않음";
-  const partner = { none: "미혼, 연인 없음", dating: "연애 중 (미혼)", married: "기혼", divorced: "이혼 후 혼자", widowed: "배우자와 사별" }[f.partner];
-  const kids = f.children ? `${f.children}명 (${kidAges.length === f.children ? kidAges.map((a, i) => `${ORDINAL[i + 1] ?? `${i + 1}째`} ${a}세`).join(", ") : "나이 미상"})` : f.noKids ? "없음, 갖지 않기로 함" : "없음";
-  const home = f.homeOwner ? `자가 (${f.homeArea || "지역 미상"}${f.homeValue ? `, 시세 ${won(f.homeValue)}` : ""}${f.mortgage ? `, 대출 잔액 ${won(f.mortgage)}` : ""})` : "무주택 (전세나 월세)";
+        ? L("일자리 없음 (구직 중). 회사에 다니지 않으므로 휴직·승진·회사 이야기는 해당 없음")
+        : L("아직 일하지 않음");
+  const partner = { none: L("미혼, 연인 없음"), dating: L("연애 중 (미혼)"), married: L("기혼"), divorced: L("이혼 후 혼자"), widowed: L("배우자와 사별") }[f.partner];
+  const kids = f.children ? L`${f.children}명 (${kidAges.length === f.children ? kidAges.map((a, i) => L`${ORDINAL()[i + 1] ?? L`${i + 1}째`} ${a}세`).join(", ") : L("나이 미상")})` : f.noKids ? L("없음, 갖지 않기로 함") : L("없음");
+  const home = f.homeOwner ? L`자가 (${f.homeArea || L("지역 미상")}${f.homeValue ? L`, 시세 ${won(f.homeValue)}` : ""}${f.mortgage ? L`, 대출 잔액 ${won(f.mortgage)}` : ""})` : L("무주택 (전세나 월세)");
   return [
-    `시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
-    `성향: ${s.profile.mbti || "MBTI 미입력"}. ${s.profile.personality || ""}`.trim(),
-    `학업: ${study}`,
-    `학력: ${degreeFacts(s)}`,
-    ...timelineFacts(s).map((t) => `날짜: ${t}`),
-    `일: ${work}`,
-    `연애·결혼: ${partner}`,
-    `자녀: ${kids}`,
-    `집: ${home}`,
-    `순자산: ${formatWealth(s.wealth)}`,
-    `월 고정지출: ${costLine(s)}`,
-    `능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 교육 ${s.stats.knowledge}, 관계 ${s.stats.relationships}`,
-    s.flags.pet ? "반려동물과 함께 삶" : "",
+    L`시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
+    L`성향: ${s.profile.mbti || L("MBTI 미입력")}. ${s.profile.personality || ""}`.trim(),
+    L`학업: ${study}`,
+    L`학력: ${degreeFacts(s)}`,
+    ...timelineFacts(s).map((t) => L`날짜: ${t}`),
+    L`일: ${work}`,
+    L`연애·결혼: ${partner}`,
+    L`자녀: ${kids}`,
+    L`집: ${home}`,
+    L`순자산: ${formatWealth(s.wealth)}`,
+    L`월 고정지출: ${costLine(s)}`,
+    L`능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 교육 ${s.stats.knowledge}, 관계 ${s.stats.relationships}`,
+    s.flags.pet ? L("반려동물과 함께 삶") : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -1558,14 +1570,14 @@ export function lifeFacts(s: LifeState): string {
 
 
 /** A compact summary of the life so far, passed to the narrator. */
-export function lifeSummary(s: LifeState, recent = 12): string {
+function lifeSummaryHere(s: LifeState, recent = 12): string {
   const age = ageOf(s);
   const lines = [
-    `현재 ${formatMi(s.mi)}, ${age}세. 상태: ${statusLabel(s)}.`,
+    L`현재 ${formatMi(s.mi)}, ${age}세. 상태: ${statusLabel(s)}.`,
     lifeFacts(s),
-    `인생 이력 (이미 일어난 사실, 시간순): ${(s.memory ?? []).join(" / ") || "없음"}`,
-    `지금까지의 주요 선택: ${s.choices.map((c) => `${c.age}세 ${c.title} → ${c.picked}`).join(" / ") || "없음"}`,
-    `최근 기록: ${s.log
+    L`인생 이력 (이미 일어난 사실, 시간순): ${(s.memory ?? []).join(" / ") || L("없음")}`,
+    L`지금까지의 주요 선택: ${s.choices.map((c) => L`${c.age}세 ${c.title} → ${c.picked}`).join(" / ") || L("없음")}`,
+    L`최근 기록: ${s.log
       .filter((l) => l.kind !== "turn" && l.kind !== "news")
       .slice(-recent)
       .map((l) => `[${formatMi(l.mi)}] ${l.text.slice(0, 120)}`)
@@ -1573,3 +1585,26 @@ export function lifeSummary(s: LifeState, recent = 12): string {
   ];
   return lines.join("\n");
 }
+
+// ── Entry points ───────────────────────────────────────
+// Each runs in the life's own region (region.ts), so texts, money and rules follow the country the life began in.
+
+const inLife =
+  <A extends unknown[], R>(fn: (s: LifeState, ...rest: A) => R) =>
+  (s: LifeState, ...rest: A): R =>
+    inRegion(s.region, () => fn(s, ...rest));
+
+export const resolveChoice = inLife(resolveChoiceHere);
+export const dropPending = inLife(dropPendingHere);
+export const allowedChanges = inLife(allowedChangesHere);
+export const fillMoment = inLife(fillMomentHere);
+export const slotFallback = inLife(slotFallbackHere);
+export const fillScene = inLife(fillSceneHere);
+export const advanceTurn = inLife(advanceTurnHere);
+export const advanceUntilStop = inLife(advanceUntilStopHere);
+export const autoPick = inLife(autoPickHere);
+export const statusLabel = inLife(statusLabelHere);
+export const payLabel = inLife(payLabelHere);
+export const costLine = inLife(costLineHere);
+export const lifeFacts = inLife(lifeFactsHere);
+export const lifeSummary = inLife(lifeSummaryHere);

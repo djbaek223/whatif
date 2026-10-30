@@ -1,12 +1,14 @@
 // "knowledge" is shown as 교육 (schooling and learning); the key stays so saved lives and the narrator schema keep working.
+import { L } from "./i18n";
+import type { Region } from "./region";
 export type StatKey = "health" | "happiness" | "knowledge" | "relationships";
 export type Stats = Record<StatKey, number>;
 
 export const STAT_LABELS: Record<StatKey, string> = {
-  health: "건강",
-  happiness: "행복",
-  knowledge: "교육",
-  relationships: "관계",
+  get health() { return L("건강"); },
+  get happiness() { return L("행복"); },
+  get knowledge() { return L("교육"); },
+  get relationships() { return L("관계"); },
 };
 
 export type Gender = "남" | "여" | "기타" | "";
@@ -41,12 +43,12 @@ export type Education = "school" | "highschool" | "university" | "graduate" | "d
 export type Degree = "none" | "high" | "college" | "bachelor" | "master" | "phd";
 
 export const DEGREE_LABELS: Record<Degree, string> = {
-  none: "중졸",
-  high: "고졸",
-  college: "전문대졸",
-  bachelor: "대졸",
-  master: "석사",
-  phd: "박사",
+  get none() { return L("중졸"); },
+  get high() { return L("고졸"); },
+  get college() { return L("전문대졸"); },
+  get bachelor() { return L("대졸"); },
+  get master() { return L("석사"); },
+  get phd() { return L("박사"); },
 };
 
 export type Partner = "none" | "dating" | "married" | "divorced" | "widowed";
@@ -177,13 +179,13 @@ export interface PendingChoice {
 export type Category = "daily" | "relation" | "work" | "money" | "health" | "era" | "chance";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
-  daily: "일상",
-  relation: "관계",
-  work: "일",
-  money: "돈",
-  health: "건강",
-  era: "시대",
-  chance: "우연",
+  get daily() { return L("일상"); },
+  get relation() { return L("관계"); },
+  get work() { return L("일"); },
+  get money() { return L("돈"); },
+  get health() { return L("건강"); },
+  get era() { return L("시대"); },
+  get chance() { return L("우연"); },
 };
 
 /** Temperament axes read from MBTI and self-description, each -1..1. */
@@ -231,6 +233,7 @@ export interface ChoiceRecord {
 
 export interface LifeState {
   version: 1;
+  region?: Region; // the country this life is lived in; missing means Korea (lives saved before regions existed)
   profile: Profile;
   turningPoint: TurningPoint;
   persona: string;

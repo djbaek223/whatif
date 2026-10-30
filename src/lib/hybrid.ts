@@ -8,6 +8,7 @@ import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
 import { timelineConflict } from "./timeline";
 import { ownsBusiness } from "./work";
+import { L } from "./i18n";
 
 const CORE = new Set(CORE_EVENTS.map((e) => e.id));
 
@@ -54,13 +55,13 @@ const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급/;
  */
 export function conflictIn(text: string, s: LifeState): string | null {
   const f = s.flags;
-  if (!f.employed || f.retired ? OFFICE.test(text) : ownsBusiness(f) && BOSSED.test(text)) return "회사";
-  if (!ownsBusiness(f) && SHOP.test(text)) return "가게";
-  if (f.partner !== "married" && SPOUSE.test(text)) return "배우자";
-  if (f.partner !== "dating" && f.partner !== "married" && LOVER.test(text)) return "연인";
-  if (f.children === 0 && KIDS.test(text)) return "자녀";
-  if (!f.homeOwner && OWN_HOME.test(text)) return "자가";
-  if (ageOf(s) < 19 && ADULT.test(text)) return "나이";
+  if (!f.employed || f.retired ? OFFICE.test(text) : ownsBusiness(f) && BOSSED.test(text)) return L("회사");
+  if (!ownsBusiness(f) && SHOP.test(text)) return L("가게");
+  if (f.partner !== "married" && SPOUSE.test(text)) return L("배우자");
+  if (f.partner !== "dating" && f.partner !== "married" && LOVER.test(text)) return L("연인");
+  if (f.children === 0 && KIDS.test(text)) return L("자녀");
+  if (!f.homeOwner && OWN_HOME.test(text)) return L("자가");
+  if (ageOf(s) < 19 && ADULT.test(text)) return L("나이");
   return timelineConflict(text, s);
 }
 

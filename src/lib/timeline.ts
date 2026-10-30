@@ -2,9 +2,12 @@
 // in the year one enlisted. The engine sets school and service dates from these, and the narrator is told them,
 // so a retake never ends in the same year and a four-year degree never ends early.
 import type { LifeFlags, LifeState } from "./types";
+import { L } from "./i18n";
+import { isUS } from "./region";
 
 const mi = (year: number, month: number) => year * 12 + (month - 1);
-const fmt = (m: number) => `${Math.floor(m / 12)}년 ${(m % 12) + 1}월`;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmt = (m: number) => (isUS() ? `${MONTHS[m % 12]} ${Math.floor(m / 12)}` : `${Math.floor(m / 12)}년 ${(m % 12) + 1}월`);
 
 // Army (육군) active service by enlistment date. Steps from 병무청 and press histories (세계일보 2014, 중앙일보 2017):
 // 36 after the war, 33 from 1959, 30 from 1962, back to 36 after 1·21 (1968), 33 from 1977, 30 from 1984,
@@ -87,7 +90,7 @@ export function enlist(s: LifeState): string[] {
   f.serviceFrom = s.mi;
   f.serviceUntil = back;
   f.busyUntil = Math.max(f.busyUntil, back);
-  const out = [`육군 복무 ${months}개월, ${fmt(back)} 전역 예정이다.`];
+  const out = [L`육군 복무 ${months}개월, ${fmt(back)} 전역 예정이다.`];
   if ((f.education === "university" || f.education === "graduate") && s.mi <= f.eduUntil) {
     if ((f.eduFrom ?? 0) > s.mi) {
       // Admitted but not started: the place is kept and the first year begins after service.
@@ -101,7 +104,7 @@ export function enlist(s: LifeState): string[] {
       f.eduFrom = nextTerm(back);
       f.eduUntil = f.eduFrom + terms * 6 - 1;
     }
-    out.push(`학교는 휴학했다. ${fmt(f.eduFrom)} 복학, ${fmt(f.eduUntil)} 졸업 예정.`);
+    out.push(L`학교는 휴학했다. ${fmt(f.eduFrom)} 복학, ${fmt(f.eduUntil)} 졸업 예정.`);
   }
   return out;
 }
@@ -118,7 +121,7 @@ export function startRetake(s: LifeState): string {
   f.job = "";
   f.busyUntil = Math.max(f.busyUntil, exam);
   const year = Math.floor(exam / 12);
-  return `${n >= 2 ? "삼수" : "재수"}를 시작했다. 다음 수능은 ${year}년 11월, 대학은 빨라도 ${year + 1}년 3월에 들어간다.`;
+  return L`${n >= 2 ? L("삼수") : L("재수")}를 시작했다. 다음 수능은 ${year}년 11월, 대학은 빨라도 ${year + 1}년 3월에 들어간다.`;
 }
 
 /** Dates the narrator must keep to: exam and entrance years, graduation, service. Empty when none apply. */
@@ -127,21 +130,21 @@ export function timelineFacts(s: LifeState): string[] {
   const out: string[] = [];
   if (retaking(s)) {
     const exam = Math.floor(f.retaking! / 12);
-    out.push(`${(f.retakes ?? 1) >= 2 ? "삼수" : "재수"} 중: 다음 수능 ${exam}년 11월, 대학 입학은 빨라도 ${exam + 1}년 3월. 그 전에 대학에 붙거나 입학했다고 쓰지 않음`);
+    out.push(L`${(f.retakes ?? 1) >= 2 ? L("삼수") : L("재수")} 중: 다음 수능 ${exam}년 11월, 대학 입학은 빨라도 ${exam + 1}년 3월. 그 전에 대학에 붙거나 입학했다고 쓰지 않음`);
   }
   if (f.education === "university" || f.education === "graduate") {
-    const what = f.education === "university" ? "대학" : "대학원";
-    if (f.entered !== undefined && s.mi < f.entered) out.push(`${what} 합격, ${fmt(f.entered)} 입학 예정. 아직 수업·캠퍼스 생활 전`);
+    const what = f.education === "university" ? L("대학") : L("대학원");
+    if (f.entered !== undefined && s.mi < f.entered) out.push(L`${what} 합격, ${fmt(f.entered)} 입학 예정. 아직 수업·캠퍼스 생활 전`);
     else if (f.entered !== undefined) {
-      const years = f.education === "university" ? ` (${Math.min(4, Math.floor((s.mi - f.entered) / 12) + 1)}학년차)` : "";
-      out.push(`${what}: ${fmt(f.entered)} 입학${years}, 졸업 예정 ${fmt(f.eduUntil)}. 그 전에 졸업했다고 쓰지 않음`);
-    } else out.push(`${what}: 졸업 예정 ${fmt(f.eduUntil)}. 그 전에 졸업했다고 쓰지 않음`);
-    if (!inService(s) && f.eduFrom !== undefined && s.mi < f.eduFrom && f.entered !== f.eduFrom) out.push(`휴학 중, ${fmt(f.eduFrom)} 복학 예정`);
+      const years = f.education === "university" ? L` (${Math.min(4, Math.floor((s.mi - f.entered) / 12) + 1)}학년차)` : "";
+      out.push(L`${what}: ${fmt(f.entered)} 입학${years}, 졸업 예정 ${fmt(f.eduUntil)}. 그 전에 졸업했다고 쓰지 않음`);
+    } else out.push(L`${what}: 졸업 예정 ${fmt(f.eduUntil)}. 그 전에 졸업했다고 쓰지 않음`);
+    if (!inService(s) && f.eduFrom !== undefined && s.mi < f.eduFrom && f.entered !== f.eduFrom) out.push(L`휴학 중, ${fmt(f.eduFrom)} 복학 예정`);
   }
   if (inService(s) && f.serviceFrom !== undefined && f.serviceUntil !== undefined)
-    out.push(`군 복무 중: ${fmt(f.serviceFrom)} 입대, 육군 ${f.serviceUntil - f.serviceFrom}개월, ${fmt(f.serviceUntil)} 전역 예정. 그 전에 전역했다고 쓰지 않음`);
-  else if (f.serviceUntil !== undefined && f.serviceFrom !== undefined) out.push(`군 복무: ${fmt(f.serviceFrom)}~${fmt(f.serviceUntil)} 육군 만기 전역`);
-  else if (s.profile.gender === "남" && !f.military) out.push("군 미필 (아직 입대 전)");
+    out.push(L`군 복무 중: ${fmt(f.serviceFrom)} 입대, 육군 ${f.serviceUntil - f.serviceFrom}개월, ${fmt(f.serviceUntil)} 전역 예정. 그 전에 전역했다고 쓰지 않음`);
+  else if (f.serviceUntil !== undefined && f.serviceFrom !== undefined) out.push(L`군 복무: ${fmt(f.serviceFrom)}~${fmt(f.serviceUntil)} 육군 만기 전역`);
+  else if (s.profile.gender === "남" && !f.military) out.push(L("군 미필 (아직 입대 전)"));
   return out;
 }
 
@@ -153,9 +156,9 @@ const ADMITTED = /입학했|합격했|새내기|신입생|입학식|캠퍼스 �
 /** What in the text breaks the school and service dates, or null. Used with hybrid.conflictIn. */
 export function timelineConflict(text: string, s: LifeState): string | null {
   const f = s.flags;
-  if (retaking(s) && ADMITTED.test(text)) return "재수";
-  if (inService(s) && (CAMPUS.test(text) || DISCHARGED.test(text))) return "군 복무";
-  if ((f.education === "university" || f.education === "graduate") && s.mi < f.eduUntil && GRADUATED.test(text) && !/고등학교 졸업|고교 졸업/.test(text)) return "졸업";
-  if (f.education === "university" && (f.eduFrom ?? 0) > s.mi && CAMPUS.test(text)) return "입학 전";
+  if (retaking(s) && ADMITTED.test(text)) return L("재수");
+  if (inService(s) && (CAMPUS.test(text) || DISCHARGED.test(text))) return L("군 복무");
+  if ((f.education === "university" || f.education === "graduate") && s.mi < f.eduUntil && GRADUATED.test(text) && !/고등학교 졸업|고교 졸업/.test(text)) return L("졸업");
+  if (f.education === "university" && (f.eduFrom ?? 0) > s.mi && CAMPUS.test(text)) return L("입학 전");
   return null;
 }

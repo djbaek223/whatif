@@ -5,6 +5,9 @@ import { MORTGAGE_RATE } from "./catalog";
 import { ageAt } from "./events";
 import { inService } from "./timeline";
 import type { LifeState } from "./types";
+import { formatWealth } from "./format";
+import { L } from "./i18n";
+import { isUS } from "./region";
 
 export interface Expense {
   label: string;
@@ -32,13 +35,13 @@ export function monthlyCosts(s: LifeState): Expense[] {
   const add = (label: string, amount: number) => amount > 0 && out.push({ label, amount: Math.round(amount) });
   const married = f.partner === "married";
 
-  if (atHome(s, age)) add("생활비 (부모님 댁)", f.employed ? 90 : 50);
+  if (atHome(s, age)) add(L("생활비 (부모님 댁)"), f.employed ? 90 : 50);
   else {
-    add("생활비", f.retired ? (married ? 190 : 130) : married ? 220 : 150);
-    if (f.homeOwner) add("관리비·재산세", 25);
-    else add("월세", married ? (f.children ? 95 : 80) : 60);
+    add(L("생활비"), f.retired ? (married ? 190 : 130) : married ? 220 : 150);
+    if (f.homeOwner) add(L("관리비·재산세"), 25);
+    else add(L("월세"), married ? (f.children ? 95 : 80) : 60);
   }
-  if (f.homeOwner && f.mortgage) add("대출 이자", (f.mortgage * MORTGAGE_RATE) / 12);
+  if (f.homeOwner && f.mortgage) add(L("대출 이자"), (f.mortgage * MORTGAGE_RATE) / 12);
 
   // Children: care until school, then 학원 on top, then university tuition and pocket money until 23.
   const kidAges = f.kidsBorn?.length === f.children ? f.kidsBorn.map((b) => (s.mi - b) / 12) : Array(f.children).fill(10);
@@ -55,13 +58,13 @@ export function monthlyCosts(s: LifeState): Expense[] {
       academy += 55;
     } else if (a < 23) college += 100;
   }
-  add("자녀 양육비", care);
-  add("자녀 학원비", academy);
-  add("자녀 대학 등록금", college);
+  add(L("자녀 양육비"), care);
+  add(L("자녀 학원비"), academy);
+  add(L("자녀 대학 등록금"), college);
 
   // One's own tuition while classes run; parents cover half until 24.
   const enrolled = (f.education === "university" || f.education === "graduate") && s.mi <= f.eduUntil && s.mi >= (f.eduFrom ?? 0);
-  if (enrolled && f.tuition) add(age <= 24 ? "등록금 (절반은 부모님)" : "등록금", (f.tuition / 12) * (age <= 24 ? 0.5 : 1));
+  if (enrolled && f.tuition) add(age <= 24 ? L("등록금 (절반은 부모님)") : L("등록금"), (f.tuition / 12) * (age <= 24 ? 0.5 : 1));
   return out;
 }
 
@@ -79,7 +82,7 @@ export function tuitionOnly(s: LifeState): number {
 export const costBreakdown = (items: Expense[]) =>
   [...items]
     .sort((a, b) => b.amount - a.amount)
-    .map((e) => `${e.label} ${e.amount.toLocaleString()}만원`)
+    .map((e) => `${e.label} ${isUS() ? formatWealth(e.amount) : `${e.amount.toLocaleString()}만원`}`)
     .join(" · ");
 
 /** A feed line when fixed costs move by 20만원 or more a month, naming what changed. Null otherwise. */
@@ -98,10 +101,10 @@ export function costChange(before: Record<string, number> | undefined, items: Ex
     .slice(0, 2);
   const first = a === 0 && age >= ADULT_AGE && age <= ADULT_AGE + 1;
   const text = first
-    ? "성인이 되었다. 이제 매달 나가는 돈은 스스로 감당한다."
+    ? L("성인이 되었다. 이제 매달 나가는 돈은 스스로 감당한다.")
     : b > a
-      ? "매달 고정으로 나가는 돈이 늘었다."
-      : "매달 고정으로 나가는 돈이 줄었다.";
-  const facts = [`월 지출 ${a.toLocaleString()} → ${b.toLocaleString()}만원`, ...moved.map(({ l, d }) => `${l} ${d > 0 ? "+" : ""}${d.toLocaleString()}`)];
+      ? L("매달 고정으로 나가는 돈이 늘었다.")
+      : L("매달 고정으로 나가는 돈이 줄었다.");
+  const facts = [isUS() ? `Monthly costs ${formatWealth(a)} → ${formatWealth(b)}` : `월 지출 ${a.toLocaleString()} → ${b.toLocaleString()}만원`, ...moved.map(({ l, d }) => `${l} ${d > 0 ? "+" : ""}${isUS() ? formatWealth(d) : d.toLocaleString()}`)];
   return { text, facts };
 }
