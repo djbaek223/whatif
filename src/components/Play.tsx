@@ -151,7 +151,7 @@ export function PlayView({
   }, [choosing, collapsed, pendingKey, presentOpen, auto, life.dead]);
 
   // During auto play every turn would be read aloud several times a second, so only the year and rare moments are.
-  const announce = choosing ? `선택의 순간: ${pending.title}` : auto && !life.dead && !latest?.rare ? `${Math.floor(life.mi / 12)}년` : latest?.text;
+  const announce = choosing ? (sceneLoading ? "선택의 순간" : `선택의 순간: ${pending.title}`) : auto && !life.dead && !latest?.rare ? `${Math.floor(life.mi / 12)}년` : latest?.text;
 
   const pay = payLabel(life);
 
@@ -219,7 +219,7 @@ export function PlayView({
                   aria-expanded={false}
                   className="flex w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
                 >
-                  <span className="min-w-0 truncate">선택 대기 · {pending.title}</span>
+                  <span className="min-w-0 truncate">{sceneLoading ? "장면을 그리는 중" : `선택 대기 · ${pending.title}`}</span>
                   <span className="flex shrink-0 items-center gap-1 text-sm">
                     펼치기
                     <Chevron up />
@@ -300,7 +300,7 @@ export function PlayView({
         )}
       </div>
 
-      {showIntro && <BigMomentIntro pending={pending} onDone={() => setIntroSeen(pendingKey)} />}
+      {showIntro && <BigMomentIntro pending={pending} showTitle={!sceneLoading} onDone={() => setIntroSeen(pendingKey)} />}
       {fx.toast && <BadgeToast ids={fx.toast.ids} toastKey={fx.toast.key} onDone={fx.clearToast} />}
     </div>
   );
@@ -461,7 +461,8 @@ function ChoicePanel({
       : "";
 
   return (
-    <div className="rise-in space-y-3" aria-busy={sceneLoading}>
+    // While loading, the panel itself takes focus in place of the title, which stays hidden until the scene is written.
+    <div className="rise-in space-y-3 outline-none" aria-busy={sceneLoading} tabIndex={sceneLoading ? -1 : undefined} data-focus={sceneLoading ? "choice" : undefined}>
       <p role="status" className="sr-only">
         {status}
       </p>
@@ -493,9 +494,11 @@ function ChoicePanel({
           </div>
         </div>
         {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{spanName(skipped)}을 건너뛰었어요.</p>}
-        <h2 tabIndex={-1} data-focus="choice" className="mt-1 text-lg font-bold text-balance outline-none">
-          {pending.title}
-        </h2>
+        {!sceneLoading && (
+          <h2 tabIndex={-1} data-focus="choice" className="mt-1 text-lg font-bold text-balance outline-none">
+            {pending.title}
+          </h2>
+        )}
         {sceneLoading ? (
           <SceneWait elapsed={waited} />
         ) : (
@@ -577,17 +580,18 @@ function ChoicePanel({
 }
 
 /** A big fork rises into the middle of the screen for a moment, then settles into the sheet below. */
-function BigMomentIntro({ pending, onDone }: { pending: PendingChoice; onDone: () => void }) {
+function BigMomentIntro({ pending, showTitle, onDone }: { pending: PendingChoice; showTitle: boolean; onDone: () => void }) {
   return (
     <div aria-hidden onClick={onDone} className="fixed inset-0 z-40 flex items-center justify-center bg-stone-950/45 p-6 [animation:fadein_.2s_ease-out]">
       <div className="rise-in w-full max-w-sm">
         <div
           className={`rounded-3xl px-6 py-8 text-center shadow-2xl ${pending.rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950" : "bg-white dark:bg-stone-900"}`}
         >
-          <p className={`text-xs font-semibold tracking-widest ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
+          {/* While the scene is being written its title stays hidden too, so the card names only the kind of moment. */}
+          <p className={`font-semibold ${showTitle ? "text-xs tracking-widest" : "text-2xl"} ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
             {pending.rare ? "✦ 희귀한 순간" : "인생의 갈림길"}
           </p>
-          <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>
+          {showTitle && <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>}
           <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">탭하면 바로 고를 수 있어요</p>
         </div>
       </div>
