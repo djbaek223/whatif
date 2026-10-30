@@ -63,7 +63,7 @@ export function DiceRoll({ roll, onDone }: { roll: Roll; onDone: () => void }) {
           <circle key={i} cx={cx} cy={cy} r="2.1" fill={roll.face === 1 ? "#e11d48" : "#1c1917"} />
         ))}
       </svg>
-      <span className={`rounded-full px-2 py-0.5 text-xs font-bold shadow ${good ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"}`}>{LUCK[roll.face]}</span>
+      <span className={`rounded-full px-2 py-0.5 text-xs font-bold shadow ${good ? "bg-emerald-700 text-white" : "bg-rose-600 text-white"}`}>{LUCK[roll.face]}</span>
     </div>
   );
 }
@@ -106,7 +106,7 @@ export function BadgeToast({ ids, toastKey, onDone }: { ids: string[]; toastKey:
             {first.icon}
           </span>
           <span>
-            <span className="block text-[11px] font-bold text-amber-600 dark:text-amber-400">배지 획득{ids.length > 1 ? ` · 외 ${ids.length - 1}개` : ""}</span>
+            <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-400">배지 획득{ids.length > 1 ? ` · 외 ${ids.length - 1}개` : ""}</span>
             <span className="block font-bold">{first.name}</span>
             <span className="block text-xs text-stone-500 dark:text-stone-400">{first.desc}</span>
           </span>
@@ -154,7 +154,7 @@ export function BadgeCollection({ life }: { life: LifeState }) {
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">배지 컬렉션</p>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">배지 컬렉션</h2>
         <p className="text-sm font-bold tabular-nums">
           {earned.size} / {BADGES.length}
         </p>

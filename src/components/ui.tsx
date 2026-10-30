@@ -9,7 +9,7 @@ export function Button({ variant = "primary", className = "", ...props }: Button
       "bg-stone-900 text-stone-50 hover:bg-stone-700 disabled:bg-stone-200 disabled:text-stone-500 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-400",
     ghost: "border border-stone-300 hover:bg-stone-100 disabled:opacity-40 dark:border-stone-700 dark:hover:bg-stone-800",
     choice:
-      "w-full text-left border border-stone-300 bg-white hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-40 dark:border-stone-700 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
+      "w-full text-left border border-field bg-white hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-40 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
   }[variant];
   return (
     <button
@@ -116,7 +116,7 @@ export function FieldError({ id, children }: { id?: string; children: ReactNode 
 
 // Invalid fields get a rose ring; focus gets the same indigo ring as buttons.
 const inputClass =
-  "w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-[15px] outline-none placeholder:text-stone-500 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/25 aria-invalid:border-rose-600 aria-invalid:ring-1 aria-invalid:ring-rose-600 dark:border-stone-700 dark:bg-stone-900 dark:placeholder:text-stone-400 dark:aria-invalid:border-rose-400 dark:aria-invalid:ring-rose-400";
+  "w-full rounded-lg border border-field bg-white px-3 py-2.5 text-[15px] outline-none placeholder:text-stone-500 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/25 aria-invalid:border-rose-600 aria-invalid:ring-1 aria-invalid:ring-rose-600 dark:bg-stone-900 dark:placeholder:text-stone-400 dark:aria-invalid:border-rose-400 dark:aria-invalid:ring-rose-400";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />;
@@ -177,7 +177,7 @@ export function StatBars({
       {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
         <div key={k} className="min-w-0">
           <div className="flex items-baseline justify-between text-xs">
-            <span className="text-stone-500 dark:text-stone-400">{STAT_LABELS[k]}</span>
+            <span className="text-stone-600 dark:text-stone-400">{STAT_LABELS[k]}</span>
             <span className="font-semibold tabular-nums">{stats[k]}</span>
           </div>
           <div className="relative mt-1">

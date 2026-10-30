@@ -676,7 +676,7 @@ function Choice({ selected, onClick, small = false, children }: { selected: bool
       className={`min-h-11 rounded-xl border px-2 font-medium break-keep transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${small ? "text-sm" : "py-2.5 text-[15px]"} ${
         selected
           ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-500"
-          : "border-stone-300 bg-white hover:border-indigo-400 hover:bg-indigo-50 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-indigo-950"
+          : "border-field bg-white hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
       }`}
     >
       {children}
@@ -717,7 +717,7 @@ function Blank({ id, value, placeholder, onChange, invalid, label, autoFocus }: 
       placeholder={placeholder}
       maxLength={40}
       style={{ width: `${Math.max(5, Math.min(15, (value || placeholder).length + 1.5))}em` }}
-      className="mx-0.5 inline-block min-h-11 max-w-full rounded-lg border-b-2 border-indigo-400 bg-white px-2 align-middle text-[15px] font-semibold text-indigo-800 outline-none placeholder:font-normal placeholder:text-stone-400 focus:ring-3 focus:ring-indigo-500/25 aria-invalid:border-rose-600 aria-invalid:bg-rose-50 dark:bg-stone-900 dark:text-indigo-200 dark:aria-invalid:bg-rose-950"
+      className="mx-0.5 inline-block min-h-11 max-w-full rounded-lg border-b-2 border-indigo-500 bg-white px-2 align-middle text-[15px] font-semibold text-indigo-800 outline-none placeholder:font-normal placeholder:text-stone-500 focus:ring-2 focus:ring-indigo-600 dark:placeholder:text-stone-400 dark:focus:ring-indigo-400 aria-invalid:border-rose-600 aria-invalid:bg-rose-50 dark:bg-stone-900 dark:text-indigo-200 dark:aria-invalid:bg-rose-950"
     />
   );
 }
@@ -763,7 +763,7 @@ function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" |
                 names[s.key] ? "border-indigo-300 bg-white dark:border-indigo-800 dark:bg-stone-900" : "border-dashed border-stone-300 dark:border-stone-700"
               }`}
             >
-              <p key={names[s.key] ? "named" : "empty"} className={`truncate text-sm font-semibold ${names[s.key] ? "" : "text-stone-400 dark:text-stone-500"}`} style={{ animation: "fadein .3s ease-out" }}>
+              <p key={names[s.key] ? "named" : "empty"} className={`truncate text-sm font-semibold ${names[s.key] ? "" : "text-stone-500 dark:text-stone-400"}`} style={{ animation: "fadein .3s ease-out" }}>
                 {names[s.key] || s.label}
               </p>
               <p className="text-[11px] text-stone-500 tabular-nums dark:text-stone-400">
@@ -806,7 +806,7 @@ function MbtiQuiz({ answers, onAnswer, onCancel }: { answers: string[]; onAnswer
             key={o}
             type="button"
             onClick={() => onAnswer(q.letters[i])}
-            className="min-h-12 rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-left text-[15px] hover:border-indigo-400 hover:bg-indigo-50 dark:border-stone-700 dark:bg-stone-900 dark:hover:bg-indigo-950"
+            className="min-h-12 rounded-xl border border-field bg-white px-4 py-2.5 text-left text-[15px] hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
           >
             {o}
           </button>
@@ -841,7 +841,7 @@ function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint
         return (
           <div key={id} className="flex items-center gap-3 py-1.5">
             <dt className="w-16 shrink-0 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
-            <dd className={`min-w-0 flex-1 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-400 dark:text-stone-500"}`}>
+            <dd className={`min-w-0 flex-1 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
               {value || (required ? "꼭 필요해요" : "건너뜀")}
             </dd>
             <button

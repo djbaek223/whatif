@@ -6,15 +6,18 @@
   /* One color per stat, shared by the stat bars and the life graph (categorical slots 1-4). */
   --stat-health: #2a78d6;
   --stat-happiness: #eb6834;
-  --stat-knowledge: #1baf7a;
-  --stat-relationships: #eda100;
+  --stat-knowledge: #16936a;
+  --stat-relationships: #c27c00;
   --chart-grid: #e7e5e4;
-  --chart-axis: #a8a29e;
+  --chart-axis: #79716b;
+  /* Borders of text boxes and pickable options: at least 3:1 against the card, so the field can be seen. */
+  --field-border: #8f8882;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-field: var(--field-border);
   --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Noto Sans KR", sans-serif;
 }
 
@@ -27,7 +30,8 @@
     --stat-knowledge: #199e70;
     --stat-relationships: #c98500;
     --chart-grid: #292524;
-    --chart-axis: #57534e;
+    --chart-axis: #8a827c;
+    --field-border: #716b66;
   }
 }
 

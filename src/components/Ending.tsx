@@ -47,7 +47,7 @@ export function EndingView({
       </div>
 
       <Card>
-        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">마지막 모습</p>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">마지막 모습</h2>
         <p className="mt-1 font-semibold">{statusLabel(life)}</p>
         <p className="text-sm text-stone-500 dark:text-stone-400">남긴 자산 {formatWealth(life.wealth)}</p>
         <div className="mt-4">
@@ -60,12 +60,12 @@ export function EndingView({
       </Card>
 
       <Card className="space-y-3">
-        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">현실과의 비교</p>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">현실과의 비교</h2>
         <p className="leading-relaxed">{ending.comparison}</p>
       </Card>
 
       <Card className="space-y-4">
-        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">회고록</p>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">회고록</h2>
         {ending.memoir.split(/\n\s*\n/).map((para, i) => (
           <p key={i} className="leading-[1.8]">
             {para}
@@ -74,13 +74,13 @@ export function EndingView({
       </Card>
 
       <Card>
-        <p className="mb-3 text-xs font-semibold text-stone-500 dark:text-stone-400">인생 그래프 · 나이에 따른 능력치 변화</p>
+        <h2 className="mb-3 text-xs font-semibold text-stone-500 dark:text-stone-400">인생 그래프 · 나이에 따른 능력치 변화</h2>
         <LifeChart life={life} />
       </Card>
 
       {!!life.rares?.length && (
         <Card className="border-2 border-amber-400 dark:border-amber-500">
-          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간 · {life.rares.length}번</p>
+          <h2 className="text-xs font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간 · {life.rares.length}번</h2>
           <ol className="mt-3 space-y-3">
             {life.rares.map((r, i) => (
               <li key={i} className="flex gap-3 text-sm">
@@ -96,7 +96,7 @@ export function EndingView({
       )}
 
       <Card>
-        <p className="text-xs font-semibold text-stone-500 dark:text-stone-400">내가 한 선택들</p>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">내가 한 선택들</h2>
         <ol className="mt-3 space-y-2">
           {life.choices.map((c, i) => (
             <li key={i} className="flex gap-3 text-sm">
