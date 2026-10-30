@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FieldError } from "./ui";
 
 export interface Ymd {
@@ -46,6 +46,8 @@ export function DatePicker({
   const [open, setOpen] = useState<Part | null>(null);
   const [decade, setDecade] = useState(() => (value.y ? Math.floor(value.y / 10) * 10 : 0));
   const [typed, setTyped] = useState(() => (value.y && value.m && (!withDay || value.d) ? format(value, withDay) : ""));
+  const box = useRef<HTMLDivElement>(null);
+  const [moved, setMoved] = useState(0); // counts picks made with the buttons, so focus follows to the next grid
 
   const part: Part | "done" = open ?? (!value.y ? (decade ? "y" : "decade") : !value.m ? "m" : withDay && !value.d ? "d" : "done");
   const maxMonth = value.y === max.y ? max.m : 12;
@@ -61,7 +63,16 @@ export function DatePicker({
     setTyped(next.y && next.m && (!withDay || next.d) ? format(next, withDay) : "");
     onTypedError?.(null);
     setOpen(null);
+    setMoved((n) => n + 1);
   };
+
+  // A picked button disappears with its grid, so focus moves on: to the next grid's picked (or first) button,
+  // or once the date is whole, to the form's submit button.
+  useEffect(() => {
+    if (!moved) return;
+    const grid = box.current?.querySelector<HTMLElement>("[data-cell][aria-pressed=true]:not(:disabled)") ?? box.current?.querySelector<HTMLElement>("[data-cell]:not(:disabled)");
+    (grid ?? box.current?.closest("form")?.querySelector<HTMLElement>("button[type=submit]"))?.focus({ preventScroll: true });
+  }, [moved]);
 
   const onType = (text: string) => {
     setTyped(text);
@@ -78,11 +89,15 @@ export function DatePicker({
   };
 
   const errorId = `${id}-error`;
-  const chip = (p: Part, text: string, filled: boolean) => (
+  const chip = (p: Part, name: string, text: string, filled: boolean) => (
     <button
       type="button"
-      onClick={() => setOpen(p === "y" ? "decade" : p)}
-      aria-pressed={part === p || (p === "y" && part === "decade")}
+      onClick={() => {
+        setOpen(p === "y" ? "decade" : p);
+        setMoved((n) => n + 1);
+      }}
+      aria-expanded={part === p || (p === "y" && part === "decade")}
+      aria-label={filled ? `${name} ${text}, 바꾸기` : `${name} 고르기`}
       className={`min-h-11 flex-1 rounded-xl border-2 px-2 text-lg font-bold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
         part === p || (p === "y" && part === "decade")
           ? "border-indigo-500 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300"
@@ -96,11 +111,11 @@ export function DatePicker({
   );
 
   return (
-    <div className="space-y-3" id={id} tabIndex={-1}>
+    <div ref={box} className="space-y-3" id={id} tabIndex={-1}>
       <div className="flex gap-2" aria-label="고른 날짜">
-        {chip("y", value.y ? `${value.y}년` : "연도", !!value.y)}
-        {chip("m", value.m ? `${value.m}월` : "월", !!value.m)}
-        {withDay && chip("d", value.d ? `${value.d}일` : "일", !!value.d)}
+        {chip("y", "연도", value.y ? `${value.y}년` : "연도", !!value.y)}
+        {chip("m", "월", value.m ? `${value.m}월` : "월", !!value.m)}
+        {withDay && chip("d", "일", value.d ? `${value.d}일` : "일", !!value.d)}
       </div>
 
       {part === "decade" && (
@@ -111,10 +126,13 @@ export function DatePicker({
               <button
                 key={dec}
                 type="button"
+                data-cell
+                aria-pressed={decade === dec}
                 className={`${cell} ${decade === dec ? active : idle}`}
                 onClick={() => {
                   setDecade(dec);
                   setOpen("y");
+                  setMoved((n) => n + 1);
                 }}
               >
                 {dec}년대
@@ -134,7 +152,7 @@ export function DatePicker({
           }
         >
           {range(decade, decade + 9).map((y) => (
-            <button key={y} type="button" disabled={y < min.y || y > max.y} className={`${cell} ${value.y === y ? active : idle}`} onClick={() => set({ ...value, y })}>
+            <button key={y} type="button" data-cell aria-pressed={value.y === y} disabled={y < min.y || y > max.y} className={`${cell} ${value.y === y ? active : idle}`} onClick={() => set({ ...value, y })}>
               {y}
             </button>
           ))}
@@ -146,6 +164,8 @@ export function DatePicker({
             <button
               key={m}
               type="button"
+              data-cell
+              aria-pressed={value.m === m}
               disabled={!value.y || m > maxMonth || m < minMonth}
               className={`${cell} ${value.m === m ? active : idle}`}
               onClick={() => set({ ...value, m })}
@@ -158,7 +178,7 @@ export function DatePicker({
       {part === "d" && (
         <Grid label={`${value.m}월 며칠이었나요?`} cols="grid-cols-7">
           {range(1, maxDay).map((d) => (
-            <button key={d} type="button" className={`${cell} ${value.d === d ? active : idle}`} onClick={() => set({ ...value, d })}>
+            <button key={d} type="button" data-cell aria-pressed={value.d === d} className={`${cell} ${value.d === d ? active : idle}`} onClick={() => set({ ...value, d })}>
               {d}
             </button>
           ))}
@@ -176,7 +196,7 @@ export function DatePicker({
           maxLength={12}
           aria-invalid={!!error || undefined}
           aria-describedby={error ? errorId : undefined}
-          className="min-h-11 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 text-[15px] tabular-nums outline-none placeholder:text-stone-400 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/25 aria-invalid:border-rose-600 dark:border-stone-700 dark:bg-stone-900"
+          className="min-h-11 w-full min-w-0 rounded-lg border border-field bg-white px-3 text-[15px] tabular-nums outline-none placeholder:text-stone-500 dark:placeholder:text-stone-400 focus:border-indigo-500 focus:ring-3 focus:ring-indigo-500/25 aria-invalid:border-rose-600 dark:bg-stone-900"
         />
       </label>
       {error && <FieldError id={errorId}>{error}</FieldError>}

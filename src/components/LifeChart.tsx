@@ -80,13 +80,13 @@ export function LifeChart({ life }: { life: LifeState }) {
           {[yMin, Math.round((yMin + 100) / 2), 100].map((v) => (
             <g key={v}>
               <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="var(--chart-grid)" />
-              <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="currentColor" opacity="0.55">
+              <text x={PAD.left - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="currentColor" opacity="0.7">
                 {v}
               </text>
             </g>
           ))}
           {ticks.map((t) => (
-            <text key={t} x={x(t)} y={H - 10} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.55">
+            <text key={t} x={x(t)} y={H - 10} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.7">
               {t}세
             </text>
           ))}

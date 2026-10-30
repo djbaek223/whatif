@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
 import { sceneOf, type SceneState } from "@/lib/scene";
@@ -56,6 +56,7 @@ export function PlayView({
   const fx = usePlayFx(life);
   const [sound, setSoundOn] = useState(loadSoundPref);
   const [news, setNews] = useState(loadNewsPref);
+  const [keys, setKeys] = useState(loadKeysPref);
   const pendingKey = pendingKeyOf(life);
   // Each new choice card rises in with a whoosh.
   useEffect(() => {
@@ -110,10 +111,12 @@ export function PlayView({
   const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
     const t = e.target as HTMLElement | null;
-    if (t?.closest("input, textarea, select, [contenteditable=true]")) return;
+    if (t?.closest("input, textarea, select, [contenteditable=true], [role=menu]")) return;
     // A focused button already answers Space and Enter itself.
     if ((e.key === " " || e.key === "Enter") && t?.closest("button, a")) return;
     if (e.key === "Escape" && showIntro) return setIntroSeen(pendingKey);
+    // Single keys can be turned off in the ⋯ menu, for voice control and anyone who presses them by accident.
+    if (!keys) return;
     if (choosing) {
       const n = Number(e.key);
       if (n >= 1 && n <= pending.options.length && !busy && !sceneLoading) {
@@ -136,12 +139,24 @@ export function PlayView({
     return () => window.removeEventListener("keydown", h);
   }, []);
 
+  // Choosing, answering, folding the sheet and toggling auto play each take the focused control off the page.
+  // When that leaves focus nowhere, hand it to what took its place, so keyboard and screen reader users keep their spot.
+  useEffect(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body) return;
+    const target = choosing ? (collapsed ? "pill" : "choice") : presentOpen ? "present" : "controls";
+    root.current?.querySelector<HTMLElement>(`[data-focus="${target}"]:not(:disabled)`)?.focus({ preventScroll: true });
+  }, [choosing, collapsed, pendingKey, presentOpen, auto, life.dead]);
+
+  // During auto play every turn would be read aloud several times a second, so only the year and rare moments are.
+  const announce = choosing ? `선택의 순간: ${pending.title}` : auto && !life.dead && !latest?.rare ? `${Math.floor(life.mi / 12)}년` : latest?.text;
+
   const pay = payLabel(life);
 
   return (
     <div ref={root} className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-10">
       <aside className="contents lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:flex lg:max-h-dvh lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overscroll-contain lg:-mx-2 lg:px-2 lg:py-6">
-        <header className="sticky top-0 z-10 order-1 -mx-4 border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-3 backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+        <header className="sticky top-0 z-10 order-1 -mx-4 border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-3 backdrop-blur dark:border-stone-800 lg:relative lg:z-20 lg:order-none lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold">
@@ -169,6 +184,11 @@ export function PlayView({
                   saveNewsPref(m);
                   setNews(m);
                 }}
+                keys={keys}
+                onKeys={() => {
+                  saveKeysPref(!keys);
+                  setKeys(!keys);
+                }}
                 onQuit={handlers.onQuit}
               />
             </div>
@@ -190,6 +210,7 @@ export function PlayView({
               <div className="sticky bottom-0 z-10 order-3 -mx-4 px-4 pt-2 pb-5 lg:hidden">
                 <button
                   type="button"
+                  data-focus="pill"
                   onClick={() => setCollapsedKey(null)}
                   {...pillDrag}
                   aria-expanded={false}
@@ -227,6 +248,7 @@ export function PlayView({
                 skipped={skipped}
                 ai={ai}
                 auto={auto}
+                keys={keys}
                 busy={busy}
                 sceneLoading={sceneLoading}
                 onChoose={act.choose}
@@ -252,6 +274,7 @@ export function PlayView({
                 speed={speed}
                 canAdvance={canAdvance}
                 presentOpen={presentOpen}
+                keys={keys}
                 handlers={handlers}
                 onStep={act.step}
                 onSkip={act.skip}
@@ -264,7 +287,7 @@ export function PlayView({
       <div className="order-2 flex-1 py-4 lg:col-start-1 lg:row-start-1 lg:min-h-dvh lg:py-8">
         <Feed feed={feed} news={news} />
         <p aria-live="polite" className="sr-only">
-          {choosing ? `선택의 순간: ${pending.title}` : latest?.text}
+          {announce}
         </p>
         {presentOpen && <PresentCard life={life} onClose={handlers.onClosePresent} />}
         {!following && (
@@ -300,6 +323,7 @@ function ControlBar({
   speed,
   canAdvance,
   presentOpen,
+  keys,
   handlers,
   onStep,
   onSkip,
@@ -310,6 +334,7 @@ function ControlBar({
   speed: Speed;
   canAdvance: boolean;
   presentOpen: boolean;
+  keys: boolean;
   handlers: PlayHandlers;
   onStep: () => void;
   onSkip: () => void;
@@ -317,7 +342,7 @@ function ControlBar({
   if (auto)
     return (
       <div className="space-y-2">
-        <Button className="flex w-full items-center justify-center gap-2" onClick={handlers.onToggleAuto} aria-keyshortcuts="A">
+        <Button data-focus="controls" className="flex w-full items-center justify-center gap-2" onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined}>
           <PauseIcon />
           멈추기
         </Button>
@@ -344,25 +369,25 @@ function ControlBar({
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
-        <Button className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap" disabled={!canAdvance} onClick={onStep} aria-keyshortcuts="Space">
+        <Button className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap" disabled={!canAdvance} onClick={onStep} aria-keyshortcuts={keys ? "Space" : undefined} data-focus="controls">
           {turnName(months)}
           <span aria-hidden>→</span>
         </Button>
         {/* The icons give way on the narrowest phones so all three fit on one row. */}
-        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={!canAdvance} onClick={onSkip} aria-keyshortcuts="Enter">
+        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={!canAdvance} onClick={onSkip} aria-keyshortcuts={keys ? "Enter" : undefined}>
           <span className="flex max-[359px]:hidden">
             <SkipIcon />
           </span>
           선택까지
         </Button>
-        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={presentOpen} onClick={handlers.onToggleAuto} aria-keyshortcuts="A" aria-label="자동 재생">
+        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={presentOpen} onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined} aria-label="자동 재생" data-focus="controls">
           <span className="flex max-[359px]:hidden">
             <PlayIcon />
           </span>
           자동
         </Button>
       </div>
-      <p className="hidden text-xs text-stone-500 lg:block dark:text-stone-400">
+      <p className={`hidden text-xs text-stone-500 dark:text-stone-400 ${keys ? "lg:block" : ""}`}>
         <Kbd>Space</Kbd> {turnName(months)} · <Kbd>Enter</Kbd> 선택까지 · <Kbd>A</Kbd> 자동 · <Kbd>1</Kbd>~<Kbd>4</Kbd> 선택
       </p>
     </div>
@@ -376,6 +401,7 @@ function ChoicePanel({
   skipped,
   ai,
   auto,
+  keys,
   busy,
   sceneLoading,
   onChoose,
@@ -389,6 +415,7 @@ function ChoicePanel({
   skipped: number;
   ai: boolean;
   auto: boolean;
+  keys: boolean;
   busy: boolean;
   sceneLoading: boolean;
   onChoose: (id: string) => void;
@@ -432,7 +459,9 @@ function ChoicePanel({
           </div>
         </div>
         {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{spanName(skipped)}을 건너뛰었어요.</p>}
-        <h2 className="mt-1 text-lg font-bold text-balance">{pending.title}</h2>
+        <h2 tabIndex={-1} data-focus="choice" className="mt-1 text-lg font-bold text-balance outline-none">
+          {pending.title}
+        </h2>
         {sceneLoading ? (
           <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
             <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
@@ -457,8 +486,12 @@ function ChoicePanel({
       </div>
       <div className="space-y-2">
         {pending.options.map((o, i) => (
-          <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => onChoose(o.id)} aria-keyshortcuts={i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
-            <Kbd className="mt-0.5 hidden lg:inline-flex">{i + 1}</Kbd>
+          <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => onChoose(o.id)} aria-keyshortcuts={keys && i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
+            {keys && (
+              <Kbd className="mt-0.5 hidden lg:inline-flex" hidden>
+                {i + 1}
+              </Kbd>
+            )}
             <span className="min-w-0">
               {o.label}
               {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
@@ -534,33 +567,54 @@ function PlayMenu({
   onSound,
   news,
   onNews,
+  keys,
+  onKeys,
   onQuit,
 }: {
   sound: boolean;
   onSound: () => void;
   news: NewsMode;
   onNews: (m: NewsMode) => void;
+  keys: boolean;
+  onKeys: () => void;
   onQuit: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const close = () => {
+    setOpen(false);
+    trigger.current?.focus();
+  };
+  // Opening moves focus to the first item; a press outside closes it.
   useEffect(() => {
     if (!open) return;
+    menu.current?.querySelector<HTMLElement>("[role^=menuitem]")?.focus();
     const away = (e: PointerEvent) => {
       if (!box.current?.contains(e.target as Node)) setOpen(false);
     };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", esc);
-    };
+    return () => document.removeEventListener("pointerdown", away);
   }, [open]);
+  // Arrow keys, Home and End move between items; Escape closes and returns to ⋯; Tab leaves and closes.
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    const items = [...(menu.current?.querySelectorAll<HTMLElement>("[role^=menuitem]") ?? [])];
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: items.length - 1 }[e.key];
+    if (to !== undefined) {
+      e.preventDefault();
+      items[(to + items.length) % items.length]?.focus();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    } else if (e.key === "Tab") setOpen(false);
+  };
   const item = "flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline-none dark:hover:bg-stone-800 dark:focus-visible:bg-stone-800";
   return (
     <div ref={box} className="relative">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
@@ -575,7 +629,7 @@ function PlayMenu({
         </svg>
       </button>
       {open && (
-        <div role="menu" className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
+        <div ref={menu} role="menu" aria-label="메뉴" onKeyDown={onMenuKey} className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
           <button
             type="button"
             role="menuitemcheckbox"
@@ -583,7 +637,7 @@ function PlayMenu({
             className={item}
             onClick={() => {
               onSound();
-              setOpen(false);
+              close();
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -603,7 +657,7 @@ function PlayMenu({
                 className={`${item} py-2.5`}
                 onClick={() => {
                   onNews(m.value);
-                  setOpen(false);
+                  close();
                 }}
               >
                 <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${news === m.value ? "" : "invisible"}`}>
@@ -613,6 +667,21 @@ function PlayMenu({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={keys}
+            className={`${item} border-b border-stone-100 dark:border-stone-800`}
+            onClick={() => {
+              onKeys();
+              close();
+            }}
+          >
+            <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${keys ? "" : "invisible"}`}>
+              ✓
+            </span>
+            키보드 단축키
+          </button>
           <button type="button" role="menuitem" className={item} onClick={onQuit}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
@@ -638,9 +707,10 @@ function JumpButton({ onClick, className = "" }: { onClick: () => void; classNam
 }
 
 // Pass a display class (inline-flex, or hidden lg:inline-flex) in className, so it can't fight a built-in one.
-function Kbd({ children, className = "inline-flex" }: { children: ReactNode; className?: string }) {
+function Kbd({ children, className = "inline-flex", hidden = false }: { children: ReactNode; className?: string; hidden?: boolean }) {
   return (
     <kbd
+      aria-hidden={hidden || undefined}
       className={`min-w-5 items-center justify-center rounded border border-stone-300 bg-stone-50 px-1 font-sans text-[11px] leading-4 font-semibold text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${className}`}
     >
       {children}
@@ -922,6 +992,24 @@ function saveNewsPref(m: NewsMode) {
   }
 }
 
+const KEYS_KEY = "whatif.shortcuts";
+
+function loadKeysPref(): boolean {
+  try {
+    return localStorage.getItem(KEYS_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function saveKeysPref(on: boolean) {
+  try {
+    localStorage.setItem(KEYS_KEY, on ? "on" : "off");
+  } catch {
+    // Private mode or blocked storage: the choice lasts for this visit only.
+  }
+}
+
 type FeedItem =
   | { type: "date"; mi: number }
   | { type: "world"; items: LogEntry[] }
@@ -1134,11 +1222,11 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl bg-stone-100 p-4 dark:bg-stone-800">
-          <p className="text-xs text-stone-500 dark:text-stone-400">현실의 나</p>
+          <p className="text-xs text-stone-600 dark:text-stone-400">현실의 나</p>
           <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">{life.profile.currentLife || "현실의 삶을 입력하지 않았어요."}</p>
         </div>
         <div className="rounded-xl bg-indigo-50 p-4 dark:bg-indigo-950">
-          <p className="text-xs text-stone-500 dark:text-stone-400">이 가지의 나 · {ageOf(life)}세</p>
+          <p className="text-xs text-stone-600 dark:text-stone-400">이 가지의 나 · {ageOf(life)}세</p>
           <p className="mt-1 text-[15px] font-semibold">{statusLabel(life)}</p>
           <p className="text-sm text-stone-600 dark:text-stone-400">
             자산 {formatWealth(life.wealth)}
@@ -1149,7 +1237,7 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
           </div>
         </div>
       </div>
-      <Button className="w-full" onClick={onClose}>
+      <Button data-focus="present" className="w-full" onClick={onClose}>
         계속 살아보기
       </Button>
     </Card>
