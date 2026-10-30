@@ -6,6 +6,7 @@ import { MORE_EVENTS } from "./moreEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
 import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
+import { US_CORE_EVENTS, US_MORE_EVENTS } from "../regions/us/events";
 import { L } from "./i18n";
 import { region, type Region } from "./region";
 
@@ -1024,7 +1025,11 @@ export const CORE_EVENTS: EventDef[] = [
   },
 ];
 
-export const EVENTS: EventDef[] = [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS];
+// Events that make sense only in a Korean life: the 수능 and army calendar, Korean history, Korean promotion exams.
+const KR_ONLY = new Set(["csat", "military", "d-promo-exam", "drivers-license"]);
+for (const e of [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS]) if (KR_ONLY.has(e.id) || e.id.startsWith("era-")) e.region = "kr";
+
+export const EVENTS: EventDef[] = [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
 
 const POOLS: Partial<Record<Region, EventDef[]>> = {};
 

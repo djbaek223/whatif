@@ -6,6 +6,7 @@ import type { LifeState, Profile, TurningPoint } from "../types";
 import type { EndingResult, OpeningResult } from "./schema";
 import { josa } from "../onboarding";
 import { alternativePaths } from "./turningChoices";
+import { inRegion, isUS } from "../region";
 
 function mbtiStats(mbti: string) {
   const m = mbti.toUpperCase();
@@ -26,6 +27,20 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
   const actual = tp.actualChoice || "익숙한 길";
   const student = age < 20;
   const alternatives = alternativePaths(profile, tp);
+  if (isUS()) {
+    const who = profile.name || "You";
+    return {
+      persona: `${who} ${profile.mbti ? `is an ${profile.mbti} type. ` : "is hard to sum up in a sentence. "}${profile.personality}`.trim().slice(0, 300),
+      stats: mbtiStats(profile.mbti),
+      era: [`${formatMi(mi)}. ${who === "You" ? "You were" : `${who} was`} ${age}.`, hints.length ? hints.join(" ") : "The world was changing a little at a time, the way it always does."].join("\n\n"),
+      situation: `${tp.situation || "That day, you stood at a fork in the road."} Back then you chose "${tp.actualChoice || "the familiar path"}." What will you do this time?`,
+      initial: heuristicInitial(profile, tp),
+      choices: [
+        { label: tp.actualChoice || "Make the same choice as before", preset: "original", jobTitle: "", place: "", original: true, education: age >= 17 && student && profile.university ? "university" : "same" },
+        ...alternatives,
+      ],
+    };
+  }
   return {
     persona: `${name}${josa(name, "는", "은")} ${profile.mbti ? `${profile.mbti} 성향의 ` : ""}사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`.slice(0, 300),
     stats: mbtiStats(profile.mbti),
@@ -51,6 +66,7 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
 }
 
 export function fallbackEnding(s: LifeState): EndingResult {
+  if (s.region === "us") return inRegion("us", () => usEnding(s));
   const name = s.profile.name || "나";
   const first = s.choices[0];
   const outcomes = s.log
@@ -69,5 +85,27 @@ export function fallbackEnding(s: LifeState): EndingResult {
     comparison: s.profile.currentLife
       ? `현실의 나는 "${s.profile.currentLife.slice(0, 80)}"인 삶을 살고 있다. 이 가지의 나는 ${s.deathAge ?? "?"}세까지 살았고, 마지막 모습은 ${statusLabel(s)}였다.`
       : "현실의 삶 정보를 입력하면 두 삶을 나란히 비교해 볼 수 있다.",
+  };
+}
+
+function usEnding(s: LifeState): EndingResult {
+  const name = s.profile.name || "I";
+  const first = s.choices[0];
+  const outcomes = s.log
+    .filter((l) => l.kind === "outcome")
+    .slice(1, 7)
+    .map((l) => `At ${ageAt(s.profile.birthDate, l.mi)}: ${l.text.split(". ")[0].replace(/\.$/, "")}.`);
+  return {
+    title: `${name === "I" ? "My" : `${name}'s`} other ${s.deathAge ?? "?"} years`,
+    memoir: [
+      `In ${formatMi(turningPointMi(s.turningPoint))}, I chose ${first ? `"${first.picked}"` : "a different road"}.`,
+      outcomes.length ? `${outcomes.join(" ")} Every choice led to another.` : "The life that followed was quieter than I expected.",
+      `At the end I was ${statusLabel(s) || "an ordinary person"}, and I left ${formatWealth(s.wealth)} behind.`,
+      "Looking back, every road had days of laughing and days of crying.",
+    ].join("\n\n"),
+    epitaph: "I walked a different road, and it was my life too.",
+    comparison: s.profile.currentLife
+      ? `In real life I am "${s.profile.currentLife.slice(0, 80)}." On this branch I lived to ${s.deathAge ?? "?"}, and at the end I was ${statusLabel(s)}.`
+      : "Add what your real life looks like to compare the two side by side.",
   };
 }

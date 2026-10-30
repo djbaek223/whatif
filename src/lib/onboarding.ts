@@ -1,4 +1,5 @@
 // Helpers for the profile and turning point questions: school years, sentence templates, suggestions and the MBTI quiz.
+import { isUS } from "./region";
 import type { TurningPoint } from "./types";
 
 const hasFinal = (word: string) => {
@@ -19,6 +20,21 @@ export interface SchoolStage {
 export function schoolYears(birthDate: string, universityYear?: string): { stages: SchoolStage[]; early: boolean } | null {
   const [y, m] = birthDate.split("-").map(Number);
   if (!y || !m) return null;
+  if (isUS()) {
+    // Kindergarten starts in September of the year a child turns five by September 1; K-5, 6-8, 9-12, then college.
+    const day = Number(birthDate.split("-")[2]) || 1;
+    const k = y + (m < 9 || (m === 9 && day <= 1) ? 5 : 6);
+    const uni = Number(universityYear) || k + 13;
+    return {
+      early: false,
+      stages: [
+        { key: "elementary", label: "Elementary school", from: k, to: k + 6 },
+        { key: "middle", label: "Middle school", from: k + 6, to: k + 9 },
+        { key: "high", label: "High school", from: k + 9, to: k + 13 },
+        { key: "university", label: "College", from: uni, to: uni + 4 },
+      ],
+    };
+  }
   // Children born in January or February started a year early until the 2009 school year (빠른년생).
   const early = m <= 2 && y <= 2002;
   const e = y + (early ? 6 : 7);

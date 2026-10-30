@@ -3,6 +3,7 @@
 // for this life, inside the same call that already writes each choice scene.
 // The pool still decides *when* something happens (age, conditions, odds, cooldowns, the 1%/yr cap on rare);
 // the narrator only decides *what*. Whenever it can't, or what it wrote contradicts the life, the pool plays as written.
+import { US_CORE_EVENTS } from "../regions/us/events";
 import { CORE_EVENTS, ageOf, type Effect, type EventDef } from "./events";
 import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
@@ -10,7 +11,7 @@ import { timelineConflict } from "./timeline";
 import { ownsBusiness } from "./work";
 import { L } from "./i18n";
 
-const CORE = new Set(CORE_EVENTS.map((e) => e.id));
+const CORE = new Set([...CORE_EVENTS, ...US_CORE_EVENTS].map((e) => e.id));
 
 // Milestones the engine tracks by date (a child turning 7, a grandchild) and the later steps of pool chains,
 // which only follow a pool event that already happened. These stay as written.

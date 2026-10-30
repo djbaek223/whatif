@@ -1,6 +1,7 @@
 import {
   ABROAD,
-  MORTGAGE_RATE,
+  mortgageRate,
+  titleLadders,
   betterTier,
   DEGREE_RANK,
   degreePay,
@@ -21,14 +22,14 @@ import {
   tuitionFor,
   type CompanyTier,
 } from "./catalog";
-import { ADULT_AGE, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
+import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth } from "./format";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
 import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
-import { inRegion, isUS, type Region } from "./region";
+import { inRegion, isUS, region, type Region } from "./region";
 import { Rng, newSeed } from "./rng";
 import { DEGREE_LABELS } from "./types";
 import type {
@@ -86,6 +87,7 @@ const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, Math.ro
 
 /** Where a young person stands at school by age (만 나이): 초등학교 at 7, 중학교 at 13, 고등학교 at 16. Adults get "". */
 export function lifeStage(age: number): string {
+  if (isUS()) return age < 5 ? "preschooler" : age < 11 ? "elementary schooler" : age < 14 ? "middle schooler" : age < 18 ? "high schooler" : "";
   if (age < 7) return L("미취학 아동");
   if (age < 13) return L("초등학생");
   if (age < 16) return L("중학생");
@@ -95,6 +97,7 @@ export function lifeStage(age: number): string {
 
 /** The school a child or teen attends at this age, from the profile. */
 function schoolAt(profile: Profile, age: number): string {
+  if (isUS()) return age < 5 ? "" : (age < 11 ? profile.elementary : age < 14 ? profile.middle : profile.high).trim();
   if (age < 7) return "";
   return (age < 13 ? profile.elementary : age < 16 ? profile.middle : profile.high).trim();
 }
@@ -102,11 +105,13 @@ function schoolAt(profile: Profile, age: number): string {
 /** University months from the entrance year the player entered: March of that year to February four years on. */
 export function universitySpan(profile: Profile): { from: number; to: number } | null {
   const y = Number(profile.universityYear);
+  if (isUS()) return y && profile.university.trim() ? { from: monthIndex(y, 9), to: monthIndex(y + 4, 5) } : null; // September to May
   return y && profile.university.trim() ? { from: monthIndex(y, 3), to: monthIndex(y + 4, 2) } : null;
 }
 
 /** Old enough to finish school: work full time, go to university, or drop out. A senior counts from exam season (빠른년생). */
 function canLeaveSchool(age: number, mi: number): boolean {
+  if (isUS()) return age >= 18 || (age === 17 && mi % 12 >= 4); // seniors graduate in May or June
   return age >= 18 || (age === 17 && mi % 12 >= 8);
 }
 
@@ -117,11 +122,11 @@ function canLeaveSchool(age: number, mi: number): boolean {
 export function fitInitialToAge(init: OpeningResult["initial"], age: number, mi: number, profile: Profile): OpeningResult["initial"] {
   const out = { ...init };
   if (!canLeaveSchool(age, mi)) {
-    out.education = age < 16 ? "school" : "highschool";
+    out.education = age < (isUS() ? 14 : 16) ? "school" : "highschool";
     out.school = schoolAt(profile, age);
     Object.assign(out, { employed: false, jobTitle: "", company: "", monthlyIncome: 0, children: 0 });
     out.wealth = Math.max(0, Math.min(300, out.wealth));
-    if (age < 16 || out.partner !== "dating") out.partner = "none";
+    if (age < (isUS() ? 14 : 16) || out.partner !== "dating") out.partner = "none";
   } else if (out.education === "graduate" && age < 22) out.education = "university";
   if (age < 20 && out.partner !== "none" && out.partner !== "dating") out.partner = "none";
   return out;
@@ -160,7 +165,8 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
 function uniDates(profile: Profile, mi: number, age: number): { entered?: number; until: number } {
   const given = universitySpan(profile);
   const usual = schoolYears(profile.birthDate)?.stages.find((x) => x.key === "university");
-  const uni = given ?? (usual ? { from: monthIndex(usual.from, 3), to: monthIndex(usual.to, 2) } : null);
+  const [start, end] = isUS() ? [9, 5] : [3, 2];
+  const uni = given ?? (usual ? { from: monthIndex(usual.from, start), to: monthIndex(usual.to, end) } : null);
   if (uni && mi >= uni.from && mi <= uni.to) return { entered: uni.from, until: uni.to };
   // A late or unusual student: about four years from the last March, ending in February.
   return { until: nextMarch(mi + Math.max(12, (23 - age) * 12)) - 1 };
@@ -205,7 +211,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     children: Math.max(0, Math.min(5, init.children)),
     homeOwner: false,
     retired: false,
-    military: profile.gender !== "남" || age > 24,
+    military: region() === "us" || profile.gender !== "남" || age > 24, // no draft in the US (enlisting is a choice)
     busyUntil: mi,
     noKids: false,
     // Children who already exist at the turning point get rough birth months, oldest first.
@@ -416,7 +422,10 @@ const shortTown = (s: LifeState) => (s.profile.hometown || L("서울")).trim().s
 function planHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, plan?: OptionPlan): Required<Pick<OptionPlan, "place" | "tier" | "salary">> {
   const tier = (plan?.tier as CompanyTier | undefined) ?? (spec.tier === "auto" ? autoTier(s, rng) : reachable(s, spec.tier));
   let place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`));
-  if (tier === "civil" && !plan?.place) place = `${shortTown(s)}${place === L("시청") ? "" : " "}${place}`;
+  if (tier === "civil" && !plan?.place)
+    place = isUS()
+      ? place === "City Hall" ? `${s.profile.hometown.split(",")[0].trim() || "the city"} City Hall` : place
+      : `${shortTown(s)}${place === L("시청") ? "" : " "}${place}`;
   return { place, tier, salary: plan?.salary ?? Math.round((salaryFor(rng, tier, yearsWorked(s)) * degreePay(tier, degreeOf(s.flags))) / 50) * 50 };
 }
 
@@ -517,7 +526,7 @@ const LADDERS = () => [
 ];
 
 function doPromote(s: LifeState, out: Applied) {
-  for (const ladder of LADDERS()) {
+  for (const ladder of titleLadders() ?? LADDERS()) {
     const i = ladder.indexOf(s.flags.job);
     if (i >= 0 && i < ladder.length - 1) {
       s.flags.job = ladder[i + 1];
@@ -553,7 +562,7 @@ function doBuyHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>,
   s.flags = { ...s.flags, homeOwner: true, homeArea: p.place, homeValue: p.price, mortgage: p.loan };
   const kind = /빌라/.test(p.place) ? "" : L(" 아파트(84㎡)");
   out.texts.push(
-    L`${p.place}${kind}를 ${won(p.price)}에 샀다. 모은 돈 ${won(down)}${p.loan ? L`에 주택담보대출 ${won(p.loan)}(연 ${(MORTGAGE_RATE * 100).toFixed(1)}%)을 더했다` : L("으로 대출 없이 샀다")}. 취득세·중개수수료·이사비로 ${won(fees)}이 나갔다.`,
+    L`${p.place}${kind}를 ${won(p.price)}에 샀다. 모은 돈 ${won(down)}${p.loan ? L`에 주택담보대출 ${won(p.loan)}(연 ${(mortgageRate() * 100).toFixed(1)}%)을 더했다` : L("으로 대출 없이 샀다")}. 취득세·중개수수료·이사비로 ${won(fees)}이 나갔다.`,
   );
 }
 
@@ -576,7 +585,8 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.wealthPct && s.wealth > 0) s.wealth += Math.round(s.wealth * effect.wealthPct);
   const spent = s.wealth - wealthBefore;
   if (effect.note && spent) out.texts.push(spent < 0 ? L`${effect.note}에 ${won(-spent)}이 들었다.` : L`${effect.note}로 ${won(spent)}이 들어왔다.`);
-  if (effect.income !== undefined) s.income = Math.round(effect.income);
+  // A retirement income in an American life is Social Security plus a 401(k), about 1.45 times a Korean pension.
+  if (effect.income !== undefined) s.income = Math.round(effect.income * (isUS() && s.flags.retired ? 1.45 : 1));
   if (effect.incomePct) s.income = Math.round(s.income * effect.incomePct);
   if (effect.flags) {
     const hadPet = s.flags.pet;
@@ -963,7 +973,7 @@ function changeEffect(c: CustomChange, o?: Pick<CustomOption, "title" | "place">
     case "startBusiness":
       return { startBusiness: { title: o?.title?.trim() || businessTitle(`${o?.place ?? ""}`), name: o?.place?.trim() || undefined }, intense: 6 };
     case "retire":
-      return { flags: { employed: false, retired: true, job: L("은퇴") }, income: 130 };
+      return { flags: { employed: false, retired: true, job: L("은퇴") }, income: isUS() ? 190 : 130 };
     case "enrollUniversity":
       return { flags: { education: "university", employed: false, job: "" }, income: 0, eduYears: 4, enroll: { level: "university", pick: "fit" } };
     case "enrollGraduate":
@@ -1154,7 +1164,8 @@ export function turnLength(s: LifeState): number {
 
 /** Approximate Korean annual mortality (Gompertz fit), scaled by the health stat. */
 export function annualDeathRate(age: number, health: number): number {
-  const base = 0.000018 * Math.exp(0.095 * age);
+  // Americans live about four years less than Koreans on average (CDC/SSA vs KOSTAT life tables).
+  const base = 0.000018 * Math.exp(0.095 * age) * (isUS() ? 1.45 : 1);
   const healthFactor = Math.exp((60 - health) / 30);
   return Math.min(0.9, base * healthFactor);
 }
@@ -1182,7 +1193,7 @@ function drift(s: LifeState, months: number) {
 
   // Money: adults earn and pay fixed monthly costs (budget.ts): rent or upkeep, living, children, tuition.
   // Money is in today's won (real terms), so prices stay flat and raises are real raises.
-  if (age >= ADULT_AGE) {
+  if (age >= adultAge()) {
     s.wealth += Math.round((s.income - costTotal(monthlyCosts(s))) * months);
     // Repaying principal moves cash into the home, so net worth doesn't change; only the loan shrinks.
     if (f.mortgage) f.mortgage = Math.max(0, Math.round(f.mortgage - Math.max(30, f.mortgage / 240) * months));
@@ -1470,7 +1481,7 @@ function advanceUntilStopHere(state: LifeState, maxTurns = 400): { state: LifeSt
 }
 
 // Life forks from the main event list: where to study, work, live, whom to marry, whether to have a child.
-const BIG_EVENTS = new Set(["csat", "military", "graduation", "grad-done", "job-search", "job-offer", "startup-itch", "layoff", "retirement", "marriage", "baby", "marriage-crisis", "house"]);
+const BIG_EVENTS = new Set(["college-apps", "draft-lottery", "csat", "military", "graduation", "grad-done", "job-search", "job-offer", "startup-itch", "layoff", "retirement", "marriage", "baby", "marriage-crisis", "house"]);
 
 /** A choice big enough that auto-decide stops and asks, and that gets a moment of its own on screen. */
 export function isBigChoice(p: PendingChoice): boolean {
