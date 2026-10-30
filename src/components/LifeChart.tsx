@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { STAT_LABELS, type LifeState, type StatKey } from "@/lib/types";
 import { STAT_COLORS } from "./ui";
+import { L } from "@/lib/i18n";
+import { isUS } from "@/lib/region";
+import { ageText } from "@/lib/format";
 
 const KEYS = Object.keys(STAT_LABELS) as StatKey[];
 const H = 240;
@@ -63,7 +66,7 @@ export function LifeChart({ life }: { life: LifeState }) {
         ))}
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rotate-45 bg-stone-500" />
-          내가 한 선택
+          {L("내가 한 선택")}
         </span>
       </div>
       <div ref={box} className="relative">
@@ -73,7 +76,7 @@ export function LifeChart({ life }: { life: LifeState }) {
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none select-none"
           role="img"
-          aria-label="나이에 따른 건강, 행복, 지식, 관계의 변화"
+          aria-label={L("나이에 따른 건강, 행복, 지식, 관계의 변화")}
           onPointerMove={onMove}
           onPointerLeave={() => setHover(null)}
         >
@@ -87,7 +90,7 @@ export function LifeChart({ life }: { life: LifeState }) {
           ))}
           {ticks.map((t) => (
             <text key={t} x={x(t)} y={H - 10} textAnchor="middle" fontSize="11" fill="currentColor" opacity="0.7">
-              {t}세
+              {ageText(t)}
             </text>
           ))}
           {[...choicesByAge.keys()].map((age) => (
@@ -124,7 +127,7 @@ export function LifeChart({ life }: { life: LifeState }) {
             style={x(hp.age) > W / 2 ? { right: `${((W - x(hp.age)) / W) * 100 + 2}%` } : { left: `${(x(hp.age) / W) * 100 + 2}%` }}
           >
             <p className="font-semibold">
-              {hp.age}세 · {hp.year}년
+              {ageText(hp.age)} · {hp.year}{isUS() ? "" : "년"}
             </p>
             {KEYS.map((k) => (
               <p key={k} className="mt-0.5 flex items-center justify-between">
@@ -144,11 +147,11 @@ export function LifeChart({ life }: { life: LifeState }) {
         )}
       </div>
       <details className="mt-3 text-xs">
-        <summary className="cursor-pointer text-stone-500 dark:text-stone-400">표로 보기</summary>
+        <summary className="cursor-pointer text-stone-500 dark:text-stone-400">{L("표로 보기")}</summary>
         <table className="mt-2 w-full tabular-nums">
           <thead>
             <tr className="text-left text-stone-500 dark:text-stone-400">
-              <th className="py-1 font-medium">나이</th>
+              <th className="py-1 font-medium">{L("나이")}</th>
               {KEYS.map((k) => (
                 <th key={k} className="py-1 text-right font-medium">
                   {STAT_LABELS[k]}
@@ -161,7 +164,7 @@ export function LifeChart({ life }: { life: LifeState }) {
               .filter((p, i) => p.age % 5 === 0 || i === points.length - 1)
               .map((p) => (
                 <tr key={p.year} className="border-t border-stone-200 dark:border-stone-800">
-                  <td className="py-1">{p.age}세</td>
+                  <td className="py-1">{ageText(p.age)}</td>
                   {KEYS.map((k) => (
                     <td key={k} className="py-1 text-right">
                       {p.stats[k]}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Region } from "../region";
 
 const PRESETS = ["original", "study", "career", "risk", "love", "move", "family", "health", "rest"] as const;
 
@@ -141,7 +142,9 @@ export interface MomentSlot {
   rare: boolean; // the engine rolled a rare moment (1% a year or less)
 }
 
-export type NarrateRequest =
+export type NarrateRequest = NarrateBody & { region?: Region }; // the life's country; missing means Korea
+
+type NarrateBody =
   | { kind: "opening"; profile: unknown; turningPoint: unknown; eraHints: string[]; age: number; hints?: { kind: string; roadNotTaken: string | null; examples: string[] } }
   | {
       kind: "scene";

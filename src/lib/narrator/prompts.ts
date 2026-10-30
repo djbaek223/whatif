@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { lifeStage } from "../engine";
+import { isUS } from "../region";
+import { englishSchema, US_SYSTEM, usPromptFor } from "../../regions/us/prompts";
 import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, SlotMomentSchema, withEpisodes, type NarrateRequest } from "./schema";
 
 export const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이터의 내레이터입니다.
@@ -34,10 +36,16 @@ const EPISODE_RULES = [
 ].join("\n");
 
 /** The system message: the narrator's rules and the reply's JSON schema. */
-export const systemFor = (schema: z.ZodType) => `${SYSTEM}\n\nJSON 스키마:\n${JSON.stringify(z.toJSONSchema(schema))}`;
+export const systemFor = (schema: z.ZodType) =>
+  isUS() ? `${US_SYSTEM}\n\nJSON schema:\n${JSON.stringify(englishSchema(z.toJSONSchema(schema)))}` : `${SYSTEM}\n\nJSON 스키마:\n${JSON.stringify(z.toJSONSchema(schema))}`;
 
 /** The reply schema and user prompt for a narration request. Pure, so scripts can count its tokens. */
 export function promptFor(req: NarrateRequest): { schema: z.ZodType; prompt: string } {
+  const { schema, prompt } = koreanPromptFor(req);
+  return isUS() ? { schema, prompt: usPromptFor(req) } : { schema, prompt };
+}
+
+function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: string } {
   switch (req.kind) {
     case "opening":
       return {

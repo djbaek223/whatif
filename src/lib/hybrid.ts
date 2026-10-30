@@ -3,13 +3,15 @@
 // for this life, inside the same call that already writes each choice scene.
 // The pool still decides *when* something happens (age, conditions, odds, cooldowns, the 1%/yr cap on rare);
 // the narrator only decides *what*. Whenever it can't, or what it wrote contradicts the life, the pool plays as written.
+import { US_CORE_EVENTS } from "../regions/us/events";
 import { CORE_EVENTS, ageOf, type Effect, type EventDef } from "./events";
 import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
 import { timelineConflict } from "./timeline";
 import { ownsBusiness } from "./work";
+import { L } from "./i18n";
 
-const CORE = new Set(CORE_EVENTS.map((e) => e.id));
+const CORE = new Set([...CORE_EVENTS, ...US_CORE_EVENTS].map((e) => e.id));
 
 // Milestones the engine tracks by date (a child turning 7, a grandchild) and the later steps of pool chains,
 // which only follow a pool event that already happened. These stay as written.
@@ -39,14 +41,14 @@ export const hybridOn = (s: LifeState) => !!s.ai && s.hybrid !== false;
 
 // ── Contradictions ─────────────────────────────────────
 
-const OFFICE = /출근|퇴근|상사|팀장님|부장님|과장님|회식|승진|연봉|야근|사내|입사 동기|회사 일|회사에서/;
-const BOSSED = /상사|팀장님|부장님|과장님|회식|승진|연봉|사내|입사 동기/;
-const SHOP = /우리 가게|내 가게|가게 매출|매출이|단골손님/;
-const SPOUSE = /남편|아내|배우자|시댁|처가|시어머니|시아버지|장모|장인어른|결혼기념일|신혼/;
-const LOVER = /(?<!옛 |전 |전\s?)(연인|여자\s?친구|남자\s?친구|애인)/;
-const KIDS = /우리 아이|아이들|아들|딸아이|딸이|딸과|딸의|딸에게|자녀|육아|첫째|둘째/;
-const OWN_HOME = /우리 집 시세|집값이 (올|뛰|떨|내)|주택담보|내 집의/;
-const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급/;
+const OFFICE = /출근|퇴근|상사|팀장님|부장님|과장님|회식|승진|연봉|야근|사내|입사 동기|회사 일|회사에서|\b(commute|my boss|your boss|the boss|manager|promotion|salary|overtime|coworkers?|office party|at the office|at work)\b/i;
+const BOSSED = /상사|팀장님|부장님|과장님|회식|승진|연봉|사내|입사 동기|\b(my boss|your boss|the boss|manager|promotion|salary|coworkers?|office party)\b/i;
+const SHOP = /우리 가게|내 가게|가게 매출|매출이|단골손님|\b(my shop|your shop|my store|your store|sales were|regulars)\b/i;
+const SPOUSE = /남편|아내|배우자|시댁|처가|시어머니|시아버지|장모|장인어른|결혼기념일|신혼|\b(husband|wife|spouse|in-laws|mother-in-law|father-in-law|anniversary|newlyweds?)\b/i;
+const LOVER = /(?<!옛 |전 |전\s?)(연인|여자\s?친구|남자\s?친구|애인)|(?<!\b(ex|old|former)[- ])\b(girlfriend|boyfriend)\b/i;
+const KIDS = /우리 아이|아이들|아들|딸아이|딸이|딸과|딸의|딸에게|자녀|육아|첫째|둘째|\b(your kids?|the kids|my kids?|your son|your daughter|my son|my daughter|children|parenting|toddler)\b/i;
+const OWN_HOME = /우리 집 시세|집값이 (올|뛰|떨|내)|주택담보|내 집의|\b(your house is worth|home value|mortgage payment|your mortgage)\b/i;
+const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급|\b(drinks|beer|wine|bar|married|driving|commute|paycheck)\b/i;
 
 /**
  * What in the text can't be true of this life right now, or null when nothing is off.
@@ -54,13 +56,13 @@ const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급/;
  */
 export function conflictIn(text: string, s: LifeState): string | null {
   const f = s.flags;
-  if (!f.employed || f.retired ? OFFICE.test(text) : ownsBusiness(f) && BOSSED.test(text)) return "회사";
-  if (!ownsBusiness(f) && SHOP.test(text)) return "가게";
-  if (f.partner !== "married" && SPOUSE.test(text)) return "배우자";
-  if (f.partner !== "dating" && f.partner !== "married" && LOVER.test(text)) return "연인";
-  if (f.children === 0 && KIDS.test(text)) return "자녀";
-  if (!f.homeOwner && OWN_HOME.test(text)) return "자가";
-  if (ageOf(s) < 19 && ADULT.test(text)) return "나이";
+  if (!f.employed || f.retired ? OFFICE.test(text) : ownsBusiness(f) && BOSSED.test(text)) return L("회사");
+  if (!ownsBusiness(f) && SHOP.test(text)) return L("가게");
+  if (f.partner !== "married" && SPOUSE.test(text)) return L("배우자");
+  if (f.partner !== "dating" && f.partner !== "married" && LOVER.test(text)) return L("연인");
+  if (f.children === 0 && KIDS.test(text)) return L("자녀");
+  if (!f.homeOwner && OWN_HOME.test(text)) return L("자가");
+  if (ageOf(s) < 19 && ADULT.test(text)) return L("나이");
   return timelineConflict(text, s);
 }
 

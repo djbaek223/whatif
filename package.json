@@ -14,7 +14,10 @@
     "check:hybrid": "tsx scripts/check-hybrid.ts",
     "check:timeline": "tsx scripts/check-timeline.ts",
     "check:budget": "tsx scripts/check-budget.ts",
-    "check:freetext": "tsx scripts/check-freetext.ts"
+    "check:freetext": "tsx scripts/check-freetext.ts",
+    "check:same": "tsx scripts/check-same.ts",
+    "check:i18n": "tsx scripts/check-i18n.ts",
+    "simulate:us": "tsx scripts/simulate-us.ts"
   },
   "dependencies": {
     "next": "16.4.2",

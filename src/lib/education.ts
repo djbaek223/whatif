@@ -2,6 +2,7 @@
 // has passed, so dropping out earns nothing. Employers ask for a degree (catalog.ts TIER_NEEDS), and the narrator is told.
 import { DEGREE_RANK, TIER_LABEL, canWorkAt, isMedical, type CompanyTier } from "./catalog";
 import { DEGREE_LABELS, type Degree, type LifeFlags, type LifeState } from "./types";
+import { L } from "./i18n";
 
 const COLLEGE = /전문대/;
 const GRAD = /대학원|박사|석사/;
@@ -60,13 +61,13 @@ export function creditHighSchool(f: LifeFlags) {
 
 export const degreeLabel = (f: LifeFlags) => DEGREE_LABELS[degreeOf(f)];
 
-const SHORT: Record<Degree, string> = { none: "중졸", high: "고졸", college: "전문대", bachelor: "대졸", master: "석사", phd: "박사" };
+const SHORT: Record<Degree, string> = { get none() { return L("중졸"); }, get high() { return L("고졸"); }, get college() { return L("전문대"); }, get bachelor() { return L("대졸"); }, get master() { return L("석사"); }, get phd() { return L("박사"); } };
 
 /** The degree beside the 교육 gauge, once school is behind (or under way past high school). Nothing for a child. */
 export function degreeTag(s: LifeState): string | undefined {
   const f = s.flags;
   if (f.education === "school" || (f.education === "highschool" && f.retaking === undefined)) return undefined;
-  if ((f.education === "university" || f.education === "graduate") && s.mi < f.eduUntil) return `${SHORT[f.program ?? (f.education === "graduate" ? "master" : "bachelor")]} 과정`;
+  if ((f.education === "university" || f.education === "graduate") && s.mi < f.eduUntil) return L`${SHORT[f.program ?? (f.education === "graduate" ? "master" : "bachelor")]} 과정`;
   return SHORT[degreeOf(f)];
 }
 
@@ -78,6 +79,6 @@ export function degreeFacts(s: LifeState): string {
   const major = s.profile.major;
   const open = OPEN_ORDER.filter((t) => canWorkAt(t, d, major)).map((t) => TIER_LABEL[t]);
   const closed = OPEN_ORDER.filter((t) => !canWorkAt(t, d, major) && (t !== "doctor" || isMedical(major))).map((t) => TIER_LABEL[t]);
-  const course = s.flags.program && (s.flags.education === "university" || s.flags.education === "graduate") && s.mi < s.flags.eduUntil ? `, ${DEGREE_LABELS[s.flags.program]} 과정 중` : "";
-  return `${DEGREE_LABELS[d]}${course}. 지원 가능: ${open.join("·") || "없음"}${closed.length ? `. 학력이 모자라 지원 불가: ${closed.join("·")}` : ""}`;
+  const course = s.flags.program && (s.flags.education === "university" || s.flags.education === "graduate") && s.mi < s.flags.eduUntil ? L`, ${DEGREE_LABELS[s.flags.program]} 과정 중` : "";
+  return L`${DEGREE_LABELS[d]}${course}. 지원 가능: ${open.join("·") || L("없음")}${closed.length ? L`. 학력이 모자라 지원 불가: ${closed.join("·")}` : ""}`;
 }

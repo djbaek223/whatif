@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { formatWealth } from "@/lib/format";
 import { STAT_LABELS, type StatKey, type Stats } from "@/lib/types";
+import { L } from "@/lib/i18n";
 
 // Matches the Figma components (Button/Primary, Button/Disabled, Button/Ghost, Choice): a disabled primary button turns flat grey instead of fading.
 export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" }) {
@@ -96,9 +97,9 @@ export function Field({
 
 function Badge({ required }: { required: boolean }) {
   return required ? (
-    <span className="rounded bg-indigo-50 px-1.5 py-px text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">필수</span>
+    <span className="rounded bg-indigo-50 px-1.5 py-px text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{L("필수")}</span>
   ) : (
-    <span className="rounded bg-stone-200 px-1.5 py-px text-[11px] font-medium text-stone-600 dark:bg-stone-800 dark:text-stone-300">선택</span>
+    <span className="rounded bg-stone-200 px-1.5 py-px text-[11px] font-medium text-stone-600 dark:bg-stone-800 dark:text-stone-300">{L("선택")}</span>
   );
 }
 
@@ -208,7 +209,7 @@ export function DeltaChips({ delta, money }: { delta?: Partial<Stats>; money?: n
             money > 0 ? "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
           }`}
         >
-          자산 {money > 0 ? "+" : "-"}
+          {L("자산")} {money > 0 ? "+" : "-"}
           {formatWealth(Math.abs(money))}
         </span>
       )}

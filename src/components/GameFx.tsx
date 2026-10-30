@@ -4,6 +4,8 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { BADGES, badgeById } from "@/lib/badges";
 import { sfx } from "@/lib/sound";
 import type { LifeState, LogEntry, StatKey } from "@/lib/types";
+import { L } from "@/lib/i18n";
+import { ageText } from "@/lib/format";
 
 // Short game-like moments layered over the play screen. None of them block input, and each lasts about a second.
 
@@ -28,7 +30,7 @@ export interface Roll {
   face: number; // 1-6
 }
 
-const LUCK = ["", "최악의 운", "운이 없었다", "조금 아쉽다", "무난했다", "운이 좋았다", "대박!"];
+const luck = () => ["", L("최악의 운"), L("운이 없었다"), L("조금 아쉽다"), L("무난했다"), L("운이 좋았다"), L("대박!")];
 
 /** How a choice turned out, read from the stats and money its outcome moved. */
 export function rollOf(outcome: LogEntry, id: number): Roll {
@@ -63,7 +65,7 @@ export function DiceRoll({ roll, onDone }: { roll: Roll; onDone: () => void }) {
           <circle key={i} cx={cx} cy={cy} r="2.1" fill={roll.face === 1 ? "#e11d48" : "#1c1917"} />
         ))}
       </svg>
-      <span className={`rounded-full px-2 py-0.5 text-xs font-bold shadow ${good ? "bg-emerald-700 text-white" : "bg-rose-600 text-white"}`}>{LUCK[roll.face]}</span>
+      <span className={`rounded-full px-2 py-0.5 text-xs font-bold shadow ${good ? "bg-emerald-700 text-white" : "bg-rose-600 text-white"}`}>{luck()[roll.face]}</span>
     </div>
   );
 }
@@ -106,7 +108,7 @@ export function BadgeToast({ ids, toastKey, onDone }: { ids: string[]; toastKey:
             {first.icon}
           </span>
           <span>
-            <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-400">배지 획득{ids.length > 1 ? ` · 외 ${ids.length - 1}개` : ""}</span>
+            <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-400">{L("배지 획득")}{ids.length > 1 ? L` · 외 ${ids.length - 1}개` : ""}</span>
             <span className="block font-bold">{first.name}</span>
             <span className="block text-xs text-stone-500 dark:text-stone-400">{first.desc}</span>
           </span>
@@ -134,8 +136,8 @@ export function SoundToggle({ on, onToggle }: { on: boolean; onToggle: () => voi
       type="button"
       onClick={onToggle}
       aria-pressed={on}
-      aria-label={on ? "효과음 끄기" : "효과음 켜기"}
-      title={on ? "효과음 끄기" : "효과음 켜기"}
+      aria-label={on ? L("효과음 끄기") : L("효과음 켜기")}
+      title={on ? L("효과음 끄기") : L("효과음 켜기")}
       className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -154,13 +156,13 @@ export function BadgeCollection({ life }: { life: LifeState }) {
   return (
     <div>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">배지 컬렉션</h2>
+        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">{L("배지 컬렉션")}</h2>
         <p className="text-sm font-bold tabular-nums">
           {earned.size} / {BADGES.length}
         </p>
       </div>
       {list.length === 0 ? (
-        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">이번 인생에서는 배지를 얻지 못했어요.</p>
+        <p className="mt-3 text-sm text-stone-500 dark:text-stone-400">{L("이번 인생에서는 배지를 얻지 못했어요.")}</p>
       ) : (
         <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
           {list.map((b) => {
@@ -174,14 +176,14 @@ export function BadgeCollection({ life }: { life: LifeState }) {
                   {b.icon}
                 </span>
                 <span className={`mt-1 text-xs font-semibold ${got ? "" : "text-stone-500 dark:text-stone-400"}`}>{b.name}</span>
-                <span className="text-[11px] text-stone-500 tabular-nums dark:text-stone-400">{got ? `${got.age}세` : "미획득"}</span>
+                <span className="text-[11px] text-stone-500 tabular-nums dark:text-stone-400">{got ? ageText(got.age) : L("미획득")}</span>
               </li>
             );
           })}
         </ul>
       )}
       <button type="button" onClick={() => setOpen((o) => !o)} className="mt-2 w-full py-2.5 text-sm text-stone-500 underline-offset-2 hover:underline dark:text-stone-400">
-        {open ? "얻은 배지만 보기" : "모든 배지 보기"}
+        {open ? L("얻은 배지만 보기") : L("모든 배지 보기")}
       </button>
     </div>
   );

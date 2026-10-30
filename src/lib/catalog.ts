@@ -1,5 +1,8 @@
 // Concrete names and prices: employers, schools, salaries, tuition and homes.
 // Money is in today's 만원 like the rest of the engine, so a 1998 salary reads in 2026 terms.
+// An American life reads the same things from src/regions/us/catalog.ts (in engine units of $10).
+import { US_ABROAD, US_ABROAD_SCHOOLS, US_AREAS, US_COMPANIES, US_LADDERS, US_MORTGAGE_RATE, US_SALARY, US_TIER_LABEL, US_UNIVERSITIES, usTitle, usTuition } from "../regions/us/catalog";
+import { isUS } from "./region";
 import type { Rng } from "./rng";
 import type { Degree } from "./types";
 
@@ -22,8 +25,13 @@ interface Company {
   name: string;
   tier: CompanyTier;
   since?: number; // first year it hired under this name
+  until?: number; // last year it hired under this name
   fields?: RegExp; // majors or job titles it suits
 }
+
+/** A table that reads the American version in a US life. */
+const byRegion = <T extends object>(kr: T, us: T): T => new Proxy(kr, { get: (_, k) => Reflect.get(isUS() ? us : kr, k) });
+const companies = (): Company[] => (isUS() ? US_COMPANIES : COMPANIES);
 
 const TECH = /컴퓨터|소프트|정보|전산|데이터|AI|인공지능|개발|프로그래|IT|전자|반도체/;
 const ENG = /공학|공대|기계|전기|화학|재료|산업|건축|토목|자동차|조선|에너지/;
@@ -124,7 +132,7 @@ const COMPANIES: Company[] = [
 ];
 
 /** Starting salary range (annual, 만원, today's won) for a new graduate. Experienced hires get more. */
-export const SALARY: Record<CompanyTier, [number, number]> = {
+const KR_SALARY: Record<CompanyTier, [number, number]> = {
   large: [4800, 5800],
   it: [4600, 5600],
   foreign: [4600, 6000],
@@ -140,7 +148,7 @@ export const SALARY: Record<CompanyTier, [number, number]> = {
   doctor: [6000, 8000],
 };
 
-export const TIER_LABEL: Record<CompanyTier, string> = {
+const KR_TIER_LABEL: Record<CompanyTier, string> = {
   large: "대기업",
   it: "IT 대기업",
   foreign: "외국계 기업",
@@ -155,6 +163,10 @@ export const TIER_LABEL: Record<CompanyTier, string> = {
   professor: "대학 교수",
   doctor: "병원 의사",
 };
+
+export const SALARY = byRegion(KR_SALARY, US_SALARY);
+
+export const TIER_LABEL = byRegion(KR_TIER_LABEL, US_TIER_LABEL);
 
 const TITLE: Record<CompanyTier, string> = {
   large: "사원",
@@ -220,12 +232,13 @@ export function degreePay(tier: CompanyTier, degree: Degree): number {
 export function tierOf(company: string | undefined): CompanyTier | undefined {
   if (!company) return undefined;
   // An exact name first: "삼성전자 기흥공장 생산라인" is a factory line, not 삼성전자's head office.
-  return (COMPANIES.find((c) => c.name === company) ?? COMPANIES.find((c) => company.includes(c.name)))?.tier;
+  const all = companies();
+  return (all.find((c) => c.name === company) ?? all.find((c) => company.includes(c.name)))?.tier;
 }
 
 /** Picks an employer of the tier that existed that year, preferring ones that fit the major. */
 export function pickCompany(rng: Rng, tier: CompanyTier, year: number, major: string, exclude?: string): string {
-  const pool = COMPANIES.filter((c) => c.tier === tier && (c.since ?? 0) <= year && c.name !== exclude);
+  const pool = companies().filter((c) => c.tier === tier && (c.since ?? 0) <= year && (c.until ?? Infinity) >= year && c.name !== exclude);
   if (!pool.length) return TIER_LABEL[tier];
   const fit = pool.filter((c) => c.fields?.test(major));
   return rng.pick(fit.length && rng.chance(0.75) ? fit : pool).name;
@@ -240,6 +253,7 @@ export function salaryFor(rng: Rng, tier: CompanyTier, yearsExp: number): number
 }
 
 export function titleFor(tier: CompanyTier, yearsExp: number): string {
+  if (isUS()) return usTitle(tier, yearsExp);
   if (tier === "professor") return yearsExp >= 12 ? "정교수" : yearsExp >= 6 ? "부교수" : "조교수";
   if (tier === "doctor") return yearsExp >= 12 ? "과장" : yearsExp >= 4 ? "전문의" : "전공의";
   if (tier === "civil") return yearsExp >= 15 ? "6급 공무원" : yearsExp >= 7 ? "7급 공무원" : "9급 공무원";
@@ -283,7 +297,7 @@ export function guessTier(name: string): CompanyTier {
 
 export type SchoolTier = "top" | "seoul" | "national" | "regional" | "college";
 
-const UNIVERSITIES: Record<SchoolTier, string[]> = {
+const KR_UNIVERSITIES: Record<SchoolTier, string[]> = {
   top: ["서울대학교", "연세대학교", "고려대학교", "KAIST", "포항공과대학교"],
   seoul: ["성균관대학교", "한양대학교", "서강대학교", "중앙대학교", "경희대학교", "한국외국어대학교", "이화여자대학교", "건국대학교", "동국대학교", "홍익대학교", "서울시립대학교"],
   national: ["부산대학교", "경북대학교", "전남대학교", "충남대학교", "충북대학교", "강원대학교", "전북대학교", "경상국립대학교"],
@@ -291,8 +305,14 @@ const UNIVERSITIES: Record<SchoolTier, string[]> = {
   college: ["인하공업전문대학", "영진전문대학교", "명지전문대학", "대림대학교"],
 };
 
+const UNIVERSITIES: Record<SchoolTier, string[]> = byRegion(KR_UNIVERSITIES, US_UNIVERSITIES);
+
+/** Promotion ladders for the current region (engine.ts doPromote). */
+export const titleLadders = () => (isUS() ? US_LADDERS : null);
+
 /** Yearly tuition (만원). National universities charge about half of private ones. */
 export function tuitionFor(school: string, level: "university" | "graduate" | "abroad"): number {
+  if (isUS()) return usTuition(school, level);
   if (level === "abroad") return 0; // funded PhD: tuition waived, a stipend instead
   if (level === "graduate" && ABROAD.test(school)) return 6000; // a self-funded master's abroad
   const national = /서울대|KAIST|포항공과|부산대|경북대|전남대|충남대|충북대|강원대|전북대|경상국립대|서울시립대|국립/.test(school);
@@ -309,8 +329,9 @@ export function pickUniversity(rng: Rng, knowledge: number, fromProfile?: string
 }
 
 export function pickGradSchool(rng: Rng, knowledge: number, undergrad?: string): string {
-  if (undergrad && rng.chance(0.5)) return `${undergrad} 대학원`;
-  return `${rng.pick(UNIVERSITIES[knowledge >= 70 ? "top" : "seoul"])} 대학원`;
+  const grad = (u: string) => (isUS() ? `graduate school at ${u}` : `${u} 대학원`);
+  if (undergrad && rng.chance(0.5)) return grad(undergrad);
+  return grad(rng.pick(UNIVERSITIES[knowledge >= 70 ? "top" : "seoul"]));
 }
 
 /** A university to teach at: one a step or two below where one studied is the usual first post. */
@@ -320,11 +341,16 @@ export function pickFaculty(rng: Rng, knowledge: number): string {
 
 const ABROAD_SCHOOLS = ["미국 UC버클리", "미국 미시간대", "미국 일리노이대", "영국 임페리얼칼리지", "독일 뮌헨공대", "일본 도쿄대", "미국 퍼듀대", "싱가포르국립대"];
 
-/** Words that put a school (or the plan to study) abroad. */
-export const ABROAD = /미국|영국|독일|프랑스|일본|중국|캐나다|호주|네덜란드|스위스|싱가포르|홍콩|해외|유학/;
+/** Words that put a school (or the plan to study) abroad: from Korea, or from the US. */
+const KR_ABROAD = /미국|영국|독일|프랑스|일본|중국|캐나다|호주|네덜란드|스위스|싱가포르|홍콩|해외|유학/;
+export const ABROAD = new RegExp(`${KR_ABROAD.source}|${US_ABROAD.source}`, "i");
 
 /** A school abroad; in the country the player named ("미국 대학 석사"), if they named one. */
 export function pickAbroad(rng: Rng, words = ""): string {
+  if (isUS()) {
+    const named = US_ABROAD_SCHOOLS.find((x) => words.toLowerCase().includes(x.replace(/^the /, "").toLowerCase()));
+    return named ?? rng.pick(US_ABROAD_SCHOOLS);
+  }
   const country = words.match(ABROAD)?.[0];
   if (!country || country === "해외" || country === "유학") return rng.pick(ABROAD_SCHOOLS);
   const there = ABROAD_SCHOOLS.filter((x) => x.startsWith(country));
@@ -333,6 +359,12 @@ export function pickAbroad(rng: Rng, words = ""): string {
 
 /** A Korean university named in the player's own words ("서울대 대학원 간다" → 서울대학교), if any. */
 export function schoolIn(text: string): string | undefined {
+  if (isUS()) {
+    const t = text.toLowerCase();
+    return Object.values(US_UNIVERSITIES)
+      .flat()
+      .find((u) => t.includes(u.toLowerCase()) || t.includes(u.replace(/^University of /, "").toLowerCase()));
+  }
   const t = text.replace(/\s/g, "");
   if (/카이스트/i.test(t)) return "KAIST";
   if (/포스텍/.test(t)) return "포항공과대학교";
@@ -368,6 +400,13 @@ const AREAS: HomeArea[] = [
 /** The best area this person can buy in with at most 60% borrowed, nudged toward their hometown. */
 export function pickHome(rng: Rng, wealth: number, hometown: string, cheap = false): HomeArea {
   const budget = Math.max(0, wealth) / 0.4;
+  if (isUS()) {
+    // Up to 80% borrowed, nudged toward the home state.
+    const can = Math.max(0, wealth) / 0.2;
+    const affordable = US_AREAS.filter((a) => a.price <= can).sort((a, b) => b.price - a.price);
+    if (!affordable.length) return { name: "a starter condo", price: Math.max(12000, Math.round(can / 1000) * 1000) };
+    return rng.pick(cheap ? affordable.slice(-3) : affordable.slice(0, 3));
+  }
   const affordable = AREAS.filter((a) => a.price <= budget).sort((a, b) => b.price - a.price);
   if (!affordable.length) return { name: "외곽의 빌라", price: Math.max(15000, Math.round(budget / 1000) * 1000) };
   const home = affordable.find((a) => hometown && a.name.includes(hometown.slice(0, 2)));
@@ -376,4 +415,7 @@ export function pickHome(rng: Rng, wealth: number, hometown: string, cheap = fal
   return rng.pick(pool);
 }
 
-export const MORTGAGE_RATE = 0.042; // yearly
+const KR_MORTGAGE_RATE = 0.042; // yearly
+
+/** Yearly mortgage interest in the current region. */
+export const mortgageRate = () => (isUS() ? US_MORTGAGE_RATE : KR_MORTGAGE_RATE);

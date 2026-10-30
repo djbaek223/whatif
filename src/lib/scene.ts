@@ -5,6 +5,7 @@ import { ageOf } from "./events";
 import type { LifeState } from "./types";
 import { inService, retaking } from "./timeline";
 import { ownsBusiness } from "./work";
+import { L } from "./i18n";
 
 export type Era = "old" | "apartment" | "highrise" | "future";
 export type Season = "spring" | "sunny" | "rain" | "autumn" | "snow";
@@ -105,6 +106,6 @@ export function sceneOf(s: LifeState): SceneState {
 
 function shortSign(company: string | undefined): string {
   const name = (company ?? "").replace(/\(.*?\)/g, "").trim();
-  if (!name) return "내 가게";
+  if (!name) return L("내 가게");
   return name.length > 6 ? `${name.slice(0, 5)}…` : name;
 }

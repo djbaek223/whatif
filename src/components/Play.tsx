@@ -14,6 +14,8 @@ import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "
 import { LifeScene } from "./LifeScene";
 import { SCENE_LATE_MS, SceneWait } from "./Waiting";
 import { Button, Card, DeltaChips, Segmented, Spinner, StatBars, Switch, Textarea } from "./ui";
+import { L } from "@/lib/i18n";
+import { ageText } from "@/lib/format";
 
 export type Speed = 1 | 2 | 4;
 
@@ -154,7 +156,7 @@ export function PlayView({
   }, [choosing, collapsed, pendingKey, presentOpen, auto, life.dead]);
 
   // During auto play every turn would be read aloud several times a second, so only the year and rare moments are.
-  const announce = choosing ? (sceneLoading ? "선택의 순간" : `선택의 순간: ${pending.title}`) : auto && !life.dead && !latest?.rare ? `${Math.floor(life.mi / 12)}년` : latest?.text;
+  const announce = choosing ? (sceneLoading ? L("선택의 순간") : L`선택의 순간: ${pending.title}`) : auto && !life.dead && !latest?.rare ? L`${Math.floor(life.mi / 12)}년` : latest?.text;
 
   const pay = payLabel(life);
 
@@ -165,7 +167,7 @@ export function PlayView({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h1 className="truncate text-lg font-bold">
-                {life.profile.name || "나"} · {age}세
+                {life.profile.name || L("나")} · {ageText(age)}
               </h1>
               <p className="truncate text-xs text-stone-500 dark:text-stone-400">{statusLabel(life)}</p>
             </div>
@@ -190,7 +192,7 @@ export function PlayView({
                   saveKeysPref(!keys);
                   setKeys(!keys);
                 }}
-                where={`${life.profile.name || "나"} · ${age}세 · ${formatMi(life.mi)}`}
+                where={L`${life.profile.name || L("나")} · ${age}세 · ${formatMi(life.mi)}`}
                 onQuit={handlers.onQuit}
               />
             </div>
@@ -218,9 +220,9 @@ export function PlayView({
                   aria-expanded={false}
                   className="flex w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
                 >
-                  <span className="min-w-0 truncate">{sceneLoading ? "장면을 그리는 중" : `선택 대기 · ${pending.title}`}</span>
+                  <span className="min-w-0 truncate">{sceneLoading ? L("장면을 그리는 중") : L`선택 대기 · ${pending.title}`}</span>
                   <span className="flex shrink-0 items-center gap-1 text-sm">
-                    펼치기
+                    {L("펼치기")}
                     <Chevron up />
                   </span>
                 </button>
@@ -228,7 +230,7 @@ export function PlayView({
             )}
             <section
               ref={sheetRef}
-              aria-label="선택의 순간"
+              aria-label={L("선택의 순간")}
               className={`sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-5 shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
                 pending.rare ? "border-2 border-b-0 border-amber-400 dark:border-amber-500 lg:border-b-2" : "lg:border-stone-200 dark:lg:border-stone-800"
               } ${collapsed ? "max-lg:hidden" : ""}`}
@@ -236,7 +238,7 @@ export function PlayView({
               <button
                 type="button"
                 onClick={() => setCollapsedKey(pendingKey)}
-                aria-label="선택 창 내리고 이야기 읽기"
+                aria-label={L("선택 창 내리고 이야기 읽기")}
                 aria-expanded
                 className="mx-auto flex h-6 w-16 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden"
               >
@@ -266,7 +268,7 @@ export function PlayView({
             {life.dead ? (
               <p className="flex items-center justify-center gap-2 text-center text-stone-500 dark:text-stone-400" role="status">
                 <Spinner />
-                삶이 끝났습니다. 회고록을 쓰는 중...
+                {L("삶이 끝났습니다. 회고록을 쓰는 중...")}
               </p>
             ) : (
               <ControlBar
@@ -321,15 +323,15 @@ function useElapsed(active: boolean): number {
 }
 
 function turnName(months: number): string {
-  if (months === 1) return "다음 달";
-  if (months === 12) return "1년 뒤";
-  return `${months}개월 뒤`;
+  if (months === 1) return L("다음 달");
+  if (months === 12) return L("1년 뒤");
+  return L`${months}개월 뒤`;
 }
 
 function spanName(months: number): string {
   const y = Math.floor(months / 12);
   const m = months % 12;
-  return [y && `${y}년`, m && `${m}개월`].filter(Boolean).join(" ");
+  return [y && L`${y}년`, m && L`${m}개월`].filter(Boolean).join(" ");
 }
 
 /** The controls between choices, laid out like a player: step, skip, and play/pause with its speed and delegation. */
@@ -361,11 +363,11 @@ function ControlBar({
       <div className="space-y-2">
         <Button data-focus="controls" className="flex w-full items-center justify-center gap-2" onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined}>
           <PauseIcon />
-          멈추기
+          {L("멈추기")}
         </Button>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <Segmented
-            label="재생 속도"
+            label={L("재생 속도")}
             value={speed}
             onChange={handlers.onSpeed}
             options={[
@@ -375,11 +377,11 @@ function ControlBar({
             ]}
           />
           <Switch checked={autoDecide} onChange={handlers.onToggleAutoDecide}>
-            선택도 맡기기
+            {L("선택도 맡기기")}
           </Switch>
         </div>
         <p className="text-xs text-stone-500 dark:text-stone-400">
-          {autoDecide ? "작은 선택은 성격대로 대신 골라요. 큰 결정은 멈춰서 물어봐요." : "선택이 오면 멈추고 기다려요."}
+          {autoDecide ? L("작은 선택은 성격대로 대신 골라요. 큰 결정은 멈춰서 물어봐요.") : L("선택이 오면 멈추고 기다려요.")}
         </p>
       </div>
     );
@@ -395,17 +397,17 @@ function ControlBar({
           <span className="flex max-[359px]:hidden">
             <SkipIcon />
           </span>
-          선택까지
+          {L("선택까지")}
         </Button>
-        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={presentOpen} onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined} aria-label="자동 재생" data-focus="controls">
+        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={presentOpen} onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined} aria-label={L("자동 재생")} data-focus="controls">
           <span className="flex max-[359px]:hidden">
             <PlayIcon />
           </span>
-          자동
+          {L("자동")}
         </Button>
       </div>
       <p className={`hidden text-xs text-stone-500 dark:text-stone-400 ${keys ? "lg:block" : ""}`}>
-        <Kbd>Space</Kbd> {turnName(months)} · <Kbd>Enter</Kbd> 선택까지 · <Kbd>A</Kbd> 자동 · <Kbd>1</Kbd>~<Kbd>4</Kbd> 선택
+        <Kbd>Space</Kbd> {turnName(months)} · <Kbd>Enter</Kbd> {L("선택까지 ·")} <Kbd>A</Kbd> {L("자동 ·")} <Kbd>1</Kbd>~<Kbd>4</Kbd> {L("선택")}
       </p>
     </div>
   );
@@ -444,19 +446,19 @@ function ChoicePanel({
   const [writing, setWriting] = useState(false);
   const [more, setMore] = useState(false);
   const long = pending.scene.length > 110;
-  const kind = pending.rare ? "✦ 희귀한 순간" : pending.small ? "작은 선택" : big ? "인생의 갈림길" : "선택의 순간";
+  const kind = pending.rare ? L("✦ 희귀한 순간") : pending.small ? L("작은 선택") : big ? L("인생의 갈림길") : L("선택의 순간");
   const waited = useElapsed(sceneLoading);
   const [waitedForScene] = useState(sceneLoading);
   // One status line for screen readers. It starts empty so the choice itself is announced first, and the step
   // changes in SceneWait stay silent; only the wait, a slow wait and the finished scene are read.
   const status = sceneLoading
     ? waited >= SCENE_LATE_MS
-      ? "조금 더 걸리고 있어요. 늦어지면 기본 이야기로 이어가요."
+      ? L("조금 더 걸리고 있어요. 늦어지면 기본 이야기로 이어가요.")
       : waited > 0
-        ? "장면을 그리는 중이에요."
+        ? L("장면을 그리는 중이에요.")
         : ""
     : waitedForScene
-      ? `장면이 준비됐어요. 선택지 ${pending.options.length}개 중에서 골라 주세요.`
+      ? L`장면이 준비됐어요. 선택지 ${pending.options.length}개 중에서 골라 주세요.`
       : "";
 
   return (
@@ -476,10 +478,10 @@ function ChoicePanel({
                 type="button"
                 onClick={onStopAuto}
                 className="-my-1 flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                aria-label="자동 재생 중, 눌러서 멈추기"
+                aria-label={L("자동 재생 중, 눌러서 멈추기")}
               >
                 <PlayIcon small />
-                자동 재생 중 · 멈추기
+                {L("자동 재생 중 · 멈추기")}
               </button>
             )}
             <button
@@ -487,12 +489,12 @@ function ChoicePanel({
               onClick={onCollapse}
               className="-my-2 -mr-2 flex items-center gap-0.5 px-2 py-2 text-xs text-stone-500 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden dark:text-stone-400 dark:hover:text-stone-200"
             >
-              내리기
+              {L("내리기")}
               <Chevron />
             </button>
           </div>
         </div>
-        {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{spanName(skipped)}을 건너뛰었어요.</p>}
+        {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{L`${spanName(skipped)}을 건너뛰었어요.`}</p>}
         {!sceneLoading && (
           <h2 tabIndex={-1} data-focus="choice" className="mt-1 text-lg font-bold text-balance outline-none">
             {pending.title}
@@ -509,7 +511,7 @@ function ChoicePanel({
                 onClick={() => setMore(!more)}
                 className="-my-1 py-1 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline lg:hidden dark:text-indigo-300"
               >
-                {more ? "접기" : "더 보기"}
+                {more ? L("접기") : L("더 보기")}
               </button>
             )}
           </>
@@ -542,8 +544,8 @@ function ChoicePanel({
                     rows={1}
                     value={free}
                     onChange={(e) => setFree(e.target.value)}
-                    placeholder="나라면 이렇게 하겠다"
-                    aria-label="직접 쓰기"
+                    placeholder={L("나라면 이렇게 하겠다")}
+                    aria-label={L("직접 쓰기")}
                     maxLength={200}
                     autoFocus
                   />
@@ -558,7 +560,7 @@ function ChoicePanel({
                   className="flex items-center gap-2"
                 >
                   {busy && <Spinner />}
-                  {busy ? "읽는 중" : "결정"}
+                  {busy ? L("읽는 중") : L("결정")}
                 </Button>
               </div>
             ) : (
@@ -569,7 +571,7 @@ function ChoicePanel({
                 className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
               >
                 <PencilIcon />
-                직접 쓰기
+                {L("직접 쓰기")}
               </button>
             ))}
         </div>
@@ -588,10 +590,10 @@ function BigMomentIntro({ pending, showTitle, onDone }: { pending: PendingChoice
         >
           {/* While the scene is being written its title stays hidden too, so the card names only the kind of moment. */}
           <p className={`font-semibold ${showTitle ? "text-xs tracking-widest" : "text-2xl"} ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-            {pending.rare ? "✦ 희귀한 순간" : "인생의 갈림길"}
+            {pending.rare ? L("✦ 희귀한 순간") : L("인생의 갈림길")}
           </p>
           {showTitle && <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>}
-          <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">탭하면 바로 고를 수 있어요</p>
+          <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">{L("탭하면 바로 고를 수 있어요")}</p>
         </div>
       </div>
     </div>
@@ -660,7 +662,7 @@ function PlayMenu({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="메뉴"
+        aria-label={L("메뉴")}
         className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -670,7 +672,7 @@ function PlayMenu({
         </svg>
       </button>
       {open && (
-        <div ref={menu} role="menu" aria-label="메뉴" onKeyDown={onMenuKey} className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
+        <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
           <button
             type="button"
             role="menuitemcheckbox"
@@ -685,10 +687,10 @@ function PlayMenu({
               <path d="M11 5 6 9H2v6h4l5 4z" />
               {sound ? <path d="m22 9-6 6M16 9l6 6" /> : <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />}
             </svg>
-            {sound ? "효과음 끄기" : "효과음 켜기"}
+            {sound ? L("효과음 끄기") : L("효과음 켜기")}
           </button>
-          <div role="group" aria-label="세상 뉴스" className="border-y border-stone-100 py-1 dark:border-stone-800">
-            <p className="px-4 pt-1.5 pb-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400">세상 뉴스</p>
+          <div role="group" aria-label={L("세상 뉴스")} className="border-y border-stone-100 py-1 dark:border-stone-800">
+            <p className="px-4 pt-1.5 pb-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400">{L("세상 뉴스")}</p>
             {NEWS_MODES.map((m) => (
               <button
                 key={m.value}
@@ -721,7 +723,7 @@ function PlayMenu({
             <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${keys ? "" : "invisible"}`}>
               ✓
             </span>
-            키보드 단축키
+            {L("키보드 단축키")}
           </button>
           <button
             type="button"
@@ -737,7 +739,7 @@ function PlayMenu({
               <rect x="2" y="4" width="20" height="16" rx="2" />
               <path d="m22 7-10 6L2 7" />
             </svg>
-            의견 보내기
+            {L("의견 보내기")}
           </button>
           <button
             type="button"
@@ -753,13 +755,13 @@ function PlayMenu({
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4M12 8h.01" />
             </svg>
-            서비스 소개
+            {L("서비스 소개")}
           </button>
           <button type="button" role="menuitem" className={item} onClick={onQuit}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
             </svg>
-            저장하고 나가기
+            {L("저장하고 나가기")}
           </button>
           <p className="border-t border-stone-100 px-4 pt-2 pb-1.5 text-[11px] text-stone-500 tabular-nums dark:border-stone-800 dark:text-stone-400">What If {versionLabel}</p>
         </div>
@@ -790,7 +792,7 @@ function JumpButton({ onClick, className = "" }: { onClick: () => void; classNam
       onClick={onClick}
       className={`rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 ${className}`}
     >
-      ↓ 최신 내용 보기
+      {L("↓ 최신 내용 보기")}
     </button>
   );
 }
@@ -1058,9 +1060,9 @@ function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
 
 export type NewsMode = "full" | "headline" | "hidden";
 const NEWS_MODES: { value: NewsMode; label: string }[] = [
-  { value: "full", label: "펼쳐 보기" },
-  { value: "headline", label: "헤드라인만" },
-  { value: "hidden", label: "숨기기" },
+  { value: "full", get label() { return L("펼쳐 보기"); } },
+  { value: "headline", get label() { return L("헤드라인만"); } },
+  { value: "hidden", get label() { return L("숨기기"); } },
 ];
 const NEWS_KEY = "whatif.news";
 
@@ -1203,7 +1205,7 @@ function Spine({ children, filled = false, className = "" }: { children: ReactNo
 function WorldBox({ items, open }: { items: LogEntry[]; open: boolean }) {
   return (
     <li className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2 text-[13px] text-stone-600 dark:border-amber-900 dark:bg-amber-950/20 dark:text-stone-400">
-      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">그때 세상은 · {items.length}</p>
+      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">{L("그때 세상은 ·")} {items.length}</p>
       <ul className={open ? "mt-1 space-y-1.5" : "mt-0.5"}>
         {items.map((n, j) => {
           const [cat, month] = (n.tag ?? "").split(" · ");
@@ -1230,7 +1232,7 @@ function ChoiceCard({ title, picked, outcome }: { title: string; picked: string;
     <Spine filled>
       <div className={`rounded-xl px-3.5 py-2.5 ${rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/50" : "bg-indigo-50 dark:bg-indigo-950/60"}`}>
         <p className={`text-[11px] font-semibold ${rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-          {rare ? "✦ 희귀한 순간" : "선택"} · {title}
+          {rare ? L("✦ 희귀한 순간") : L("선택")} · {title}
         </p>
         <p className="font-semibold text-indigo-800 dark:text-indigo-200">{picked}</p>
         {outcome && (
@@ -1292,7 +1294,7 @@ function RareLine({ entry }: { entry: LogEntry }) {
   return (
     <Spine filled>
       <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-500 dark:bg-amber-950/50">
-        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">✦ 희귀한 순간</p>
+        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{L("✦ 희귀한 순간")}</p>
         <p className="mt-0.5 font-semibold leading-relaxed">
           {entry.text}
           <DeltaChips delta={entry.delta} money={entry.money} />
@@ -1332,21 +1334,21 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
         className="-mr-1 rounded px-1 text-right text-xs text-stone-500 tabular-nums hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
       >
         <span className="block">
-          자산 {formatWealth(life.wealth)}
+          {L("자산")} {formatWealth(life.wealth)}
           {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
           <span aria-hidden className="ml-0.5 inline-block text-[10px]">{open ? "▴" : "▾"}</span>
         </span>
         {pay && <span className="block sm:hidden lg:block">{pay}</span>}
-        {total > 0 && <span className="hidden lg:block">고정지출 월 {formatWealth(total)}</span>}
-        <span className="sr-only">, 월 고정지출 자세히 보기</span>
+        {total > 0 && <span className="hidden lg:block">{L("고정지출 월")} {formatWealth(total)}</span>}
+        <span className="sr-only">{L(", 월 고정지출 자세히 보기")}</span>
       </button>
       {open && (
         <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs shadow-lg dark:border-stone-800 dark:bg-stone-900">
-          <p className="font-semibold text-stone-700 dark:text-stone-200">매달 들어오고 나가는 돈</p>
+          <p className="font-semibold text-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
           <dl className="mt-2 space-y-1 tabular-nums">
             <div className="flex justify-between gap-2">
-              <dt className="text-stone-600 dark:text-stone-400">수입</dt>
-              <dd>월 {formatWealth(Math.max(0, life.income))}</dd>
+              <dt className="text-stone-600 dark:text-stone-400">{L("수입")}</dt>
+              <dd>{L("월")} {formatWealth(Math.max(0, life.income))}</dd>
             </div>
             {items.map((e) => (
               <div key={e.label} className="flex justify-between gap-2">
@@ -1354,10 +1356,10 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
                 <dd>-{formatWealth(e.amount)}</dd>
               </div>
             ))}
-            {!items.length && <div className="text-stone-500 dark:text-stone-400">{ageOf(life) < 20 ? "아직은 부모님이 생활비를 대 주신다." : "지금은 나가는 고정지출이 없다."}</div>}
+            {!items.length && <div className="text-stone-500 dark:text-stone-400">{ageOf(life) < 20 ? L("아직은 부모님이 생활비를 대 주신다.") : L("지금은 나가는 고정지출이 없다.")}</div>}
             {items.length > 0 && (
               <div className="flex justify-between gap-2 border-t border-stone-200 pt-1 font-semibold dark:border-stone-700">
-                <dt>매달 {left >= 0 ? "남는 돈" : "모자라는 돈"}</dt>
+                <dt>{L("매달")} {left >= 0 ? L("남는 돈") : L("모자라는 돈")}</dt>
                 <dd className={left >= 0 ? "text-sky-700 dark:text-sky-300" : "text-amber-700 dark:text-amber-300"}>{formatWealth(Math.abs(left))}</dd>
               </div>
             )}
@@ -1372,29 +1374,29 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
   return (
     <Card className="space-y-4 border-indigo-300 dark:border-indigo-800">
       <div>
-        <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">지금 이 순간</p>
-        <p className="text-lg font-bold">현실의 나와 또 다른 나</p>
+        <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">{L("지금 이 순간")}</p>
+        <p className="text-lg font-bold">{L("현실의 나와 또 다른 나")}</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl bg-stone-100 p-4 dark:bg-stone-800">
-          <p className="text-xs text-stone-600 dark:text-stone-400">현실의 나</p>
-          <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">{life.profile.currentLife || "현실의 삶을 입력하지 않았어요."}</p>
+          <p className="text-xs text-stone-600 dark:text-stone-400">{L("현실의 나")}</p>
+          <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed">{life.profile.currentLife || L("현실의 삶을 입력하지 않았어요.")}</p>
         </div>
         <div className="rounded-xl bg-indigo-50 p-4 dark:bg-indigo-950">
-          <p className="text-xs text-stone-600 dark:text-stone-400">이 가지의 나 · {ageOf(life)}세</p>
+          <p className="text-xs text-stone-600 dark:text-stone-400">{L("이 가지의 나 ·")} {ageText(ageOf(life))}</p>
           <p className="mt-1 text-[15px] font-semibold">{statusLabel(life)}</p>
           <p className="text-sm text-stone-600 dark:text-stone-400">
-            자산 {formatWealth(life.wealth)}
+            {L("자산")} {formatWealth(life.wealth)}
             {payLabel(life) && ` · ${payLabel(life)}`}
           </p>
-          {monthlyCosts(life).length > 0 && <p className="text-xs text-stone-500 dark:text-stone-400">고정지출 월 {formatWealth(costTotal(monthlyCosts(life)))}: {costBreakdown(monthlyCosts(life))}</p>}
+          {monthlyCosts(life).length > 0 && <p className="text-xs text-stone-500 dark:text-stone-400">{L("고정지출 월")} {formatWealth(costTotal(monthlyCosts(life)))}: {costBreakdown(monthlyCosts(life))}</p>}
           <div className="mt-3">
             <StatBars stats={life.stats} compact notes={{ knowledge: degreeTag(life) }} />
           </div>
         </div>
       </div>
       <Button data-focus="present" className="w-full" onClick={onClose}>
-        계속 살아보기
+        {L("계속 살아보기")}
       </Button>
     </Card>
   );
