@@ -47,7 +47,9 @@ export function keysInCode(): Map<string, string> {
 if (require.main === module) {
   const keys = keysInCode();
   const missing = [...keys].filter(([k]) => EN[k] === undefined);
-  const unused = Object.keys(EN).filter((k) => !keys.has(k));
+  // News categories are looked up by value (L(x.cat) in engine.ts), so no literal names them.
+  const dynamic = new Set(["사회", "정치", "경제", "스포츠", "연예", "세계", "과학", "가상"]);
+  const unused = Object.keys(EN).filter((k) => !keys.has(k) && !dynamic.has(k));
   // Placeholders must match: an English text that drops {1} would lose a name or a number.
   const holes = (t: string) => (t.match(/\{\d+\}/g) ?? []).sort().join();
   const broken = [...keys.keys()].filter((k) => EN[k] !== undefined && holes(EN[k]) !== holes(k));

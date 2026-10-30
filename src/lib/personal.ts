@@ -31,14 +31,14 @@ const EVENT_THEME: Record<string, Theme> = {
 };
 
 const KEYWORDS: [Theme, RegExp][] = [
-  ["risk", /도전|모험|사업|창업|즉흥|충동|대담|자유/],
-  ["family", /가족|아이|부모|효도|가정|육아/],
-  ["study", /공부|책|연구|배우|호기심|분석|논리/],
-  ["health", /운동|건강|등산|달리기|요가/],
-  ["money", /돈|재테크|투자|절약|저축|부동산|현실적/],
-  ["career", /성실|일|성공|야망|욕심|완벽|책임|승진/],
-  ["love", /사람|친구|연애|사교|외향|다정|공감/],
-  ["leisure", /여행|취미|음악|게임|여유|느긋|쉬/],
+  ["risk", /도전|모험|사업|창업|즉흥|충동|대담|자유|\b(adventur\w*|bold|risk\w*|entrepreneur\w*|spontaneous|impulsive|free spirit)/i],
+  ["family", /가족|아이|부모|효도|가정|육아|\b(family|kids|parents|home\s?body)/i],
+  ["study", /공부|책|연구|배우|호기심|분석|논리|\b(curious|books?|read\w*|research|learn\w*|analytical|logical|nerd)/i],
+  ["health", /운동|건강|등산|달리기|요가|\b(sports?|fitness|gym|hik\w+|running|yoga|athletic)/i],
+  ["money", /돈|재테크|투자|절약|저축|부동산|현실적|\b(money|invest\w*|frugal|sav(e|ing)|practical|real estate)/i],
+  ["career", /성실|일|성공|야망|욕심|완벽|책임|승진|\b(hardworking|work\w*|success\w*|ambitio\w*|perfectionist|responsible|driven)/i],
+  ["love", /사람|친구|연애|사교|외향|다정|공감|\b(people|friends|romantic|social|outgoing|warm|empath\w*)/i],
+  ["leisure", /여행|취미|음악|게임|여유|느긋|쉬|\b(travel\w*|hobb\w+|music|gam(es|ing)|laid-back|relaxed|chill)/i],
 ];
 
 /** Leanings read from MBTI and how the person describes themselves. Each is roughly -0.3..0.3. */
@@ -111,10 +111,10 @@ export function relativeAffinity(s: LifeState, theme: Theme): number {
 // ── Temperament ────────────────────────────────────────
 
 const AXIS_WORDS: [Axis, RegExp, RegExp][] = [
-  ["outgoing", /외향|사교|활발|친구\s?많|수다|사람\s?좋아|분위기\s?메이커/, /내향|조용|낯가림|혼자|소심|집순이|집돌이/],
-  ["bold", /도전|모험|즉흥|충동|대담|과감|자유|호기심/, /안정|무난|겁|보수적/],
-  ["careful", /신중|꼼꼼|계획|성실|완벽|현실적|절약|원칙/, /덤벙|대충|게으|즉흥/],
-  ["warm", /다정|공감|배려|정\s?많|착한|따뜻|감성/, /냉정|이성적|논리|직설/],
+  ["outgoing", /외향|사교|활발|친구\s?많|수다|사람\s?좋아|분위기\s?메이커|\b(outgoing|extrovert\w*|social|talkative|life of the party)/i, /내향|조용|낯가림|혼자|소심|집순이|집돌이|\b(introvert\w*|quiet|shy|loner|homebody)/i],
+  ["bold", /도전|모험|즉흥|충동|대담|과감|자유|호기심|\b(adventur\w*|bold|daring|spontaneous|impulsive|curious)/i, /안정|무난|겁|보수적|\b(stable|stability|cautious|timid|conservative|safe)/i],
+  ["careful", /신중|꼼꼼|계획|성실|완벽|현실적|절약|원칙|\b(careful|meticulous|plann\w+|hardworking|perfectionist|practical|frugal|principled)/i, /덤벙|대충|게으|즉흥|\b(clumsy|sloppy|lazy|spontaneous)/i],
+  ["warm", /다정|공감|배려|정\s?많|착한|따뜻|감성|\b(warm|kind|caring|empath\w*|considerate|sensitive)/i, /냉정|이성적|논리|직설|\b(cold|rational|logical|blunt)/i],
 ];
 
 /** Temperament from MBTI letters and the self-description. Each axis is -1..1, 0 when nothing is known. */

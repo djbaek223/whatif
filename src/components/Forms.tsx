@@ -10,16 +10,19 @@ import {
   kindDef,
   MBTI_QUIZ,
   MBTI_TYPES,
-  PERSONALITY_CHIPS,
+  personalityChips,
   schoolYears,
   suggestions,
-  TP_KINDS,
+  tpKinds,
   type TpBlanks,
 } from "@/lib/onboarding";
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
 import { Button, Card, FieldError, Input, Select, Textarea } from "./ui";
+import { L } from "@/lib/i18n";
+import { ageText, ymText, ymdText, cap } from "@/lib/format";
+import { isUS } from "@/lib/region";
 
 export const EMPTY_PROFILE: Profile = {
   name: "",
@@ -58,22 +61,22 @@ type StepId =
 
 // One question per screen. secs is a rough time to answer, for the "about 2 minutes left" estimate.
 const STEPS: { id: StepId; section: string; secs: number; required?: boolean }[] = [
-  { id: "birth", section: "나에 대해", secs: 15, required: true },
-  { id: "name", section: "나에 대해", secs: 8 },
-  { id: "gender", section: "나에 대해", secs: 4 },
-  { id: "hometown", section: "나에 대해", secs: 6 },
-  { id: "schools", section: "나에 대해", secs: 18 },
-  { id: "university", section: "나에 대해", secs: 10 },
-  { id: "family", section: "나에 대해", secs: 18 },
-  { id: "mbti", section: "나에 대해", secs: 8 },
-  { id: "personality", section: "나에 대해", secs: 20 },
-  { id: "current", section: "나에 대해", secs: 18 },
-  { id: "kind", section: "변곡점", secs: 5 },
-  { id: "date", section: "변곡점", secs: 10, required: true },
-  { id: "situation", section: "변곡점", secs: 30, required: true },
-  { id: "actual", section: "변곡점", secs: 8 },
-  { id: "regret", section: "변곡점", secs: 12 },
-  { id: "review", section: "확인", secs: 8 },
+  { id: "birth", get section() { return L("나에 대해"); }, secs: 15, required: true },
+  { id: "name", get section() { return L("나에 대해"); }, secs: 8 },
+  { id: "gender", get section() { return L("나에 대해"); }, secs: 4 },
+  { id: "hometown", get section() { return L("나에 대해"); }, secs: 6 },
+  { id: "schools", get section() { return L("나에 대해"); }, secs: 18 },
+  { id: "university", get section() { return L("나에 대해"); }, secs: 10 },
+  { id: "family", get section() { return L("나에 대해"); }, secs: 18 },
+  { id: "mbti", get section() { return L("나에 대해"); }, secs: 8 },
+  { id: "personality", get section() { return L("나에 대해"); }, secs: 20 },
+  { id: "current", get section() { return L("나에 대해"); }, secs: 18 },
+  { id: "kind", get section() { return L("변곡점"); }, secs: 5 },
+  { id: "date", get section() { return L("변곡점"); }, secs: 10, required: true },
+  { id: "situation", get section() { return L("변곡점"); }, secs: 30, required: true },
+  { id: "actual", get section() { return L("변곡점"); }, secs: 8 },
+  { id: "regret", get section() { return L("변곡점"); }, secs: 12 },
+  { id: "review", get section() { return L("확인"); }, secs: 8 },
 ];
 const indexOf = (id: StepId) => STEPS.findIndex((s) => s.id === id);
 export const TURNING_STEP = indexOf("kind");
@@ -81,7 +84,8 @@ export const TURNING_STEP = indexOf("kind");
 const MIN_SITUATION = 5;
 const pad = (n: number) => String(n).padStart(2, "0");
 
-const NICKNAMES = ["새벽산책러", "늦깎이여행자", "골목고양이", "주말등산가", "별헤는밤", "커피한잔", "느린거북이", "바닷가소년", "책방주인", "구름조각", "밤하늘고래", "봄날의곰"];
+const US_NICKNAMES = ["NightOwl", "LateBloomer", "AlleyCat", "WeekendHiker", "Stargazer", "CoffeeBreak", "SlowTurtle", "BeachKid", "Bookworm", "CloudPiece", "SkyWhale", "SpringBear"];
+const nicknames = () => (isUS() ? US_NICKNAMES : ["새벽산책러", "늦깎이여행자", "골목고양이", "주말등산가", "별헤는밤", "커피한잔", "느린거북이", "바닷가소년", "책방주인", "구름조각", "밤하늘고래", "봄날의곰"]);
 
 // Common Korean surnames; a 2-4 syllable Hangul name starting with one of these probably is a real name.
 const SURNAMES = "김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경사부";
@@ -106,7 +110,7 @@ const toYmd = (date: string): Ymd => {
 
 function remaining(step: number) {
   const secs = STEPS.slice(step).reduce((sum, s) => sum + s.secs, 0);
-  return secs < 50 ? "1분 이내" : `약 ${Math.round(secs / 60)}분`;
+  return secs < 50 ? L("1분 이내") : L`약 ${Math.round(secs / 60)}분`;
 }
 
 export function Onboarding({
@@ -188,22 +192,22 @@ export function Onboarding({
     birth: typedError
       ? { id: "birth", text: typedError }
       : !p.birthDate && tried
-        ? { id: "birth", text: !birth.y ? "태어난 해부터 골라 주세요" : !birth.m ? "몇 월에 태어났는지 골라 주세요" : "며칠에 태어났는지 골라 주세요" }
+        ? { id: "birth", text: !birth.y ? L("태어난 해부터 골라 주세요") : !birth.m ? L("몇 월에 태어났는지 골라 주세요") : L("며칠에 태어났는지 골라 주세요") }
         : null,
     date: typedError
       ? { id: "tp-date", text: typedError }
       : !tp.date && tried
-        ? { id: "tp-date", text: !tpYm.y ? "몇 년이었는지 골라 주세요" : "몇 월이었는지 골라 주세요" }
+        ? { id: "tp-date", text: !tpYm.y ? L("몇 년이었는지 골라 주세요") : L("몇 월이었는지 골라 주세요") }
         : null,
     situation:
       mode === "template"
         ? (!blanks.a.trim() || !blanks.b.trim()) && tried
-          ? { id: !blanks.a.trim() ? "blank-a" : "blank-b", text: "고민했던 두 갈래를 모두 적어 주세요" }
+          ? { id: !blanks.a.trim() ? "blank-a" : "blank-b", text: L("고민했던 두 갈래를 모두 적어 주세요") }
           : null
         : (() => {
             const len = tp.situation.trim().length;
-            if (len === 0) return tried ? { id: "tp-situation", text: "어떤 상황이었는지 한 줄이라도 적어 주세요" } : null;
-            return len < MIN_SITUATION ? { id: "tp-situation", text: `조금만 더 적어 주세요. ${MIN_SITUATION}자 이상이면 돼요 (지금 ${len}자)` } : null;
+            if (len === 0) return tried ? { id: "tp-situation", text: L("어떤 상황이었는지 한 줄이라도 적어 주세요") } : null;
+            return len < MIN_SITUATION ? { id: "tp-situation", text: L`조금만 더 적어 주세요. ${MIN_SITUATION}자 이상이면 돼요 (지금 ${len}자)` } : null;
           })(),
   };
   const invalid = (id: StepId) =>
@@ -242,7 +246,7 @@ export function Onboarding({
     <div className="space-y-1.5">
       <h1 tabIndex={-1} className="text-[22px] leading-snug font-bold outline-none sm:text-2xl">
         {title}
-        {cur.required && <span className="ml-2 align-middle rounded bg-indigo-50 px-1.5 py-px text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">필수</span>}
+        {cur.required && <span className="ml-2 align-middle rounded bg-indigo-50 px-1.5 py-px text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{L("필수")}</span>}
       </h1>
       {hint && <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{hint}</p>}
     </div>
@@ -253,7 +257,7 @@ export function Onboarding({
       case "birth":
         return (
           <>
-            {question("언제 태어났나요?", "학교 연도와 그 시절 이야기를 맞추는 데 써요.")}
+            {question(L("언제 태어났나요?"), L("학교 연도와 그 시절 이야기를 맞추는 데 써요."))}
             <DatePicker
               id="birth"
               value={birth}
@@ -268,32 +272,32 @@ export function Onboarding({
       case "name":
         return (
           <>
-            {question("이야기 속에서 뭐라고 부를까요?", "실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요.")}
+            {question(L("이야기 속에서 뭐라고 부를까요?"), L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요."))}
             <div className="flex gap-2">
-              <Input data-autofocus aria-label="별명" value={p.name} onChange={setField("name")} placeholder="예: 늦깎이여행자" maxLength={20} />
+              <Input data-autofocus aria-label={L("별명")} value={p.name} onChange={setField("name")} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  const pool = NICKNAMES.filter((n) => n !== p.name);
+                  const pool = nicknames().filter((n) => n !== p.name);
                   setP({ ...p, name: pool[Math.floor(Math.random() * pool.length)] });
                 }}
                 className="shrink-0 py-2.5"
               >
-                추천
+                {L("추천")}
               </Button>
             </div>
-            {looksLikeRealName(p.name) && <p className="text-[13px] text-amber-700 dark:text-amber-400">혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.</p>}
+            {looksLikeRealName(p.name) && <p className="text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</p>}
           </>
         );
       case "gender":
         return (
           <>
-            {question("성별을 알려 주세요", "입대 같은 일부 사건에만 쓰여요.")}
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label="성별">
+            {question(L("성별을 알려 주세요"), L("입대 같은 일부 사건에만 쓰여요."))}
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
               {(["남", "여", "기타"] as Gender[]).map((g) => (
                 <Choice key={g} selected={p.gender === g} onClick={() => pick("gender", g)}>
-                  {g}
+                  {({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[g]}
                 </Choice>
               ))}
             </div>
@@ -302,18 +306,18 @@ export function Onboarding({
       case "hometown":
         return (
           <>
-            {question("어디서 자랐나요?", "도시나 동네 이름이면 충분해요.")}
-            <Input data-autofocus aria-label="자란 지역" value={p.hometown} onChange={setField("hometown")} placeholder="예: 대전" maxLength={40} />
+            {question(L("어디서 자랐나요?"), L("도시나 동네 이름이면 충분해요."))}
+            <Input data-autofocus aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={L("예: 대전")} maxLength={40} />
           </>
         );
       case "schools":
         return (
           <>
-            {question("어느 학교를 다녔나요?", "학교 이름을 적으면 아래 연표가 바로 채워져요.")}
+            {question(L("어느 학교를 다녔나요?"), L("학교 이름을 적으면 아래 연표가 바로 채워져요."))}
             <div className="space-y-2">
-              <LabeledInput label="초등학교" autoFocus value={p.elementary} onChange={setField("elementary")} placeholder={`예: ${p.hometown || "대전"} 문화초`} />
-              <LabeledInput label="중학교" value={p.middle} onChange={setField("middle")} placeholder="예: 문화중" />
-              <LabeledInput label="고등학교" value={p.high} onChange={setField("high")} placeholder="예: 대전고" />
+              <LabeledInput label={L("초등학교")} autoFocus value={p.elementary} onChange={setField("elementary")} placeholder={isUS() ? "e.g. Lincoln Elementary" : `예: ${p.hometown || "대전"} 문화초`} />
+              <LabeledInput label={L("중학교")} value={p.middle} onChange={setField("middle")} placeholder={L("예: 문화중")} />
+              <LabeledInput label={L("고등학교")} value={p.high} onChange={setField("high")} placeholder={L("예: 대전고")} />
             </div>
             <SchoolTimeline profile={p} upTo="high" />
           </>
@@ -321,19 +325,19 @@ export function Onboarding({
       case "university":
         return (
           <>
-            {question("대학은 어디서 무엇을 공부했나요?", "재수했거나 늦게 들어갔다면 입학년도를 골라 주세요. 안 다녔다면 건너뛰어도 괜찮아요.")}
+            {question(L("대학은 어디서 무엇을 공부했나요?"), L("재수했거나 늦게 들어갔다면 입학년도를 골라 주세요. 안 다녔다면 건너뛰어도 괜찮아요."))}
             <div className="space-y-2">
-              <LabeledInput label="대학교" autoFocus value={p.university} onChange={setField("university")} placeholder="예: 충남대" />
-              <LabeledInput label="전공" value={p.major} onChange={setField("major")} placeholder="예: 경영학" />
+              <LabeledInput label={L("대학교")} autoFocus value={p.university} onChange={setField("university")} placeholder={L("예: 충남대")} />
+              <LabeledInput label={L("전공")} value={p.major} onChange={setField("major")} placeholder={L("예: 경영학")} />
               <label className="flex items-center gap-3">
-                <span className="w-16 shrink-0 text-sm font-medium text-stone-600 dark:text-stone-400">입학년도</span>
+                <span className="w-16 shrink-0 text-sm font-medium text-stone-600 dark:text-stone-400">{L("입학년도")}</span>
                 <Select className="flex-1" value={p.universityYear ?? ""} onChange={setField("universityYear")}>
-                  <option value="">{usualUniYear ? `고교 졸업 후 바로 (${usualUniYear}년)` : "선택"}</option>
+                  <option value="">{usualUniYear ? L`고교 졸업 후 바로 (${usualUniYear}년)` : L("선택")}</option>
                   {uniYears
                     .filter((y) => y !== usualUniYear)
                     .map((y) => (
                       <option key={y} value={y}>
-                        {y}년{!usualUniYear ? "" : y < usualUniYear ? " (조기 입학)" : ` (${y - usualUniYear}년 늦게)`}
+                        {y}{L("년")}{!usualUniYear ? "" : y < usualUniYear ? L(" (조기 입학)") : L` (${y - usualUniYear}년 늦게)`}
                       </option>
                     ))}
                 </Select>
@@ -345,13 +349,13 @@ export function Onboarding({
       case "family":
         return (
           <>
-            {question("어떤 집에서 자랐나요?", "부모님 일, 형제, 집안 분위기를 편하게 적어 주세요.")}
+            {question(L("어떤 집에서 자랐나요?"), L("부모님 일, 형제, 집안 분위기를 편하게 적어 주세요."))}
             <Textarea
               data-autofocus
-              aria-label="가족과 자란 환경"
+              aria-label={L("가족과 자란 환경")}
               value={p.family}
               onChange={setField("family")}
-              placeholder="예: 공무원 아버지와 미용실을 하던 어머니, 누나 한 명. 넉넉하진 않았지만 화목했다."
+              placeholder={L("예: 공무원 아버지와 미용실을 하던 어머니, 누나 한 명. 넉넉하진 않았지만 화목했다.")}
               maxLength={800}
             />
           </>
@@ -359,7 +363,7 @@ export function Onboarding({
       case "mbti":
         return (
           <>
-            {question("MBTI가 뭔가요?", "몰라도 괜찮아요. 네 문항이면 대략 알 수 있어요.")}
+            {question(L("MBTI가 뭔가요?"), L("몰라도 괜찮아요. 네 문항이면 대략 알 수 있어요."))}
             {quiz ? (
               <MbtiQuiz
                 answers={quiz}
@@ -385,7 +389,7 @@ export function Onboarding({
                   onClick={() => setQuiz([])}
                   className="min-h-11 w-full rounded-xl border border-dashed border-indigo-300 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950"
                 >
-                  모르겠어요 → 4문항 간단 테스트
+                  {L("모르겠어요 → 4문항 간단 테스트")}
                 </button>
               </>
             )}
@@ -394,9 +398,9 @@ export function Onboarding({
       case "personality":
         return (
           <>
-            {question("나는 어떤 사람인가요?", "성격, 가치관, 습관, 좋아하는 것. 자세할수록 이야기가 나다워져요.")}
-            <div className="flex flex-wrap gap-1.5" role="group" aria-label="자주 쓰는 표현 넣기">
-              {PERSONALITY_CHIPS.map((c) => {
+            {question(L("나는 어떤 사람인가요?"), L("성격, 가치관, 습관, 좋아하는 것. 자세할수록 이야기가 나다워져요."))}
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label={L("자주 쓰는 표현 넣기")}>
+              {personalityChips().map((c) => {
                 const on = p.personality.includes(c);
                 return (
                   <button
@@ -425,11 +429,11 @@ export function Onboarding({
               })}
             </div>
             <Textarea
-              aria-label="나는 어떤 사람인가요"
+              aria-label={L("나는 어떤 사람인가요")}
               rows={4}
               value={p.personality}
               onChange={setField("personality")}
-              placeholder="예: 겉으로는 무난하지만 속으로 고민이 많다. 안정을 좋아하면서도 늘 다른 삶을 상상한다."
+              placeholder={L("예: 겉으로는 무난하지만 속으로 고민이 많다. 안정을 좋아하면서도 늘 다른 삶을 상상한다.")}
               maxLength={1500}
             />
           </>
@@ -437,14 +441,14 @@ export function Onboarding({
       case "current":
         return (
           <>
-            {question("지금은 어떻게 살고 있나요?", "엔딩에서 실제 삶과 비교할 때 써요.")}
+            {question(L("지금은 어떻게 살고 있나요?"), L("엔딩에서 실제 삶과 비교할 때 써요."))}
             <Textarea
               data-autofocus
-              aria-label="지금의 나"
+              aria-label={L("지금의 나")}
               rows={4}
               value={p.currentLife}
               onChange={setField("currentLife")}
-              placeholder="예: 서울의 IT 회사 기획자. 결혼 3년 차, 아이는 아직 없다. 일은 안정적이지만 가끔 허전하다."
+              placeholder={L("예: 서울의 IT 회사 기획자. 결혼 3년 차, 아이는 아직 없다. 일은 안정적이지만 가끔 허전하다.")}
               maxLength={800}
             />
           </>
@@ -453,9 +457,9 @@ export function Onboarding({
         const recs = suggestions(p.birthDate, p.gender, now);
         return (
           <>
-            {question("돌아가고 싶은 순간은 어떤 갈림길이었나요?", "가장 가까운 것을 골라 주세요. 다음 질문이 그에 맞게 바뀌어요.")}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="변곡점 유형">
-              {TP_KINDS.map((k) => (
+            {question(L("돌아가고 싶은 순간은 어떤 갈림길이었나요?"), L("가장 가까운 것을 골라 주세요. 다음 질문이 그에 맞게 바뀌어요."))}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label={L("변곡점 유형")}>
+              {tpKinds().map((k) => (
                 <Choice key={k.id} selected={tp.kind === k.label} onClick={() => setTp({ ...tp, kind: tp.kind === k.label ? undefined : k.label })}>
                   <span aria-hidden className="mr-1">
                     {k.icon}
@@ -466,7 +470,7 @@ export function Onboarding({
             </div>
             {recs.length > 0 && (
               <Suggestions
-                title="이 나이에 많이들 겪는 순간"
+                title={L("이 나이에 많이들 겪는 순간")}
                 items={recs}
                 current={tp.date}
                 onPick={(s) => {
@@ -483,7 +487,7 @@ export function Onboarding({
         const recs = suggestions(p.birthDate, p.gender, now, tp.kind && kind.id);
         return (
           <>
-            {question("그때가 언제였나요?", age !== null && tp.date ? `그때 ${age}살이었어요.` : `${birthYear ? birthYear + 7 : 1940}년(일곱 살)부터 고를 수 있어요.`)}
+            {question(L("그때가 언제였나요?"), age !== null && tp.date ? L`그때 ${age}살이었어요.` : L`${birthYear ? birthYear + 7 : 1940}년(일곱 살)부터 고를 수 있어요.`)}
             <DatePicker
               id="tp-date"
               value={tpYm}
@@ -496,7 +500,7 @@ export function Onboarding({
             />
             {recs.length > 0 && (
               <Suggestions
-                title="혹시 이때였나요?"
+                title={L("혹시 이때였나요?")}
                 items={recs}
                 current={tp.date}
                 onPick={(s) => {
@@ -512,27 +516,42 @@ export function Onboarding({
       case "situation":
         return (
           <>
-            {question("어떤 상황이었나요?", mode === "template" ? "빈칸만 채우면 문장이 완성돼요." : "고민, 주변 상황, 마음을 자유롭게 적어 주세요.")}
+            {question(L("어떤 상황이었나요?"), mode === "template" ? L("빈칸만 채우면 문장이 완성돼요.") : L("고민, 주변 상황, 마음을 자유롭게 적어 주세요."))}
             {mode === "template" ? (
               <div className="space-y-3 rounded-2xl bg-stone-50 p-4 leading-loose dark:bg-stone-800/50">
                 <p className="text-[15px] leading-[2.6]">
-                  {age !== null && age >= 0 && <b>{age}살, </b>}
-                  <Blank id="blank-a" autoFocus value={blanks.a} placeholder={kind.a} onChange={(a) => setBlank({ ...blanks, a })} invalid={err?.id === "blank-a"} label="첫 번째 갈래" />
-                  <span>{blanks.a.trim() ? josa(blanks.a, "와", "과") : "와(과)"} </span>
-                  <Blank id="blank-b" value={blanks.b} placeholder={kind.b} onChange={(b) => setBlank({ ...blanks, b })} invalid={err?.id === "blank-b"} label="두 번째 갈래" />
-                  <span> 사이에서 고민했다. 가장 마음에 걸린 건 </span>
-                  <Blank id="blank-why" value={blanks.why} placeholder={kind.why} onChange={(why) => setBlank({ ...blanks, why })} label="마음에 걸린 것" />
-                  <span>{blanks.why.trim() ? josa(blanks.why, "였다", "이었다") : "(이)었다"}.</span>
+                  {isUS() ? (
+                    <>
+                      {age !== null && age >= 0 && <b>At {age}, </b>}
+                      <span>I was torn between </span>
+                      <Blank id="blank-a" autoFocus value={blanks.a} placeholder={kind.a} onChange={(a) => setBlank({ ...blanks, a })} invalid={err?.id === "blank-a"} label="First path" />
+                      <span> and </span>
+                      <Blank id="blank-b" value={blanks.b} placeholder={kind.b} onChange={(b) => setBlank({ ...blanks, b })} invalid={err?.id === "blank-b"} label="Second path" />
+                      <span>. What weighed on me most was </span>
+                      <Blank id="blank-why" value={blanks.why} placeholder={kind.why} onChange={(why) => setBlank({ ...blanks, why })} label="What weighed on you" />
+                      <span>.</span>
+                    </>
+                  ) : (
+                    <>
+                      {age !== null && age >= 0 && <b>{age}살, </b>}
+                      <Blank id="blank-a" autoFocus value={blanks.a} placeholder={kind.a} onChange={(a) => setBlank({ ...blanks, a })} invalid={err?.id === "blank-a"} label="첫 번째 갈래" />
+                      <span>{blanks.a.trim() ? josa(blanks.a, "와", "과") : "와(과)"} </span>
+                      <Blank id="blank-b" value={blanks.b} placeholder={kind.b} onChange={(b) => setBlank({ ...blanks, b })} invalid={err?.id === "blank-b"} label="두 번째 갈래" />
+                      <span> 사이에서 고민했다. 가장 마음에 걸린 건 </span>
+                      <Blank id="blank-why" value={blanks.why} placeholder={kind.why} onChange={(why) => setBlank({ ...blanks, why })} label="마음에 걸린 것" />
+                      <span>{blanks.why.trim() ? josa(blanks.why, "였다", "이었다") : "(이)었다"}.</span>
+                    </>
+                  )}
                 </p>
               </div>
             ) : (
               <Textarea
                 id="tp-situation"
                 data-autofocus
-                aria-label="어떤 상황이었나요"
+                aria-label={L("어떤 상황이었나요")}
                 value={tp.situation}
                 onChange={(e) => setTp({ ...tp, situation: e.target.value })}
-                placeholder="예: 고3 수능을 기대보다 못 봤다. 재수를 할지, 성적에 맞춰 지방대에 갈지 고민했다."
+                placeholder={L("예: 고3 수능을 기대보다 못 봤다. 재수를 할지, 성적에 맞춰 지방대에 갈지 고민했다.")}
                 maxLength={1000}
                 aria-invalid={!!err || undefined}
                 aria-describedby={err ? "situation-error" : undefined}
@@ -547,9 +566,9 @@ export function Onboarding({
                   setTried(false);
                 }}
               >
-                예시로 채워 보기
+                {L("예시로 채워 보기")}
               </SmallButton>
-              <SmallButton onClick={() => switchMode(mode === "template" ? "free" : "template")}>{mode === "template" ? "직접 자유롭게 쓰기" : "빈칸 채우기로 쓰기"}</SmallButton>
+              <SmallButton onClick={() => switchMode(mode === "template" ? "free" : "template")}>{mode === "template" ? L("직접 자유롭게 쓰기") : L("빈칸 채우기로 쓰기")}</SmallButton>
             </div>
           </>
         );
@@ -557,9 +576,9 @@ export function Onboarding({
         const options = [blanks.a, blanks.b].map((s) => s.trim()).filter(Boolean);
         return (
           <>
-            {question("실제로는 어떤 선택을 했나요?", "이번 인생에서는 다른 길을 가볼 수 있어요.")}
+            {question(L("실제로는 어떤 선택을 했나요?"), L("이번 인생에서는 다른 길을 가볼 수 있어요."))}
             {options.length > 0 && (
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label="고민했던 갈래">
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label={L("고민했던 갈래")}>
                 {options.map((o) => (
                   <Choice key={o} selected={tp.actualChoice === o} onClick={() => setTp({ ...tp, actualChoice: tp.actualChoice === o ? "" : o })}>
                     {o}
@@ -567,29 +586,28 @@ export function Onboarding({
                 ))}
               </div>
             )}
-            <Input data-autofocus={options.length ? undefined : true} aria-label="실제로 한 선택" value={tp.actualChoice} onChange={(e) => setTp({ ...tp, actualChoice: e.target.value })} placeholder="예: 재수하지 않고 지방대에 갔다" maxLength={100} />
+            <Input data-autofocus={options.length ? undefined : true} aria-label={L("실제로 한 선택")} value={tp.actualChoice} onChange={(e) => setTp({ ...tp, actualChoice: e.target.value })} placeholder={L("예: 재수하지 않고 지방대에 갔다")} maxLength={100} />
           </>
         );
       }
       case "regret":
         return (
           <>
-            {question("무엇이 아쉬웠나요?", "그때의 마음을 적어 주면 이야기에 담겨요.")}
-            <Textarea data-autofocus aria-label="아쉬웠던 점" rows={3} value={tp.regret} onChange={(e) => setTp({ ...tp, regret: e.target.value })} placeholder="예: 그때 한 번만 더 도전했다면 어땠을까." maxLength={600} />
+            {question(L("무엇이 아쉬웠나요?"), L("그때의 마음을 적어 주면 이야기에 담겨요."))}
+            <Textarea data-autofocus aria-label={L("아쉬웠던 점")} rows={3} value={tp.regret} onChange={(e) => setTp({ ...tp, regret: e.target.value })} placeholder={L("예: 그때 한 번만 더 도전했다면 어땠을까.")} maxLength={600} />
           </>
         );
       case "review":
         return (
           <>
-            {question("이 정보로 시작할까요?", "고치고 싶은 항목은 바로 수정할 수 있어요.")}
+            {question(L("이 정보로 시작할까요?"), L("고치고 싶은 항목은 바로 수정할 수 있어요."))}
             <Review profile={p} tp={tp} onEdit={(id) => go(indexOf(id), true)} />
             <label className="flex cursor-pointer gap-3 rounded-xl border border-stone-200 p-4 dark:border-stone-800">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-indigo-600" />
               <span className="space-y-1">
-                <span className="block text-sm font-semibold">다음에 다시 입력하지 않도록 이 기기에 저장하기</span>
+                <span className="block text-sm font-semibold">{L("다음에 다시 입력하지 않도록 이 기기에 저장하기")}</span>
                 <span className="block text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-                  암호화해서 이 브라우저에만 보관하고 서버에는 저장하지 않아요. {PROFILE_TTL_DAYS}일 동안 쓰지 않으면 자동으로 지워지고, 첫 화면에서 언제든 지울 수
-                  있어요. 여러 사람이 쓰는 기기라면 체크하지 마세요.
+                  {L("암호화해서 이 브라우저에만 보관하고 서버에는 저장하지 않아요.")} {PROFILE_TTL_DAYS}{L("일 동안 쓰지 않으면 자동으로 지워지고, 첫 화면에서 언제든 지울 수 있어요. 여러 사람이 쓰는 기기라면 체크하지 마세요.")}
                 </span>
               </span>
             </label>
@@ -621,18 +639,18 @@ export function Onboarding({
           </Card>
           <div className="flex gap-2">
             <Button type="button" variant="ghost" onClick={back} className="min-h-11">
-              이전
+              {L("이전")}
             </Button>
             {!cur.required && !isLast && (
               <Button type="button" variant="ghost" onClick={() => go(toReview ? indexOf("review") : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
-                건너뛰기
+                {L("건너뛰기")}
               </Button>
             )}
             <Button type="submit" className="min-h-11 flex-1">
-              {isLast ? "그날로 돌아가기" : toReview ? "확인" : "다음"}
+              {isLast ? L("그날로 돌아가기") : toReview ? L("확인") : L("다음")}
             </Button>
           </div>
-          {!isLast && <p className="hidden text-center text-xs text-stone-500 sm:block dark:text-stone-400">Enter 키를 눌러도 다음으로 넘어가요.</p>}
+          {!isLast && <p className="hidden text-center text-xs text-stone-500 sm:block dark:text-stone-400">{L("Enter 키를 눌러도 다음으로 넘어가요.")}</p>}
         </form>
       </div>
       <div className="sticky top-6 hidden lg:block">
@@ -650,13 +668,13 @@ function Progress({ step }: { step: number }) {
       <div className="flex items-baseline justify-between text-sm">
         <span className="font-semibold text-indigo-700 dark:text-indigo-300">{cur.section}</span>
         <span className="text-stone-500 tabular-nums dark:text-stone-400">
-          {step + 1} / {STEPS.length} · {cur.id === "review" ? "마지막 확인" : `${remaining(step)} 남음`}
+          {step + 1} / {STEPS.length} · {cur.id === "review" ? L("마지막 확인") : L`${remaining(step)} 남음`}
         </span>
       </div>
       <div
         className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
         role="progressbar"
-        aria-label="입력 진행률"
+        aria-label={L("입력 진행률")}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={pct}
@@ -699,7 +717,7 @@ function SmallButton({ onClick, children }: { onClick: () => void; children: Rea
 function LabeledInput({ label, autoFocus, ...props }: { label: string; autoFocus?: boolean; value: string; onChange: (e: { target: { value: string } }) => void; placeholder?: string }) {
   return (
     <label className="flex items-center gap-3">
-      <span className="w-16 shrink-0 text-sm font-medium text-stone-600 dark:text-stone-400">{label}</span>
+      <span className="w-16 shrink-0 text-sm font-medium text-stone-600 sm:w-20 dark:text-stone-400">{cap(label)}</span>
       <Input {...props} data-autofocus={autoFocus || undefined} maxLength={60} />
     </label>
   );
@@ -739,7 +757,7 @@ function Suggestions({ title, items, current, onPick }: { title: string; items: 
                 : "border-stone-300 hover:border-indigo-400 dark:border-stone-700"
             }`}
           >
-            <b className="font-semibold">{s.age}살</b> {s.label} <span className="text-stone-500 dark:text-stone-400">· {s.date.slice(0, 4)}</span>
+            <b className="font-semibold">{ageText(s.age, "살")}</b> {s.label} <span className="text-stone-500 dark:text-stone-400">· {s.date.slice(0, 4)}</span>
           </button>
         ))}
       </div>
@@ -754,7 +772,7 @@ function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" |
   // Three stages fit a phone's width, so the university step shows high school → university.
   const stages = upTo === "high" ? sy.stages.slice(0, 3) : sy.stages.slice(2);
   return (
-    <div className="rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50" aria-label="학교 연표">
+    <div className="rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50" aria-label={L("학교 연표")}>
       <ol className="flex items-stretch gap-1.5">
         {stages.map((s, i) => (
           <li key={s.key} className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -779,7 +797,7 @@ function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" |
         ))}
       </ol>
       <p className="mt-2 text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
-        {p.birthDate.slice(0, 4)}년생 기준으로 계산했어요{sy.early ? " (1~2월생이라 한 해 일찍 입학한 빠른년생 기준)" : ""}.{upTo === "university" ? ` 대학은 ${p.universityYear ? `${p.universityYear}년 입학, ` : ""}4년제, 휴학·군대 없이 계산했어요.` : ""}
+        {p.birthDate.slice(0, 4)}{L("년생 기준으로 계산했어요")}{sy.early ? L(" (1~2월생이라 한 해 일찍 입학한 빠른년생 기준)") : ""}.{upTo === "university" ? L` 대학은 ${p.universityYear ? L`${p.universityYear}년 입학, ` : ""}4년제, 휴학·군대 없이 계산했어요.` : ""}
       </p>
     </div>
   );
@@ -791,10 +809,10 @@ function MbtiQuiz({ answers, onAnswer, onCancel }: { answers: string[]; onAnswer
     <div className="space-y-3 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50" style={{ animation: "fadein .2s ease-out" }}>
       <div className="flex items-center justify-between text-sm">
         <span className="font-semibold text-indigo-700 dark:text-indigo-300">
-          간단 테스트 {answers.length + 1} / {MBTI_QUIZ.length}
+          {L("간단 테스트")} {answers.length + 1} / {MBTI_QUIZ.length}
         </span>
         <button type="button" onClick={onCancel} className="min-h-11 px-1 text-stone-500 underline-offset-2 hover:underline dark:text-stone-400">
-          그만두기
+          {L("그만두기")}
         </button>
       </div>
       <p key={q.q} className="font-semibold" role="status">
@@ -818,39 +836,40 @@ function MbtiQuiz({ answers, onAnswer, onCancel }: { answers: string[]; onAnswer
 
 function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint; onEdit: (id: StepId) => void }) {
   const rows: [StepId, string, string][] = [
-    ["birth", "생년월일", p.birthDate ? p.birthDate.replace(/^(\d+)-0?(\d+)-0?(\d+)$/, "$1년 $2월 $3일") : ""],
-    ["name", "별명", p.name],
-    ["gender", "성별", p.gender],
-    ["hometown", "자란 곳", p.hometown],
-    ["schools", "학교", [p.elementary, p.middle, p.high].filter(Boolean).join(" → ")],
-    ["university", "대학", [p.university, p.major, p.university && p.universityYear ? `${p.universityYear}년 입학` : ""].filter(Boolean).join(" · ")],
-    ["family", "가족", p.family],
+    ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : ""],
+    ["name", L("별명"), p.name],
+    ["gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender)],
+    ["hometown", L("자란 곳"), p.hometown],
+    ["schools", L("학교"), [p.elementary, p.middle, p.high].filter(Boolean).join(" → ")],
+    ["university", L("대학"), [p.university, p.major, p.university && p.universityYear ? L`${p.universityYear}년 입학` : ""].filter(Boolean).join(" · ")],
+    ["family", L("가족"), p.family],
     ["mbti", "MBTI", p.mbti],
-    ["personality", "성격", p.personality],
-    ["current", "지금의 나", p.currentLife],
-    ["kind", "변곡점", tp.kind ?? ""],
-    ["date", "그때", tp.date ? tp.date.replace(/^(\d+)-0?(\d+)$/, "$1년 $2월") : ""],
-    ["situation", "상황", tp.situation],
-    ["actual", "실제 선택", tp.actualChoice],
-    ["regret", "아쉬움", tp.regret],
+    ["personality", L("성격"), p.personality],
+    ["current", L("지금의 나"), p.currentLife],
+    ["kind", L("변곡점"), tp.kind ?? ""],
+    ["date", L("그때"), tp.date ? ymText(tp.date) : ""],
+    ["situation", L("상황"), tp.situation],
+    ["actual", L("실제 선택"), tp.actualChoice],
+    ["regret", L("아쉬움"), tp.regret],
   ];
   return (
     <dl className="divide-y divide-stone-100 dark:divide-stone-800">
-      {rows.map(([id, label, value]) => {
+      {rows.map(([id, rawLabel, value]) => {
+        const label = cap(rawLabel);
         const required = STEPS[indexOf(id)].required;
         return (
           <div key={id} className="flex items-center gap-3 py-1.5">
             <dt className="w-16 shrink-0 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
             <dd className={`min-w-0 flex-1 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
-              {value || (required ? "꼭 필요해요" : "건너뜀")}
+              {value || (required ? L("꼭 필요해요") : L("건너뜀"))}
             </dd>
             <button
               type="button"
               onClick={() => onEdit(id)}
-              aria-label={`${label} 수정`}
+              aria-label={L`${label} 수정`}
               className="min-h-11 shrink-0 rounded-lg px-2.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"
             >
-              수정
+              {L("수정")}
             </button>
           </div>
         );

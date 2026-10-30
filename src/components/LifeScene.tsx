@@ -2,6 +2,7 @@
 
 import { memo, type ReactNode } from "react";
 import type { Era, Outfit, Person, SceneState, Season } from "@/lib/scene";
+import { L } from "@/lib/i18n";
 
 // The world scrolls past in four layers at different speeds while the family walks in place.
 // Every moving part is a CSS transform on its own layer, so the browser composites it without repainting.
@@ -18,7 +19,7 @@ const SKY: Record<Season, [string, string]> = {
 
 const MOUNTAIN: Record<Season, string> = { spring: "#a3c9ab", sunny: "#73b083", rain: "#7f9a8c", autumn: "#c8915e", snow: "#d4dee9" };
 const CANOPY: Record<Season, string> = { spring: "#f6b3cc", sunny: "#4caf50", rain: "#3e8b4a", autumn: "#e8892f", snow: "#eef3f8" };
-const SEASON_LABEL: Record<Season, string> = { spring: "봄 🌸", sunny: "여름 ☀️", rain: "장마 ☔", autumn: "가을 🍁", snow: "겨울 ❄️" };
+const SEASON_LABEL: Record<Season, string> = { get spring() { return L("봄 🌸"); }, get sunny() { return L("여름 ☀️"); }, get rain() { return L("장마 ☔"); }, get autumn() { return L("가을 🍁"); }, get snow() { return L("겨울 ❄️"); } };
 
 export const LifeScene = memo(function LifeScene({ scene, paused, slim = false, children }: { scene: SceneState; paused: boolean; slim?: boolean; children?: ReactNode }) {
   const [top, bottom] = SKY[scene.season];
@@ -27,7 +28,7 @@ export const LifeScene = memo(function LifeScene({ scene, paused, slim = false, 
       className={`relative overflow-hidden rounded-xl transition-[height] duration-300 motion-reduce:transition-none lg:h-[140px] ${slim ? "h-[52px]" : "h-[104px] sm:h-[140px]"} ${paused ? "scene-paused" : ""}`}
       style={{ background: `linear-gradient(${top}, ${bottom})` }}
       role="img"
-      aria-label={`${scene.year}년 ${scene.month}월, ${SEASON_LABEL[scene.season].split(" ")[0]}의 거리를 걷는 모습`}
+      aria-label={L`${scene.year}년 ${scene.month}월, ${SEASON_LABEL[scene.season].split(" ")[0]}의 거리를 걷는 모습`}
     >
       <Sun season={scene.season} />
       <Layer dur={150} tile={400}>
@@ -198,7 +199,7 @@ function Apartments() {
           <rect x={bx} y={GROUND - h} width={w} height="4" fill="#c9bfae" />
           <Windows x={bx + 5} y={GROUND - h + 12} w={w - 10} h={h - 16} cw={9} ch={8} color="#9fb7c9" />
           <text x={bx + 5} y={GROUND - h + 10} fontSize="5.5" fill="#8a7f70" fontWeight="700">
-            {label}동
+            {label}{L("동")}
           </text>
         </g>
       ))}
@@ -355,7 +356,7 @@ function Home({ x, era, snow }: { x: number; era: Era; snow: boolean }) {
       <rect x={x + 62} y={GROUND - 18} width="1.6" height="18" fill="#7b5a3c" />
       <rect x={x + 57} y={GROUND - 26} width="22" height="9" rx="1.5" fill="#ffffff" stroke="#e2574c" strokeWidth="0.8" />
       <text x={x + 68} y={GROUND - 19.6} fontSize="5.5" fontWeight="700" textAnchor="middle" fill="#c2372d">
-        우리 집
+        {L("우리 집")}
       </text>
     </g>
   );

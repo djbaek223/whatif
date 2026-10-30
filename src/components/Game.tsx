@@ -36,6 +36,8 @@ import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft 
 import { PlayView, type Speed } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
+import { L } from "@/lib/i18n";
+import { setRegion, type Region } from "@/lib/region";
 
 // Everyday moments, small dilemmas, follow-ups and rare moments written for each life (hybrid.ts).
 // NEXT_PUBLIC_WHATIF_HYBRID=0 turns it off for new lives: every event then plays from the pool.
@@ -45,6 +47,8 @@ type Screen = "intro" | "profile" | "turning" | "loading" | "play" | "ending";
 
 interface Saved {
   screen: Screen;
+  region?: Region; // the country picked on the first screen; a life carries its own
+
   profile: Profile;
   tp: TurningPoint;
   life: LifeState | null;
@@ -52,8 +56,29 @@ interface Saved {
 }
 
 
-export default function Game() {
+const REGION_KEY = "whatif.region";
+
+// Each country is named in its own language, so a player who can't read the other one still finds theirs.
+const COUNTRIES: { id: Region; flag: string; name: string; lang: string }[] = [
+  { id: "kr", flag: "🇰🇷", name: "한국에서", lang: "ko" },
+  { id: "us", flag: "🇺🇸", name: "In the US", lang: "en" },
+];
+
+/** The country picked last time on this device, or one guessed from the browser's language. */
+function guessRegion(): Region {
+  try {
+    const kept = localStorage.getItem(REGION_KEY);
+    if (kept === "us" || kept === "kr") return kept;
+  } catch {
+    // storage blocked: fall through to the language
+  }
+  return /^ko\b/i.test(navigator.language) ? "kr" : /^en\b/i.test(navigator.language) ? "us" : "kr";
+}
+
+/** initialRegion comes from the address: /en opens with the American life picked. */
+export default function Game({ initialRegion }: { initialRegion?: Region } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
+  const [country, setCountry] = useState<Region>(initialRegion ?? "kr");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [tp, setTp] = useState<TurningPoint>(EMPTY_TP);
   const [life, setLife] = useState<LifeState | null>(null);
@@ -71,8 +96,27 @@ export default function Game() {
   const [draft, setDraft] = useState<WizardDraft | null>(null); // answers restored after a refresh
   const personalized = useRef<string | null>(null);
 
+  // Texts follow the life on screen; before a life starts, the country picked on the first screen.
+  const shownRegion: Region = life && (screen === "play" || screen === "ending") ? (life.region ?? "kr") : country;
+  setRegion(shownRegion);
+
+  useEffect(() => {
+    document.documentElement.lang = shownRegion === "us" ? "en" : "ko";
+  }, [shownRegion]);
+
+  const pickCountry = (r: Region) => {
+    setCountry(r);
+    try {
+      localStorage.setItem(REGION_KEY, r);
+    } catch {
+      // not remembered; the address still says which
+    }
+    window.history.replaceState(null, "", r === "us" ? "/en" : "/");
+  };
+
   // Restore the saved profile and game, and check whether the server has an AI key.
   useEffect(() => {
+    if (!initialRegion) setCountry(guessRegion()); // eslint-disable-line react-hooks/set-state-in-effect
     dropLegacySaves();
     loadProfile().then((sp) => {
       setStored(sp);
@@ -89,15 +133,15 @@ export default function Game() {
       setScreen((s) => (s === "intro" ? "profile" : s));
     });
     aiAvailable().then(setAi);
-  }, []);
+  }, [initialRegion]);
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
-    writeProgress({ screen, profile, tp, life, ending } satisfies Saved, remember);
-  }, [screen, profile, tp, life, ending, remember]);
+    writeProgress({ screen, region: country, profile, tp, life, ending } satisfies Saved, remember);
+  }, [screen, country, profile, tp, life, ending, remember]);
 
   const eraseDevice = async () => {
-    if (!confirm("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요.")) return;
+    if (!confirm(L("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요."))) return;
     await eraseAll();
     setStored(null);
     setRemember(false);
@@ -115,6 +159,7 @@ export default function Game() {
     setTp(saved.tp);
     // Lives saved before AI-written moments existed pick them up when AI is on.
     setLife(saved.life ? { ...saved.life, ai } : null);
+    setCountry(saved.life?.region ?? saved.region ?? country);
     setEnding(saved.ending);
     setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
   };
@@ -151,7 +196,7 @@ export default function Game() {
       : null;
     const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
     personalized.current = null;
-    setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID })));
+    setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID, region: country })));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -269,40 +314,59 @@ export default function Game() {
           <div>
             <p className="text-sm font-semibold tracking-widest text-indigo-600 dark:text-indigo-400">WHAT IF</p>
             <h1 className="mt-3 text-4xl font-bold leading-tight">
-              그때 다른 선택을 했다면,
+              {L("그때 다른 선택을 했다면,")}
               <br />
-              지금 나는 어떻게 살고 있을까?
+              {L("지금 나는 어떻게 살고 있을까?")}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-stone-600 dark:text-stone-400">
-              인생의 한 순간으로 돌아가 다른 선택을 하고, 그 인생을 마지막 날까지 살아보세요.
+              {L("인생의 한 순간으로 돌아가 다른 선택을 하고, 그 인생을 마지막 날까지 살아보세요.")}
             </p>
           </div>
           <div className="space-y-3">
+            <div role="radiogroup" aria-label={L("어느 나라의 인생을 살아볼까요?")} className="grid grid-cols-2 gap-2">
+              {COUNTRIES.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={country === c.id}
+                  onClick={() => pickCountry(c.id)}
+                  className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
+                    country === c.id
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-800 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-200"
+                      : "border-stone-200 text-stone-700 hover:border-stone-400 dark:border-stone-800 dark:text-stone-300"
+                  }`}
+                >
+                  <span aria-hidden>{c.flag}</span>
+                  <span lang={c.lang}>{c.name}</span>
+                </button>
+              ))}
+            </div>
             <Button className="w-full py-4 text-base" onClick={startNew}>
-              시작하기
+              {L("시작하기")}
             </Button>
             {saved?.life && (
               <Button variant="ghost" className="w-full" onClick={resume}>
-                이어하기
+                {L("이어하기")}
               </Button>
             )}
             {stored && (
               <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3 text-sm dark:border-stone-800">
                 <span className="text-stone-600 dark:text-stone-400">
-                  저장된 기본정보: <b className="text-stone-900 dark:text-stone-100">{stored.profile.name || "별명 없음"}</b> · {stored.profile.birthDate.slice(0, 4)}년생
+                  {L("저장된 기본정보:")} <b className="text-stone-900 dark:text-stone-100">{stored.profile.name || L("별명 없음")}</b> · {L`${stored.profile.birthDate.slice(0, 4)}년생`}
                 </span>
                 <button type="button" onClick={eraseDevice} className="-my-2 shrink-0 px-1 py-2 text-rose-700 underline-offset-2 hover:underline dark:text-rose-400">
-                  지우기
+                  {L("지우기")}
                 </button>
               </div>
             )}
             <p className="text-center text-xs text-stone-500 dark:text-stone-400">
-              {ai ? "AI 내레이션이 켜져 있어요." : "AI 키가 없어 기본 문장으로 진행해요."} 입력한 정보는 서버에 보관하지 않아요.
+              {ai ? L("AI 내레이션이 켜져 있어요.") : L("AI 키가 없어 기본 문장으로 진행해요.")} {L("입력한 정보는 서버에 보관하지 않아요.")}
               {!stored && saved && (
                 <>
                   {" "}
                   <button type="button" onClick={eraseDevice} className="-my-2 py-2 underline underline-offset-2">
-                    진행 기록 지우기
+                    {L("진행 기록 지우기")}
                   </button>
                 </>
               )}
@@ -364,7 +428,7 @@ export default function Game() {
             onClosePresent: () => setPresentOpen(false),
             onQuit: () => {
               setAuto(false);
-              setSaved({ screen, profile, tp, life, ending });
+              setSaved({ screen, region: country, profile, tp, life, ending });
               setScreen("intro");
             },
           }}

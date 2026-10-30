@@ -1,6 +1,7 @@
 // Helpers for the profile and turning point questions: school years, sentence templates, suggestions and the MBTI quiz.
 import { isUS } from "./region";
 import type { TurningPoint } from "./types";
+import { L } from "./i18n";
 
 const hasFinal = (word: string) => {
   const c = word.trim().slice(-1).charCodeAt(0);
@@ -42,10 +43,10 @@ export function schoolYears(birthDate: string, universityYear?: string): { stage
   return {
     early,
     stages: [
-      { key: "elementary", label: "초등학교", from: e, to: e + 6 },
-      { key: "middle", label: "중학교", from: e + 6, to: e + 9 },
-      { key: "high", label: "고등학교", from: e + 9, to: e + 12 },
-      { key: "university", label: "대학교", from: uni, to: uni + 4 },
+      { key: "elementary", label: L("초등학교"), from: e, to: e + 6 },
+      { key: "middle", label: L("중학교"), from: e + 6, to: e + 9 },
+      { key: "high", label: L("고등학교"), from: e + 9, to: e + 12 },
+      { key: "university", label: L("대학교"), from: uni, to: uni + 4 },
     ],
   };
 }
@@ -63,7 +64,7 @@ export interface TpKindDef {
   example: { a: string; b: string; why: string };
 }
 
-export const TP_KINDS: TpKindDef[] = [
+const TP_KINDS: TpKindDef[] = [
   { id: "exam", label: "입시", icon: "🎓", a: "재수", b: "성적에 맞춰 진학", why: "부모님 형편", example: { a: "재수", b: "성적에 맞춰 지방대 진학", why: "또 1년을 버틸 자신이 없었던 것" } },
   { id: "job", label: "취업", icon: "💼", a: "대기업 인턴", b: "스타트업 정규직", why: "안정성", example: { a: "합격한 중견기업 입사", b: "1년 더 대기업 준비", why: "점점 줄어드는 통장 잔고" } },
   { id: "love", label: "연애·결혼", icon: "💍", a: "지금 결혼", b: "조금 더 기다림", why: "서로 다른 미래 계획", example: { a: "5년 사귄 사람과 결혼", b: "헤어지고 유학", why: "그 사람을 혼자 두는 것" } },
@@ -73,7 +74,21 @@ export const TP_KINDS: TpKindDef[] = [
   { id: "other", label: "기타", icon: "✏️", a: "첫 번째 길", b: "두 번째 길", why: "가장 걸렸던 것", example: { a: "군대 일찍 가기", b: "대학 졸업 후 입대", why: "친구들과 멀어지는 것" } },
 ];
 
-export const kindDef = (labelOrId?: string) => TP_KINDS.find((k) => k.label === labelOrId || k.id === labelOrId);
+// The same kinds for an American life, with American examples.
+const US_TP_KINDS: TpKindDef[] = [
+  { id: "exam", label: "School", icon: "🎓", a: "a gap year", b: "the school I got into", why: "money", example: { a: "a gap year to reapply", b: "the state school that accepted me", why: "the thought of another year of waiting" } },
+  { id: "job", label: "First job", icon: "💼", a: "a big-company internship", b: "a startup job", why: "security", example: { a: "the offer from a mid-size company", b: "holding out for Google", why: "my shrinking bank balance" } },
+  { id: "love", label: "Love & marriage", icon: "💍", a: "getting married now", b: "waiting a little longer", why: "our different plans", example: { a: "marrying my college sweetheart", b: "breaking up to move to Chicago", why: "leaving them behind" } },
+  { id: "career", label: "Career change", icon: "🚀", a: "staying at my company", b: "starting a business", why: "supporting my family", example: { a: "staying at the company I'd been at for ten years", b: "opening a coffee shop with a friend", why: "my kids' college fund" } },
+  { id: "move", label: "Moving", icon: "✈️", a: "staying in my hometown", b: "moving to California", why: "leaving my parents", example: { a: "staying in Ohio", b: "moving to New York", why: "my mom living alone" } },
+  { id: "invest", label: "Money & home", icon: "📈", a: "buying a house", b: "renting a while longer", why: "the mortgage", example: { a: "stretching every dollar to buy a house", b: "keeping on renting", why: "worrying that rates would go up" } },
+  { id: "other", label: "Other", icon: "✏️", a: "the first path", b: "the second path", why: "what weighed on me most", example: { a: "enlisting right after high school", b: "going to college first", why: "drifting away from my friends" } },
+];
+
+/** The kinds of turning point for the current region. */
+export const tpKinds = () => (isUS() ? US_TP_KINDS : TP_KINDS);
+
+export const kindDef = (labelOrId?: string) => tpKinds().find((k) => k.label === labelOrId || k.id === labelOrId);
 
 export interface TpBlanks {
   a: string;
@@ -87,6 +102,10 @@ export function fillTemplate(age: number | null, f: TpBlanks): string {
   const a = f.a.trim() || "____";
   const b = f.b.trim() || "____";
   const why = f.why.trim();
+  if (isUS()) {
+    const head = `${age !== null && age >= 0 ? `At ${age}, I` : "I"} was torn between ${a} and ${b}.`;
+    return why ? `${head} What weighed on me most was ${why}.` : head;
+  }
   const head = `${age !== null && age >= 0 ? `${age}살, ` : ""}${a}${josa(a, "와", "과")} ${b} 사이에서 고민했다.`;
   return why ? `${head} 가장 마음에 걸린 건 ${why}${josa(why, "였다", "이었다")}.` : head;
 }
@@ -113,12 +132,26 @@ const COMMON: { age: number; month: number; kind: TpKind; label: string; gender?
   { age: 50, month: 1, kind: "career", label: "제2의 직업" },
 ];
 
+// The same for an American life: applying to college in senior year, no army, buying a house a little earlier.
+const US_COMMON: typeof COMMON = [
+  { age: 14, month: 8, kind: "exam", label: "Choosing a high school" },
+  { age: 17, month: 11, kind: "exam", label: "College applications" },
+  { age: 20, month: 5, kind: "move", label: "A semester abroad" },
+  { age: 22, month: 6, kind: "job", label: "First job" },
+  { age: 24, month: 8, kind: "move", label: "Moving to a new city" },
+  { age: 29, month: 6, kind: "love", label: "Getting married" },
+  { age: 32, month: 9, kind: "career", label: "First job change" },
+  { age: 33, month: 4, kind: "invest", label: "Buying a house" },
+  { age: 42, month: 5, kind: "career", label: "Starting a business" },
+  { age: 50, month: 1, kind: "career", label: "A second career" },
+];
+
 /** Common turning points that already happened in this life, newest first; optionally of one kind. */
 export function suggestions(birthDate: string, gender: string, now: Date, kind?: string): Suggestion[] {
   const [y, m] = birthDate.split("-").map(Number);
   if (!y || !m) return [];
   const nowMi = now.getFullYear() * 12 + now.getMonth();
-  return COMMON.filter((c) => (!c.gender || !gender || c.gender === gender) && (!kind || kind === "other" || c.kind === kind))
+  return (isUS() ? US_COMMON : COMMON).filter((c) => (!c.gender || !gender || c.gender === gender) && (!kind || kind === "other" || c.kind === kind))
     .map((c) => {
       // The month of the year they turned that age; earlier months fall in the next calendar year.
       const year = y + c.age + (c.month < m ? 1 : 0);
@@ -145,12 +178,12 @@ export const MBTI_TYPES = ["ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP
 
 /** Four questions, one per MBTI axis. Rough, but enough to steer the story. */
 export const MBTI_QUIZ: { q: string; options: [string, string]; letters: [string, string] }[] = [
-  { q: "오랜만에 쉬는 주말, 더 끌리는 쪽은?", options: ["친구들을 만나 밖에서 논다", "집에서 혼자 충전한다"], letters: ["E", "I"] },
-  { q: "새 가전제품을 샀을 때 나는?", options: ["설명서를 차근차근 읽는다", "일단 이것저것 눌러 본다"], letters: ["S", "N"] },
-  { q: "친구가 고민을 털어놓으면 먼저 하는 말은?", options: ["“그럼 이렇게 해 봐”", "“많이 힘들었겠다”"], letters: ["T", "F"] },
-  { q: "여행을 갈 때 나는?", options: ["일정표를 미리 짠다", "가서 정한다"], letters: ["J", "P"] },
+  { get q() { return L("오랜만에 쉬는 주말, 더 끌리는 쪽은?"); }, get options() { return [L("친구들을 만나 밖에서 논다"), L("집에서 혼자 충전한다")] as [string, string]; }, letters: ["E", "I"] },
+  { get q() { return L("새 가전제품을 샀을 때 나는?"); }, get options() { return [L("설명서를 차근차근 읽는다"), L("일단 이것저것 눌러 본다")] as [string, string]; }, letters: ["S", "N"] },
+  { get q() { return L("친구가 고민을 털어놓으면 먼저 하는 말은?"); }, get options() { return [L("“그럼 이렇게 해 봐”"), L("“많이 힘들었겠다”")] as [string, string]; }, letters: ["T", "F"] },
+  { get q() { return L("여행을 갈 때 나는?"); }, get options() { return [L("일정표를 미리 짠다"), L("가서 정한다")] as [string, string]; }, letters: ["J", "P"] },
 ];
 
-export const PERSONALITY_CHIPS = ["외향적", "내성적", "도전적", "신중함", "성실함", "호기심 많음", "다정함", "현실적", "가족 중심", "여유로움", "운동 좋아함", "여행 좋아함"];
+export const personalityChips = () => [L("외향적"), L("내성적"), L("도전적"), L("신중함"), L("성실함"), L("호기심 많음"), L("다정함"), L("현실적"), L("가족 중심"), L("여유로움"), L("운동 좋아함"), L("여행 좋아함")];
 
 export const EMPTY_TP: TurningPoint = { date: "", situation: "", actualChoice: "", regret: "" };

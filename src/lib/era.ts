@@ -1,5 +1,7 @@
 // Short Korean era notes used as hints for narration. Not exhaustive; the LLM fills in texture.
 import { newsHints } from "./news";
+import { isUS } from "./region";
+import { US_ERA } from "../regions/us/news";
 
 const ERA: Record<number, string> = {
   1980: "컬러 TV 방송이 시작되었다.",
@@ -30,10 +32,11 @@ const ERA: Record<number, string> = {
 export function eraHints(mi: number): string[] {
   const year = Math.floor(mi / 12);
   const headlines = newsHints(year, 4, mi);
-  return Object.entries(ERA)
+  const us = isUS();
+  return Object.entries(us ? US_ERA : ERA)
     .map(([y, text]) => [Number(y), text] as const)
     // Year notes carry no month, so the current year's note waits until the year is over.
     .filter(([y]) => y < year && y >= year - 2)
-    .map(([y, text]) => `${y}년: ${text}`)
+    .map(([y, text]) => (us ? `${y}: ${text}` : `${y}년: ${text}`))
     .concat(headlines);
 }

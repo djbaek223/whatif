@@ -4,6 +4,9 @@ import { ageAt } from "../events";
 import { heuristicInitial, turningPointMi } from "../engine";
 import type { OpeningChoice, Preset, Profile, TurningPoint } from "../types";
 import type { OpeningResult } from "./schema";
+import { isUS } from "../region";
+import { kindDef } from "../onboarding";
+import * as US from "../../regions/us/turningChoices";
 
 type Path = OpeningResult["choices"][number];
 
@@ -31,12 +34,20 @@ const THEME_WORDS: [TpTheme, RegExp][] = [
 
 /** The kind picked on the form, or the one the user's words point to most. */
 export function themeOf(tp: TurningPoint): TpTheme {
+  if (isUS()) {
+    const picked = kindDef(tp.kind)?.id;
+    if (picked && picked !== "other") return picked;
+    return bestTheme(`${tp.situation} ${tp.actualChoice} ${tp.regret}`, US.THEME_WORDS);
+  }
   const picked = tp.kind ? (KIND_LABELS[tp.kind] ?? (Object.values(KIND_LABELS).includes(tp.kind as TpTheme) ? (tp.kind as TpTheme) : undefined)) : undefined;
   if (picked && picked !== "other") return picked;
-  const text = `${tp.situation} ${tp.actualChoice} ${tp.regret}`;
+  return bestTheme(`${tp.situation} ${tp.actualChoice} ${tp.regret}`, THEME_WORDS);
+}
+
+function bestTheme(text: string, words: [TpTheme, RegExp][]): TpTheme {
   let best: TpTheme = "other";
   let score = 0;
-  for (const [theme, re] of THEME_WORDS) {
+  for (const [theme, re] of words) {
     const n = text.match(re)?.length ?? 0;
     if (n > score) [best, score] = [theme, n];
   }
@@ -55,6 +66,7 @@ const PRESET_WORDS: [Preset, RegExp][] = [
 ];
 
 export function presetOf(text: string): Preset | null {
+  if (isUS()) return US.presetOf(text);
   for (const [preset, re] of PRESET_WORDS) if (re.test(text)) return preset;
   return null;
 }
@@ -96,6 +108,7 @@ function negative(future: string): string {
 
 /** The two paths the user was torn between, when the situation names them. */
 export function pathsIn(situation: string): [string, string] | null {
+  if (isUS()) return US.pathsIn(situation);
   const clean = (x: string) => x.replace(LEAD, "").trim();
   const ok = (a: string, b: string) => a.length >= 2 && b.length >= 2 && a !== b;
   const m = situation.match(PAIR_PATTERNS[0]);
@@ -137,7 +150,7 @@ const CORE: [string, RegExp][] = [
   ["상경", /상경|서울/],
   ["남기", /남(?:아|았|는|기|을)/],
 ];
-const negated = (s: string) => /(않|안\s|못\s|말았|포기|접었|접고)/.test(s);
+const negated = (s: string) => (isUS() ? US.negated(s) : /(않|안\s|못\s|말았|포기|접었|접고)/.test(s));
 const cores = (s: string) => new Set(CORE.filter(([, re]) => re.test(s)).map(([k]) => k));
 
 /** Whether two phrases name the same path ("지방대 진학" and "재수하지 않고 지방대에 갔다"). */
@@ -168,6 +181,7 @@ function hasBatchim(word: string): boolean | null {
 
 /** "재수" → "재수를 택한다"; a phrase that is already a sentence ("서울로 간다") stays as it is. */
 export function asChoice(phrase: string): string {
+  if (isUS()) return US.asChoice(phrase);
   const p = phrase.trim().replace(/[.。]$/, "");
   if (/(다|자|기로)$/.test(p)) return p;
   const b = hasBatchim(p);
@@ -189,6 +203,7 @@ interface Ctx {
 type Candidate = OpeningChoice & { when?: (c: Ctx) => boolean };
 
 function pool(theme: TpTheme, c: Ctx): Candidate[] {
+  if (isUS()) return US.usPool(theme, c);
   const uni = c.university || "원하던 대학";
   const town = c.hometown.trim().split(/\s/)[0] || "고향";
   const inSeoul = /서울/.test(town);
@@ -255,6 +270,7 @@ function pool(theme: TpTheme, c: Ctx): Candidate[] {
 
 // When the user's words don't point anywhere, paths that fit their age.
 function byAge(c: Ctx): Candidate[] {
+  if (isUS()) return US.usByAge(c);
   if (c.age < 13)
     return [
       { label: "공부에 재미를 붙여 본다", preset: "study" },
@@ -340,9 +356,9 @@ export function alternativePaths(profile: Profile, tp: TurningPoint): Path[] {
     picked.push({
       label: asChoice(phrase),
       preset,
-      jobTitle: /공무원/.test(phrase) ? "공무원" : /창업|사업/.test(phrase) ? "창업가" : "",
-      place: /대기업/.test(phrase) ? "대기업" : /스타트업/.test(phrase) ? "스타트업" : "",
-      education: preset === "study" ? (/대학원|석사|박사/.test(phrase) ? "graduate" : /재수|삼수|수능/.test(phrase) ? "highschool" : ctx.student && ctx.age >= 17 ? "university" : "same") : "same",
+      jobTitle: /공무원|government job/i.test(phrase) ? (isUS() ? "Government employee" : "공무원") : /창업|사업|startup|business/i.test(phrase) ? (isUS() ? "Founder" : "창업가") : "",
+      place: /대기업/.test(phrase) ? "대기업" : /스타트업|startup/i.test(phrase) ? (isUS() ? "startup" : "스타트업") : "",
+      education: preset === "study" ? (/대학원|석사|박사|grad school|master|PhD|law school|med school/i.test(phrase) ? "graduate" : /재수|삼수|수능|gap year|reapply/i.test(phrase) ? "highschool" : ctx.student && ctx.age >= 17 ? "university" : "same") : "same",
     });
   }
 
@@ -367,7 +383,7 @@ const THEME_NAMES: Record<TpTheme, string> = { exam: "입시", job: "취업", lo
 /** What the rules read from the turning point, handed to the AI so its paths start from the same place. */
 export function pathHints(profile: Profile, tp: TurningPoint) {
   const road = roadNotTaken(tp);
-  return { kind: THEME_NAMES[themeOf(tp)], roadNotTaken: road ? asChoice(road) : null, examples: alternativePaths(profile, tp).map((c) => c.label) };
+  return { kind: (isUS() ? US.US_KIND_NAMES : THEME_NAMES)[themeOf(tp)], roadNotTaken: road ? asChoice(road) : null, examples: alternativePaths(profile, tp).map((c) => c.label) };
 }
 
 /** Fills the AI's paths up to three with rule-based ones when it returned fewer. */

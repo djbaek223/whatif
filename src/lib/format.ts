@@ -20,3 +20,29 @@ export function formatWealth(manwon: number): string {
   }
   return `${sign}${v.toLocaleString()}만원`;
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** An age on screen: "34세" (or "34살") in Korean, "age 34" in English. */
+export const ageText = (age: number | string, unit: "세" | "살" = "세") => (isUS() ? `age ${age}` : `${age}${unit}`);
+
+/** A YYYY-MM month on screen: "2019년 3월" or "Mar 2019". */
+export function ymText(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  if (!y) return ym;
+  if (!m) return String(y);
+  return isUS() ? `${MONTHS[m - 1]} ${y}` : `${y}년 ${m}월`;
+}
+
+/** A YYYY-MM-DD date on screen: "1990년 3월 5일" or "Mar 5, 1990". */
+export function ymdText(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  if (!y || !m || !d) return ymd;
+  return isUS() ? `${MONTHS[m - 1]} ${d}, ${y}` : `${y}년 ${m}월 ${d}일`;
+}
+
+/** A month on its own: "3월" or "Mar". */
+export const monthName = (m: number) => (isUS() ? MONTHS[m - 1] : `${m}월`);
+
+/** A label as shown on its own: English starts with a capital ("college" → "College"); Korean is unchanged. */
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

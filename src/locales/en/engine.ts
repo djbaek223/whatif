@@ -215,7 +215,6 @@ export const ENGINE: Record<string, string> = {
   "월급날을 손꼽아 기다렸다.": "Counted the days to payday.",
   "다음 일을 고민하며 시간을 보냈다.": "Spent the days thinking about what's next.",
   "채용 공고를 뒤적이며 하루를 보냈다.": "Spent the day scrolling job listings.",
-  "{0} · {1}월": "{0} · month {1}",
   "{0}세, 눈을 감았다.": "Passed away at {0}.",
   "지금, 현실의 나와 같은 시간에 도착했다.": "Now this life has caught up to today, the same moment as the real you.",
   "군 복무 중": "on active duty",

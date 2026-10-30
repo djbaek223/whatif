@@ -25,9 +25,9 @@ import {
 import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
-import { formatWealth } from "./format";
+import { formatWealth, monthName } from "./format";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
-import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
+import { futureCandidates, lastRealNewsMi, newsBetween, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
 import { inRegion, isUS, region, type Region } from "./region";
 import { Rng, newSeed } from "./rng";
@@ -172,7 +172,7 @@ function uniDates(profile: Profile, mi: number, age: number): { entered?: number
   return { until: nextMarch(mi + Math.max(12, (23 - age) * 12)) - 1 };
 }
 
-const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음/;
+const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음|\b(job hunting|unemployed|between jobs|laid off|none|looking for work|on leave)\b/i;
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직)$/;
 
@@ -783,21 +783,21 @@ export interface Intent {
   place?: string;
 }
 
-const negated = (t: string) => /(않|안\s|안해|못\s|말자|말고|포기|접어\s?두)/.test(t);
+const negated = (t: string) => /(않|안\s|안해|못\s|말자|말고|포기|접어\s?두)|\b(not|don't|won't|never|give up|instead of)\b/i.test(t);
 
 const INTENT_WORDS: [CustomChange, RegExp][] = [
-  ["closeBusiness", /폐업|(가게|카페|식당|사업|장사)[을를]?\s?(접|정리|닫)/],
-  ["startBusiness", /창업|개업|자영업|프리랜서|유튜브|유튜버|(가게|카페|식당|매장|사업|장사|회사)[을를]?\s?(차|열|낸|내|시작|해\s?본|한다|하기)/],
-  ["retire", /은퇴/],
-  ["quitJob", /퇴사|사표|사직|(회사|직장|일)[을를]?\s?(그만|나오|나온|관두)/],
-  ["switchJob", /이직|회사를?\s?옮/],
-  ["hire", /취업|취직|입사|재취업|(회사|직장)에\s?(들어|다니)/],
-  ["enrollGraduate", /대학원|석사|박사/],
-  ["enrollUniversity", /대학에?\s?(가|진학|입학|들어)|편입|재입학/],
-  ["marry", /결혼|청혼|프러포즈/],
-  ["startDating", /고백|사귀|연애를?\s?시작/],
-  ["addChild", /아이를?\s?(갖|낳)|임신|둘째|셋째/],
-  ["buyHome", /(집|아파트)[을를]?\s?(사|산|샀|마련|매수)|영끌/],
+  ["closeBusiness", /폐업|(가게|카페|식당|사업|장사)[을를]?\s?(접|정리|닫)|\b(close|shut down|sell) (the|my) (shop|store|caf[eé]|restaurant|business)\b/i],
+  ["startBusiness", /창업|개업|자영업|프리랜서|유튜브|유튜버|(가게|카페|식당|매장|사업|장사|회사)[을를]?\s?(차|열|낸|내|시작|해\s?본|한다|하기)|\b(start(ing)? (a|my own|my|our) (business|company|startup)|open(ing)? (a|my own|my) (shop|store|caf[eé]|restaurant|bakery|bar)|go freelance|freelanc\w*|youtube)\b/i],
+  ["retire", /은퇴|\bretire/i],
+  ["quitJob", /퇴사|사표|사직|(회사|직장|일)[을를]?\s?(그만|나오|나온|관두)|\b(quit|resign|leave my job|walk away from (my|the) job)\b/i],
+  ["switchJob", /이직|회사를?\s?옮|\b(switch jobs|change jobs|new job at|move to another company|take the offer)\b/i],
+  ["hire", /취업|취직|입사|재취업|(회사|직장)에\s?(들어|다니)|\b(get a job|get hired|apply for a job|join|work at|work for)\b/i],
+  ["enrollGraduate", /대학원|석사|박사|\b(grad school|graduate school|master'?s|PhD|law school|med school|MBA)\b/i],
+  ["enrollUniversity", /대학에?\s?(가|진학|입학|들어)|편입|재입학|\b(go to college|go back to college|enroll|transfer to|community college)\b/i],
+  ["marry", /결혼|청혼|프러포즈|\b(marry|get married|propose)\b/i],
+  ["startDating", /고백|사귀|연애를?\s?시작|\b(ask (her|him|them) out|tell (her|him|them) how I feel|start dating)\b/i],
+  ["addChild", /아이를?\s?(갖|낳)|임신|둘째|셋째|\b(have a (baby|child|kid)|start a family|pregnan\w*|another (baby|child))\b/i],
+  ["buyHome", /(집|아파트)[을를]?\s?(사|산|샀|마련|매수)|영끌|\bbuy (a|the|our|my) (house|home|condo|place)\b/i],
 ];
 
 /** Reads a life change from the player's own words, when the narrator can't: "회사를 그만두고 카페를 차린다" opens a cafe. */
@@ -910,7 +910,7 @@ function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: st
     // A country alone ("미국") is not a school; the engine picks one there.
     let place = korean ?? (ABROAD.test(text) ? pickAbroad(rng, text) : named && !new RegExp(`^(${ABROAD.source})$`).test(named) ? named : undefined);
     if (!place) return undefined;
-    if (level === "graduate" && !/대학원/.test(place)) place = L`${place} 대학원`;
+    if (level === "graduate" && !/대학원|graduate|grad school|school of|law school|business school/i.test(place)) place = L`${place} 대학원`;
     return { kind: "enroll", risky, place, tuition: tuitionFor(place, level) };
   }
   if (!named || !(e?.hire || e?.switchJob)) return undefined;
@@ -1123,7 +1123,7 @@ function clampPay(tier: CompanyTier, salary: number | undefined, fallback: numbe
 /** Renames the company or school in a plan, keeping pay within that kind of employer's range. */
 function withPlace(plan: OptionPlan, place: string, salary?: number): OptionPlan {
   if (plan.kind === "enroll") {
-    const level = /대학원/.test(place) ? "graduate" : /박사|미국|영국|독일|일본|해외/.test(place) ? "abroad" : "university";
+    const level = /대학원|graduate|grad school/i.test(place) ? "graduate" : /박사|미국|영국|독일|일본|해외/.test(place) ? "abroad" : "university";
     return { ...plan, place, tuition: tuitionFor(place, level) };
   }
   const tier = (tierOf(place) ?? plan.tier) as CompanyTier;
@@ -1319,7 +1319,7 @@ function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): Lo
     const rest = rng.shuffle(real.filter((x) => !x.big));
     items = [...big, ...rest].slice(0, Math.max(cap, big.length)).sort((a, b) => a.mi - b.mi);
   }
-  if (s.mi > LAST_REAL_NEWS_MI) {
+  if (s.mi > lastRealNewsMi()) {
     // About two imagined headlines a year once real news runs out.
     const p = 1 - Math.pow(1 - 2 / 12, months);
     const pool = futureCandidates(Math.floor(s.mi / 12), s.done);
@@ -1330,7 +1330,7 @@ function newsEntries(s: LifeState, fromMi: number, months: number, rng: Rng): Lo
     }
   }
   return items.map((x) => {
-    const tag = L`${x.cat} · ${(x.mi % 12) + 1}월`;
+    const tag = isUS() ? `${L(x.cat)} · ${monthName((x.mi % 12) + 1)}` : `${x.cat} · ${(x.mi % 12) + 1}월`;
     const impact = x.impact?.(s);
     if (!impact) return { mi: s.mi, kind: "news", text: x.text, tag };
     const applied = applyTop(s, impact, rng);

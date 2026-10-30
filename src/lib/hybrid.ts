@@ -41,14 +41,14 @@ export const hybridOn = (s: LifeState) => !!s.ai && s.hybrid !== false;
 
 // ── Contradictions ─────────────────────────────────────
 
-const OFFICE = /출근|퇴근|상사|팀장님|부장님|과장님|회식|승진|연봉|야근|사내|입사 동기|회사 일|회사에서/;
-const BOSSED = /상사|팀장님|부장님|과장님|회식|승진|연봉|사내|입사 동기/;
-const SHOP = /우리 가게|내 가게|가게 매출|매출이|단골손님/;
-const SPOUSE = /남편|아내|배우자|시댁|처가|시어머니|시아버지|장모|장인어른|결혼기념일|신혼/;
-const LOVER = /(?<!옛 |전 |전\s?)(연인|여자\s?친구|남자\s?친구|애인)/;
-const KIDS = /우리 아이|아이들|아들|딸아이|딸이|딸과|딸의|딸에게|자녀|육아|첫째|둘째/;
-const OWN_HOME = /우리 집 시세|집값이 (올|뛰|떨|내)|주택담보|내 집의/;
-const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급/;
+const OFFICE = /출근|퇴근|상사|팀장님|부장님|과장님|회식|승진|연봉|야근|사내|입사 동기|회사 일|회사에서|\b(commute|my boss|your boss|the boss|manager|promotion|salary|overtime|coworkers?|office party|at the office|at work)\b/i;
+const BOSSED = /상사|팀장님|부장님|과장님|회식|승진|연봉|사내|입사 동기|\b(my boss|your boss|the boss|manager|promotion|salary|coworkers?|office party)\b/i;
+const SHOP = /우리 가게|내 가게|가게 매출|매출이|단골손님|\b(my shop|your shop|my store|your store|sales were|regulars)\b/i;
+const SPOUSE = /남편|아내|배우자|시댁|처가|시어머니|시아버지|장모|장인어른|결혼기념일|신혼|\b(husband|wife|spouse|in-laws|mother-in-law|father-in-law|anniversary|newlyweds?)\b/i;
+const LOVER = /(?<!옛 |전 |전\s?)(연인|여자\s?친구|남자\s?친구|애인)|(?<!\b(ex|old|former)[- ])\b(girlfriend|boyfriend)\b/i;
+const KIDS = /우리 아이|아이들|아들|딸아이|딸이|딸과|딸의|딸에게|자녀|육아|첫째|둘째|\b(your kids?|the kids|my kids?|your son|your daughter|my son|my daughter|children|parenting|toddler)\b/i;
+const OWN_HOME = /우리 집 시세|집값이 (올|뛰|떨|내)|주택담보|내 집의|\b(your house is worth|home value|mortgage payment|your mortgage)\b/i;
+const ADULT = /술자리|소주|맥주|와인|결혼|운전|출근|월급|\b(drinks|beer|wine|bar|married|driving|commute|paycheck)\b/i;
 
 /**
  * What in the text can't be true of this life right now, or null when nothing is off.

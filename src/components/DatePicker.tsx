@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FieldError } from "./ui";
+import { L } from "@/lib/i18n";
+import { isUS } from "@/lib/region";
+import { monthName } from "@/lib/format";
 
 export interface Ymd {
   y: number;
@@ -78,10 +81,10 @@ export function DatePicker({
     setTyped(text);
     const parsed = parse(text, withDay);
     if (parsed === "partial") return onTypedError?.(null);
-    if (!parsed) return onTypedError?.(withDay ? "날짜를 알아보지 못했어요. 예: 1992 05 14" : "날짜를 알아보지 못했어요. 예: 2010 03");
+    if (!parsed) return onTypedError?.(withDay ? L("날짜를 알아보지 못했어요. 예: 1992 05 14") : L("날짜를 알아보지 못했어요. 예: 2010 03"));
     const n = parsed.y * 12 + parsed.m;
-    if (n < min.y * 12 + min.m) return onTypedError?.(`${min.y}년 ${min.m}월 이후로 골라주세요`);
-    if (n > max.y * 12 + max.m || (n === max.y * 12 + max.m && parsed.d > max.d)) return onTypedError?.("미래 날짜는 고를 수 없어요");
+    if (n < min.y * 12 + min.m) return onTypedError?.(L`${min.y}년 ${min.m}월 이후로 골라주세요`);
+    if (n > max.y * 12 + max.m || (n === max.y * 12 + max.m && parsed.d > max.d)) return onTypedError?.(L("미래 날짜는 고를 수 없어요"));
     onTypedError?.(null);
     setDecade(Math.floor(parsed.y / 10) * 10);
     setOpen(null);
@@ -97,7 +100,7 @@ export function DatePicker({
         setMoved((n) => n + 1);
       }}
       aria-expanded={part === p || (p === "y" && part === "decade")}
-      aria-label={filled ? `${name} ${text}, 바꾸기` : `${name} 고르기`}
+      aria-label={filled ? L`${name} ${text}, 바꾸기` : L`${name} 고르기`}
       className={`min-h-11 flex-1 rounded-xl border-2 px-2 text-lg font-bold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
         part === p || (p === "y" && part === "decade")
           ? "border-indigo-500 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300"
@@ -112,14 +115,14 @@ export function DatePicker({
 
   return (
     <div ref={box} className="space-y-3" id={id} tabIndex={-1}>
-      <div className="flex gap-2" aria-label="고른 날짜">
-        {chip("y", "연도", value.y ? `${value.y}년` : "연도", !!value.y)}
-        {chip("m", "월", value.m ? `${value.m}월` : "월", !!value.m)}
-        {withDay && chip("d", "일", value.d ? `${value.d}일` : "일", !!value.d)}
+      <div className="flex gap-2" aria-label={L("고른 날짜")}>
+        {chip("y", L("연도"), value.y ? L`${value.y}년` : L("연도"), !!value.y)}
+        {chip("m", L("월"), value.m ? monthName(value.m) : L("월"), !!value.m)}
+        {withDay && chip("d", isUS() ? "Day" : "일", value.d ? L`${value.d}일` : isUS() ? "Day" : "일", !!value.d)}
       </div>
 
       {part === "decade" && (
-        <Grid label="연대 고르기" cols="grid-cols-3 sm:grid-cols-4">
+        <Grid label={L("연대 고르기")} cols="grid-cols-3 sm:grid-cols-4">
           {range(Math.floor(min.y / 10), Math.floor(max.y / 10)).map((t) => {
             const dec = t * 10;
             return (
@@ -135,7 +138,7 @@ export function DatePicker({
                   setMoved((n) => n + 1);
                 }}
               >
-                {dec}년대
+                {dec}{L("년대")}
               </button>
             );
           })}
@@ -143,11 +146,11 @@ export function DatePicker({
       )}
       {part === "y" && (
         <Grid
-          label={`${decade}년대에서 연도 고르기`}
+          label={L`${decade}년대에서 연도 고르기`}
           cols="grid-cols-5"
           back={
             <button type="button" onClick={() => setOpen("decade")} className="min-h-11 text-sm font-medium text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
-              ← 다른 연대
+              {L("← 다른 연대")}
             </button>
           }
         >
@@ -159,7 +162,7 @@ export function DatePicker({
         </Grid>
       )}
       {part === "m" && (
-        <Grid label={`${value.y}년, 몇 월이었나요?`} cols="grid-cols-4">
+        <Grid label={L`${value.y}년, 몇 월이었나요?`} cols="grid-cols-4">
           {range(1, 12).map((m) => (
             <button
               key={m}
@@ -170,13 +173,13 @@ export function DatePicker({
               className={`${cell} ${value.m === m ? active : idle}`}
               onClick={() => set({ ...value, m })}
             >
-              {m}월
+              {monthName(m)}
             </button>
           ))}
         </Grid>
       )}
       {part === "d" && (
-        <Grid label={`${value.m}월 며칠이었나요?`} cols="grid-cols-7">
+        <Grid label={L`${monthName(value.m ?? 1)} 며칠이었나요?`} cols="grid-cols-7">
           {range(1, maxDay).map((d) => (
             <button key={d} type="button" data-cell aria-pressed={value.d === d} className={`${cell} ${value.d === d ? active : idle}`} onClick={() => set({ ...value, d })}>
               {d}
@@ -186,13 +189,13 @@ export function DatePicker({
       )}
 
       <label className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-400">
-        <span className="shrink-0">직접 입력</span>
+        <span className="shrink-0">{L("직접 입력")}</span>
         <input
           inputMode="numeric"
           autoComplete={withDay ? "bday" : "off"}
           value={typed}
           onChange={(e) => onType(e.target.value)}
-          placeholder={withDay ? "예: 1992 05 14" : "예: 2010 03"}
+          placeholder={withDay ? L("예: 1992 05 14") : L("예: 2010 03")}
           maxLength={12}
           aria-invalid={!!error || undefined}
           aria-describedby={error ? errorId : undefined}

@@ -4,6 +4,8 @@
 import type { Effect } from "./events";
 import type { LifeState } from "./types";
 import { employee, ownsBusiness } from "./work";
+import { isUS } from "./region";
+import { US_FUTURE, US_LAST_REAL_NEWS_MI, US_NEWS } from "../regions/us/news";
 
 export type NewsCat = "사회" | "정치" | "경제" | "스포츠" | "연예" | "세계" | "과학" | "가상";
 
@@ -346,6 +348,10 @@ export const NEWS: NewsItem[] = [
 /** The last month with a real headline. Imagined headlines take over after it. */
 export const LAST_REAL_NEWS_MI = mi("2026-09");
 
+/** The headlines for the current region's life. */
+export const newsList = (): NewsItem[] => (isUS() ? US_NEWS : NEWS);
+export const lastRealNewsMi = () => (isUS() ? US_LAST_REAL_NEWS_MI : LAST_REAL_NEWS_MI);
+
 // ── Imagined future (clearly tagged "가상") ──────────────
 interface FutureNews {
   from: number; // earliest year
@@ -398,7 +404,7 @@ export function futureNewsId(i: number) {
 
 /** Imagined headlines eligible in this year that this life hasn't seen yet. */
 export function futureCandidates(year: number, seen: readonly string[]): { id: string; item: NewsItem }[] {
-  return FUTURE.flatMap((f, i) => {
+  return (isUS() ? US_FUTURE : FUTURE).flatMap((f, i) => {
     const id = futureNewsId(i);
     if (f.from > year || seen.includes(id)) return [];
     return [{ id, item: { mi: 0, cat: "가상" as NewsCat, text: f.text } }];
@@ -407,13 +413,17 @@ export function futureCandidates(year: number, seen: readonly string[]): { id: s
 
 /** Real headlines whose month falls in (fromMi, toMi]. */
 export function newsBetween(fromMi: number, toMi: number): NewsItem[] {
-  return NEWS.filter((x) => x.mi > fromMi && x.mi <= toMi);
+  return newsList().filter((x) => x.mi > fromMi && x.mi <= toMi);
 }
+
+const MONTH_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** Headlines near a year, biggest first, for the narrator. */
 export function newsHints(year: number, limit = 4, upToMi = Infinity): string[] {
-  return NEWS.filter((x) => Math.floor(x.mi / 12) === year && x.mi <= upToMi)
+  const us = isUS();
+  return newsList()
+    .filter((x) => Math.floor(x.mi / 12) === year && x.mi <= upToMi)
     .sort((a, b) => Number(!!b.big) - Number(!!a.big))
     .slice(0, limit)
-    .map((x) => `${year}년 ${(x.mi % 12) + 1}월: ${x.text}`);
+    .map((x) => (us ? `${MONTH_EN[x.mi % 12]} ${year}: ${x.text}` : `${year}년 ${(x.mi % 12) + 1}월: ${x.text}`));
 }

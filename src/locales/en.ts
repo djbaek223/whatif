@@ -5,5 +5,6 @@ import { LIFE_EN } from "./en/lifeEvents";
 import { MISC } from "./en/misc";
 import { MORE1_EN } from "./en/moreEvents1";
 import { MORE2_EN } from "./en/moreEvents2";
+import { UI_EN } from "./en/ui";
 
-export const EN: Record<string, string> = { ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN };
+export const EN: Record<string, string> = { ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN, ...UI_EN };
