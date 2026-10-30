@@ -10,7 +10,7 @@ export function usMonthlyCosts(s: LifeState, age: number, add: Add, ctx: { atHom
   // Pitched so a single hourly worker about breaks even and a married couple with a child keeps a little, as in Korea.
   if (ctx.atHome) add("Living costs (at your parents')", f.employed ? 50 : 30);
   else {
-    add("Food and living costs", f.retired ? (ctx.married ? 180 : 120) : ctx.married ? 190 : 120);
+    add("Food and living costs", f.retired ? (ctx.married ? 150 : 100) : ctx.married ? 190 : 120);
     if (f.homeOwner) add("Property tax and insurance", 35);
     else add("Rent", ctx.married ? (f.children ? 160 : 140) : 110);
     // A car is part of almost every American adult life; retirees drive less.

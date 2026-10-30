@@ -1207,6 +1207,13 @@ function drift(s: LifeState, months: number) {
   const yearTurned = Math.floor(s.mi / 12) !== Math.floor((s.mi - months) / 12);
   if (yearTurned && f.employed) s.income = Math.round(s.income * 1.015);
   if (f.retired && s.income === 0) s.income = 100;
+  // Everyone in the US collects Social Security at full retirement age, worked lately or not.
+  if (isUS() && !f.employed && !f.retired && age >= 67) {
+    f.retired = true;
+    f.job = L("은퇴");
+    s.income = Math.max(s.income, f.partner === "married" ? 260 : 160); // a couple draws two checks
+    s.log.push({ mi: s.mi, kind: "event", text: "Turned 67 and started collecting Social Security." });
+  }
   if (f.education === "graduate" && s.mi >= f.eduUntil + 24) f.education = "done";
   if (f.education === "school" && age >= 16) {
     f.education = "highschool";
