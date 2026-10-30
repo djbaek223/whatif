@@ -182,11 +182,39 @@ export const SCHEMA_EN: Record<string, string> = {
   "실제 삶과 이 다른 가지의 삶을 비교하는 2~3문장. 실제 삶 정보가 없으면 변곡점의 선택 중심으로.": "2-3 sentences comparing their real life with this other branch. Without real-life information, focus on the choice at the turning point.",
 };
 
-/** The JSON schema with its descriptions in English. Descriptions with no English stay as they are. */
-export function englishSchema(json: unknown): unknown {
-  if (Array.isArray(json)) return json.map(englishSchema);
+// The descriptions whose examples name one country, for a life in the other one.
+const SCHEMA_EN_KR: Record<string, string> = {
+  "변곡점 시점의 시대 배경. 2~3문단, 감각적인 디테일 포함.": "The era at the turning point, in South Korea. 2-3 paragraphs with sensory detail.",
+  "직함이나 직업만 (예: 사원, 간호사, 9급 공무원). 일하지 않거나 구직 중이면 빈 문자열": "Job title only (e.g. Associate, Nurse, Grade 9 civil servant). Empty string if not working or job hunting",
+  "다니는 회사·기관의 실제 이름 (예: 삼성전자, 서울아산병원). 일하지 않으면 빈 문자열": "Real name of the employer (e.g. Samsung Electronics, Asan Medical Center). Empty string if not working",
+  "이 선택으로 가게 되는 구체적인 회사나 학교의 실제 이름 (예: 카카오, 부산대학교). 해당 없으면 빈 문자열": "Real name of the company or school this choice leads to (e.g. Kakao, Pusan National University). Empty string if none",
+  "이 선택 직후의 학업 상태. 바뀌지 않으면 same. 예: 대학 진학 → university, 재수 → highschool, 취업 → done": "Schooling right after this choice. same if unchanged. E.g. going to college → university, retaking the entrance exam → highschool, getting a job → done",
+  "hire/switchJob/enroll이면 구체적인 실제 회사·학교 이름, startBusiness면 차리는 가게·사업 이름 (예: 연남동 작은 카페), 아니면 빈 문자열": "For hire/switchJob/enroll, the real company or school name; for startBusiness, the business being opened (e.g. a small café in Yeonnam-dong); otherwise an empty string",
+  "이 일이 몇 달~1년 뒤 다시 이어질 수 있다면 그 실마리 한 줄 (예: 동업을 제안한 대학 동기 민수가 다시 연락해 올 수 있다). 없으면 빈 문자열": "If this could come back in a few months to a year, one line on the thread (e.g. Minsu, the college friend who pitched a partnership, may get back in touch). Otherwise an empty string",
+  "사용자가 말한 회사·가게·학교 이름 (예: '삼성전자', '서울대', '미국 대학원'). change와 상관없이 글에 있으면 적고, 없으면 빈 문자열": "Any company, shop or school the player named (e.g. 'Samsung Electronics', 'Seoul National University', 'grad school in the US'). Fill it whenever the words name one, whatever change is; otherwise an empty string",
+};
+const SCHEMA_KO_US: Record<string, string> = {
+  "변곡점 시점의 시대 배경. 2~3문단, 감각적인 디테일 포함.": "변곡점 시점의 미국 시대 배경. 2~3문단, 감각적인 디테일 포함.",
+  "직함이나 직업만 (예: 사원, 간호사, 9급 공무원). 일하지 않거나 구직 중이면 빈 문자열": "직함이나 직업만 (예: 사원, 간호사, 우체국 집배원). 일하지 않거나 구직 중이면 빈 문자열",
+  "다니는 회사·기관의 실제 이름 (예: 삼성전자, 서울아산병원). 일하지 않으면 빈 문자열": "다니는 회사·기관의 실제 이름 (예: 제너럴 일렉트릭, 메이요 클리닉). 일하지 않으면 빈 문자열",
+  "이 선택으로 가게 되는 구체적인 회사나 학교의 실제 이름 (예: 카카오, 부산대학교). 해당 없으면 빈 문자열": "이 선택으로 가게 되는 구체적인 회사나 학교의 실제 이름 (예: 마이크로소프트, 오하이오주립대). 해당 없으면 빈 문자열",
+  "이 선택 직후의 학업 상태. 바뀌지 않으면 same. 예: 대학 진학 → university, 재수 → highschool, 취업 → done": "이 선택 직후의 학업 상태. 바뀌지 않으면 same. 예: 대학 진학 → university, 1년 쉬고 재지원 → highschool, 취업 → done",
+  "hire/switchJob/enroll이면 구체적인 실제 회사·학교 이름, startBusiness면 차리는 가게·사업 이름 (예: 연남동 작은 카페), 아니면 빈 문자열": "hire/switchJob/enroll이면 구체적인 실제 회사·학교 이름, startBusiness면 차리는 가게·사업 이름 (예: 에코파크의 작은 카페), 아니면 빈 문자열",
+  "이 일이 몇 달~1년 뒤 다시 이어질 수 있다면 그 실마리 한 줄 (예: 동업을 제안한 대학 동기 민수가 다시 연락해 올 수 있다). 없으면 빈 문자열": "이 일이 몇 달~1년 뒤 다시 이어질 수 있다면 그 실마리 한 줄 (예: 동업을 제안한 대학 친구 마이크가 다시 연락해 올 수 있다). 없으면 빈 문자열",
+  "사용자가 말한 회사·가게·학교 이름 (예: '삼성전자', '서울대', '미국 대학원'). change와 상관없이 글에 있으면 적고, 없으면 빈 문자열": "사용자가 말한 회사·가게·학교 이름 (예: '구글', 'UCLA', '런던의 대학원'). change와 상관없이 글에 있으면 적고, 없으면 빈 문자열",
+};
+
+/** Rewrites a JSON schema's descriptions through a table; descriptions not in it stay as they are. */
+function mapDescriptions(json: unknown, table: (d: string) => string): unknown {
+  if (Array.isArray(json)) return json.map((x) => mapDescriptions(x, table));
   if (!json || typeof json !== "object") return json;
-  return Object.fromEntries(
-    Object.entries(json).map(([k, v]) => [k, k === "description" && typeof v === "string" ? (SCHEMA_EN[v] ?? v) : englishSchema(v)]),
-  );
+  return Object.fromEntries(Object.entries(json).map(([k, v]) => [k, k === "description" && typeof v === "string" ? table(v) : mapDescriptions(v, table)]));
 }
+
+/** The JSON schema with its descriptions in English, with examples from the life's country. */
+export const englishSchema = (json: unknown, region: "kr" | "us" = "us"): unknown =>
+  mapDescriptions(json, (d) => (region === "kr" ? SCHEMA_EN_KR[d] : undefined) ?? SCHEMA_EN[d] ?? d);
+
+/** The JSON schema as written (in Korean), with American examples for an American life. */
+export const koreanSchema = (json: unknown, region: "kr" | "us" = "kr"): unknown =>
+  region === "us" ? mapDescriptions(json, (d) => SCHEMA_KO_US[d] ?? d) : json;

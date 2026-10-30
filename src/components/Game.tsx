@@ -37,7 +37,7 @@ import { PlayView, type Speed } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
 import { L } from "@/lib/i18n";
-import { setRegion, type Region } from "@/lib/region";
+import { countryFor, inRegion, langFor, setLang, setRegion, type Lang, type Region } from "@/lib/region";
 
 // Everyday moments, small dilemmas, follow-ups and rare moments written for each life (hybrid.ts).
 // NEXT_PUBLIC_WHATIF_HYBRID=0 turns it off for new lives: every event then plays from the pool.
@@ -47,7 +47,7 @@ type Screen = "intro" | "profile" | "turning" | "loading" | "play" | "ending";
 
 interface Saved {
   screen: Screen;
-  region?: Region; // the country picked on the first screen; a life carries its own
+  region?: Region; // no longer written: the country is in the profile, and a life carries its own
 
   profile: Profile;
   tp: TurningPoint;
@@ -56,29 +56,29 @@ interface Saved {
 }
 
 
-const REGION_KEY = "whatif.region";
+const LANG_KEY = "whatif.lang";
 
-// Each country is named in its own language, so a player who can't read the other one still finds theirs.
-const COUNTRIES: { id: Region; flag: string; name: string; lang: string }[] = [
-  { id: "kr", flag: "🇰🇷", name: "한국에서", lang: "ko" },
-  { id: "us", flag: "🇺🇸", name: "In the US", lang: "en" },
+// Each language is named in itself, so a player who can't read the other one still finds theirs.
+const LANGS: { id: Lang; name: string }[] = [
+  { id: "ko", name: "한국어" },
+  { id: "en", name: "English" },
 ];
 
-/** The country picked last time on this device, or one guessed from the browser's language. */
-function guessRegion(): Region {
+/** The language picked last time on this device (or the country picked before languages existed), else the browser's. */
+function guessLang(): Lang {
   try {
-    const kept = localStorage.getItem(REGION_KEY);
-    if (kept === "us" || kept === "kr") return kept;
+    const kept = localStorage.getItem(LANG_KEY) ?? { us: "en", kr: "ko" }[localStorage.getItem("whatif.region") ?? ""];
+    if (kept === "en" || kept === "ko") return kept;
   } catch {
-    // storage blocked: fall through to the language
+    // storage blocked: fall through to the browser
   }
-  return /^ko\b/i.test(navigator.language) ? "kr" : /^en\b/i.test(navigator.language) ? "us" : "kr";
+  return /^en\b/i.test(navigator.language) ? "en" : "ko";
 }
 
-/** initialRegion comes from the address: /en opens with the American life picked. */
-export default function Game({ initialRegion }: { initialRegion?: Region } = {}) {
+/** initialLang comes from the address: /en opens in English. */
+export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
-  const [country, setCountry] = useState<Region>(initialRegion ?? "kr");
+  const [lang, setLangState] = useState<Lang>(initialLang ?? "ko");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [tp, setTp] = useState<TurningPoint>(EMPTY_TP);
   const [life, setLife] = useState<LifeState | null>(null);
@@ -96,27 +96,31 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
   const [draft, setDraft] = useState<WizardDraft | null>(null); // answers restored after a refresh
   const personalized = useRef<string | null>(null);
 
-  // Texts follow the life on screen; before a life starts, the country picked on the first screen.
-  const shownRegion: Region = life && (screen === "play" || screen === "ending") ? (life.region ?? "kr") : country;
+  // A life on screen keeps the country and language it was started in; before that, the language picked on the
+  // first screen and the country answered in the questions (the wizard sets it while it is open).
+  const lifeShown = life && (screen === "play" || screen === "ending");
+  const shownRegion: Region = lifeShown ? (life.region ?? "kr") : (profile.country ?? countryFor(lang));
+  const shownLang: Lang = lifeShown ? (life.lang ?? langFor(life.region)) : lang;
   setRegion(shownRegion);
+  setLang(shownLang);
 
   useEffect(() => {
-    document.documentElement.lang = shownRegion === "us" ? "en" : "ko";
-  }, [shownRegion]);
+    document.documentElement.lang = shownLang;
+  }, [shownLang]);
 
-  const pickCountry = (r: Region) => {
-    setCountry(r);
+  const pickLang = (l: Lang) => {
+    setLangState(l);
     try {
-      localStorage.setItem(REGION_KEY, r);
+      localStorage.setItem(LANG_KEY, l);
     } catch {
       // not remembered; the address still says which
     }
-    window.history.replaceState(null, "", r === "us" ? "/en" : "/");
+    window.history.replaceState(null, "", l === "en" ? "/en" : "/");
   };
 
   // Restore the saved profile and game, and check whether the server has an AI key.
   useEffect(() => {
-    if (!initialRegion) setCountry(guessRegion()); // eslint-disable-line react-hooks/set-state-in-effect
+    if (!initialLang) setLangState(guessLang()); // eslint-disable-line react-hooks/set-state-in-effect
     dropLegacySaves();
     loadProfile().then((sp) => {
       setStored(sp);
@@ -133,12 +137,12 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
       setScreen((s) => (s === "intro" ? "profile" : s));
     });
     aiAvailable().then(setAi);
-  }, [initialRegion]);
+  }, [initialLang]);
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
-    writeProgress({ screen, region: country, profile, tp, life, ending } satisfies Saved, remember);
-  }, [screen, country, profile, tp, life, ending, remember]);
+    writeProgress({ screen, profile, tp, life, ending } satisfies Saved, remember);
+  }, [screen, profile, tp, life, ending, remember]);
 
   const eraseDevice = async () => {
     if (!confirm(L("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요."))) return;
@@ -155,11 +159,11 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
 
   const resume = () => {
     if (!saved) return;
-    setProfile(saved.profile);
+    // A profile saved before the hometown question asked for the country takes the country picked on the first screen then.
+    setProfile(saved.region && !saved.profile.country ? { ...saved.profile, country: saved.region } : saved.profile);
     setTp(saved.tp);
     // Lives saved before AI-written moments existed pick them up when AI is on.
     setLife(saved.life ? { ...saved.life, ai } : null);
-    setCountry(saved.life?.region ?? saved.region ?? country);
     setEnding(saved.ending);
     setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
   };
@@ -191,12 +195,14 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
   async function startOpening(p: Profile, t: TurningPoint) {
     setScreen("loading");
     const mi = turningPointMi(t);
+    // The new life's country and language, until it is on screen and sets them itself.
+    const here = <T,>(fn: () => T) => inRegion(p.country ?? "kr", fn, lang);
     const res = ai
-      ? await narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(mi), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) })
+      ? await here(() => narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(mi), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) }))
       : null;
-    const opening = res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t);
+    const opening = here(() => (res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t)));
     personalized.current = null;
-    setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID, region: country })));
+    setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID, region: p.country ?? "kr", lang })));
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -310,7 +316,29 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
   return (
     <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : screen === "play" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
       {screen === "intro" && (
-        <div className="flex flex-1 flex-col justify-center gap-10 py-16">
+        <div className="relative flex flex-1 flex-col justify-center gap-10 py-16">
+          <div role="group" aria-label="Language · 언어" className="fixed right-4 top-4 z-10 flex rounded-full border border-stone-200 bg-[var(--background)] p-0.5 text-sm dark:border-stone-800">
+            <span aria-hidden className="flex items-center pl-2.5 pr-1 text-stone-500 dark:text-stone-400">
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="10" cy="10" r="7.5" />
+                <path d="M2.5 10h15M10 2.5c2.2 2.3 3.2 4.8 3.2 7.5s-1 5.2-3.2 7.5c-2.2-2.3-3.2-4.8-3.2-7.5s1-5.2 3.2-7.5z" />
+              </svg>
+            </span>
+            {LANGS.map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                lang={l.id}
+                aria-pressed={lang === l.id}
+                onClick={() => pickLang(l.id)}
+                className={`min-h-9 rounded-full px-3 font-medium transition ${
+                  lang === l.id ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900" : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                }`}
+              >
+                {l.name}
+              </button>
+            ))}
+          </div>
           <div>
             <p className="text-sm font-semibold tracking-widest text-indigo-600 dark:text-indigo-400">WHAT IF</p>
             <h1 className="mt-3 text-4xl font-bold leading-tight">
@@ -323,25 +351,6 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
             </p>
           </div>
           <div className="space-y-3">
-            <div role="radiogroup" aria-label={L("어느 나라의 인생을 살아볼까요?")} className="grid grid-cols-2 gap-2">
-              {COUNTRIES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={country === c.id}
-                  onClick={() => pickCountry(c.id)}
-                  className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-semibold transition ${
-                    country === c.id
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-800 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-200"
-                      : "border-stone-200 text-stone-700 hover:border-stone-400 dark:border-stone-800 dark:text-stone-300"
-                  }`}
-                >
-                  <span aria-hidden>{c.flag}</span>
-                  <span lang={c.lang}>{c.name}</span>
-                </button>
-              ))}
-            </div>
             <Button className="w-full py-4 text-base" onClick={startNew}>
               {L("시작하기")}
             </Button>
@@ -428,7 +437,7 @@ export default function Game({ initialRegion }: { initialRegion?: Region } = {})
             onClosePresent: () => setPresentOpen(false),
             onQuit: () => {
               setAuto(false);
-              setSaved({ screen, region: country, profile, tp, life, ending });
+              setSaved({ screen, profile, tp, life, ending });
               setScreen("intro");
             },
           }}

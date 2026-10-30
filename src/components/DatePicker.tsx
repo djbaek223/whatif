@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FieldError } from "./ui";
 import { L } from "@/lib/i18n";
-import { isUS } from "@/lib/region";
+import { isEn } from "@/lib/region";
 import { monthName } from "@/lib/format";
 
 export interface Ymd {
@@ -118,7 +118,7 @@ export function DatePicker({
       <div className="flex gap-2" aria-label={L("고른 날짜")}>
         {chip("y", L("연도"), value.y ? L`${value.y}년` : L("연도"), !!value.y)}
         {chip("m", L("월"), value.m ? monthName(value.m) : L("월"), !!value.m)}
-        {withDay && chip("d", isUS() ? "Day" : "일", value.d ? L`${value.d}일` : isUS() ? "Day" : "일", !!value.d)}
+        {withDay && chip("d", isEn() ? "Day" : "일", value.d ? L`${value.d}일` : isEn() ? "Day" : "일", !!value.d)}
       </div>
 
       {part === "decade" && (

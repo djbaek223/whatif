@@ -124,7 +124,6 @@ export const UI_EN: Record<string, string> = {
   "성별을 알려 주세요": "What's your gender?",
   "입대 같은 일부 사건에만 쓰여요.": "Only used for a few events, like the draft.",
   "어디서 자랐나요?": "Where did you grow up?",
-  "도시나 동네 이름이면 충분해요.": "A city and state is enough.",
   "자란 지역": "Where you grew up",
   "예: 대전": "e.g. Columbus, Ohio",
   "어느 학교를 다녔나요?": "Which schools did you go to?",
@@ -226,7 +225,6 @@ export const UI_EN: Record<string, string> = {
   "그때 다른 선택을 했다면,": "If you had chosen differently back then,",
   "지금 나는 어떻게 살고 있을까?": "what would your life look like now?",
   "인생의 한 순간으로 돌아가 다른 선택을 하고, 그 인생을 마지막 날까지 살아보세요.": "Go back to a moment in your life, make a different choice, and live that life to its last day.",
-  "어느 나라의 인생을 살아볼까요?": "Which country will this life be in?",
   "시작하기": "Start",
   "이어하기": "Continue",
   "저장된 기본정보:": "Saved profile:",
@@ -386,4 +384,11 @@ export const UI_EN: Record<string, string> = {
   "세계": "World",
   "과학": "Science",
   "가상": "Imagined",
+  // Language menu and country
+  "고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.": "Your life will follow that country's schools, military service, news and events.",
+  "자란 나라": "Country you grew up in",
+  "예: {0} 문화초": "e.g. {0} Elementary School",
+  "대전": "Daejeon",
+  "미국": "United States",
+  "한국": "Korea",
 };

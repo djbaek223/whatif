@@ -2,7 +2,7 @@
 // has passed, so dropping out earns nothing. Employers ask for a degree (catalog.ts TIER_NEEDS), and the narrator is told.
 import { DEGREE_RANK, TIER_LABEL, canWorkAt, isMedical, type CompanyTier } from "./catalog";
 import { DEGREE_LABELS, type Degree, type LifeFlags, type LifeState } from "./types";
-import { L } from "./i18n";
+import { L, V } from "./i18n";
 
 const COLLEGE = /전문대/;
 const GRAD = /대학원|박사|석사/;
@@ -77,8 +77,8 @@ const OPEN_ORDER: CompanyTier[] = ["professor", "doctor", "research", "large", "
 export function degreeFacts(s: LifeState): string {
   const d = degreeOf(s.flags);
   const major = s.profile.major;
-  const open = OPEN_ORDER.filter((t) => canWorkAt(t, d, major)).map((t) => TIER_LABEL[t]);
-  const closed = OPEN_ORDER.filter((t) => !canWorkAt(t, d, major) && (t !== "doctor" || isMedical(major))).map((t) => TIER_LABEL[t]);
+  const open = OPEN_ORDER.filter((t) => canWorkAt(t, d, major)).map((t) => V(TIER_LABEL[t]));
+  const closed = OPEN_ORDER.filter((t) => !canWorkAt(t, d, major) && (t !== "doctor" || isMedical(major))).map((t) => V(TIER_LABEL[t]));
   const course = s.flags.program && (s.flags.education === "university" || s.flags.education === "graduate") && s.mi < s.flags.eduUntil ? L`, ${DEGREE_LABELS[s.flags.program]} 과정 중` : "";
   return L`${DEGREE_LABELS[d]}${course}. 지원 가능: ${open.join("·") || L("없음")}${closed.length ? L`. 학력이 모자라 지원 불가: ${closed.join("·")}` : ""}`;
 }

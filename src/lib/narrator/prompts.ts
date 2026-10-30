@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { lifeStage } from "../engine";
-import { isUS } from "../region";
-import { englishSchema, US_SYSTEM, usPromptFor } from "../../regions/us/prompts";
+import { isEn, isUS } from "../region";
+import { englishSchema, koreanSchema, US_SYSTEM, usPromptFor } from "../../regions/us/prompts";
 import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, SlotMomentSchema, withEpisodes, type NarrateRequest } from "./schema";
 
 export const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이터의 내레이터입니다.
@@ -35,11 +35,19 @@ const EPISODE_RULES = [
   "- 삶처럼 좋은 일만 쓰지 않습니다. 셋 중 하나쯤은 피곤하거나 아쉽거나 돈이 드는 일로 씁니다.",
 ].join("\n");
 
-/** The system message: the narrator's rules and the reply's JSON schema. */
-export const systemFor = (schema: z.ZodType) =>
-  isUS() ? `${US_SYSTEM}\n\nJSON schema:\n${JSON.stringify(englishSchema(z.toJSONSchema(schema)))}` : `${SYSTEM}\n\nJSON 스키마:\n${JSON.stringify(z.toJSONSchema(schema))}`;
+// A life told in the other language: the country's rules stay, the words and the money in them follow the player.
+const EN_FOR_KR = `- 이 플레이어는 영어로 읽습니다. 위의 문체·돈 규칙 대신 이 규칙을 따릅니다: 답의 모든 텍스트는 자연스러운 영어로 씁니다. 한국의 사람·지명·회사·학교 이름은 로마자로 씁니다 (예: Samsung Electronics, Seoul National University, Daejeon). 한국 고유의 제도(수능, 재수, 군 복무, 전세)는 짧게 풀어 씁니다 (예: the suneung college entrance exam). 본문의 돈은 $45,000처럼 달러로 쓰고, JSON 숫자 필드의 돈은 엔진 단위(1 = $10, 즉 $45,000은 4500)입니다.`;
+const KO_FOR_US = `- This player reads Korean. These rules replace the language and money rules above: every text field in your reply is in natural Korean (한국어), warm and plain. Write American names of people and places in Hangul where a usual Korean form exists (오하이오주 콜럼버스, 마이크), and companies and schools as Koreans usually write them (구글, 오하이오주립대). Money in text is written in 만원 numbers equal to the engine units (4500 units → 4500만원); the JSON number fields keep the same units.`;
 
-/** The reply schema and user prompt for a narration request. Pure, so scripts can count its tokens. */
+/** The system message: the country's narrator rules, the language they are told in, and the reply's JSON schema. */
+export function systemFor(schema: z.ZodType): string {
+  const json = z.toJSONSchema(schema);
+  const shown = JSON.stringify(isEn() ? englishSchema(json, isUS() ? "us" : "kr") : koreanSchema(json, isUS() ? "us" : "kr"));
+  if (isUS()) return `${isEn() ? US_SYSTEM : `${US_SYSTEM.replace(/\n- (Write in warm|Every text field)[^\n]*/g, "")}\n${KO_FOR_US}`}\n\nJSON schema:\n${shown}`;
+  return `${isEn() ? `${SYSTEM}\n${EN_FOR_KR}` : SYSTEM}\n\nJSON 스키마:\n${shown}`;
+}
+
+/** The reply schema and user prompt for a narration request, written for the life's country. Pure, so scripts can count its tokens. */
 export function promptFor(req: NarrateRequest): { schema: z.ZodType; prompt: string } {
   const { schema, prompt } = koreanPromptFor(req);
   return isUS() ? { schema, prompt: usPromptFor(req) } : { schema, prompt };

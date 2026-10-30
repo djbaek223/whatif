@@ -9,7 +9,7 @@ import { LifeChart } from "./LifeChart";
 import { Button, Card, StatBars } from "./ui";
 import { EndingWait } from "./Waiting";
 import { L } from "@/lib/i18n";
-import { isUS } from "@/lib/region";
+import { isEn } from "@/lib/region";
 import { ageText } from "@/lib/format";
 
 export function EndingView({
@@ -43,7 +43,7 @@ export function EndingView({
     <div className="space-y-6 py-6">
       <div className="text-center">
         <p className="text-sm text-stone-500 dark:text-stone-400">
-          {isUS() ? `${life.profile.name ? `${life.profile.name}'s` : "My"} other life · age ${life.deathAge}` : `${life.profile.name || "나"}의 또 다른 인생 · ${life.deathAge}세`}
+          {isEn() ? `${life.profile.name ? `${life.profile.name}'s` : "My"} other life · age ${life.deathAge}` : `${life.profile.name || "나"}의 또 다른 인생 · ${life.deathAge}세`}
         </p>
         <h1 className="mt-2 text-3xl font-bold text-balance">{ending.title}</h1>
         <p className="mt-3 italic text-stone-600 dark:text-stone-400">&ldquo;{ending.epitaph}&rdquo;</p>

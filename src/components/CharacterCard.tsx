@@ -1,6 +1,6 @@
 "use client";
 
-import { ageIn, kindDef } from "@/lib/onboarding";
+import { ageIn, countryName, kindDef } from "@/lib/onboarding";
 import type { Profile, TurningPoint } from "@/lib/types";
 import { L } from "@/lib/i18n";
 import { ageText, ymText, cap } from "@/lib/format";
@@ -20,7 +20,7 @@ export function characterFacts(p: Profile, tp: TurningPoint, now: Date): { key: 
   }
   add("name", L("별명"), clip(p.name, 16));
   add("gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender));
-  add("hometown", L("자란 곳"), clip(p.hometown, 16));
+  add("hometown", L("자란 곳"), [p.country ? countryName(p.country) : "", clip(p.hometown, 16)].filter(Boolean).join(" · "));
   add("schools", L("학교"), [p.elementary, p.middle, p.high].map((s) => clip(s, 10)).filter(Boolean).join(" → "));
   add("university", L("대학"), [clip(p.university, 14), clip(p.major, 12)].filter(Boolean).join(" · "));
   add("family", L("가족"), clip(p.family, 24));

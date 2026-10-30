@@ -13,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function English() {
-  return <Game initialRegion="us" />;
+  return <Game initialLang="en" />;
 }

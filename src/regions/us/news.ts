@@ -4,6 +4,7 @@ import type { Effect } from "../../lib/events";
 import type { NewsCat, NewsItem } from "../../lib/news";
 import type { LifeState } from "../../lib/types";
 import { employee, ownsBusiness } from "../../lib/work";
+import { T } from "../../lib/i18n";
 
 const mi = (date: string) => {
   const [y, m] = date.split("-").map(Number);
@@ -20,43 +21,43 @@ const adult = (s: LifeState, min = 18) => ageOf(s) >= min;
 
 // ── Impacts of the biggest shocks ─────────────────────────
 const oilShock = (s: LifeState): Effect | null =>
-  adult(s) ? { text: "Gas lines wrapped around the block, and every fill-up hurt.", stats: { happiness: -2 }, wealth: -40 } : null;
+  adult(s) ? { text: T("Gas lines wrapped around the block, and every fill-up hurt."), stats: { happiness: -2 }, wealth: -40 } : null;
 
 const recession = (s: LifeState): Effect | null => {
-  if (!adult(s, 20)) return { text: "The grown-ups talked about money in low voices at the kitchen table.", stats: { happiness: -2 } };
-  if (ownsBusiness(s.flags)) return { text: "Customers stopped coming in. Keeping the doors open was a struggle.", stats: { happiness: -5 }, incomePct: 0.85 };
+  if (!adult(s, 20)) return { text: T("The grown-ups talked about money in low voices at the kitchen table."), stats: { happiness: -2 } };
+  if (ownsBusiness(s.flags)) return { text: T("Customers stopped coming in. Keeping the doors open was a struggle."), stats: { happiness: -5 }, incomePct: 0.85 };
   if (employee(s.flags) && !/government|teacher|mail|postal/i.test(s.flags.job))
     return {
-      text: "Layoffs came to your workplace too.",
+      text: T("Layoffs came to your workplace too."),
       risk: {
         chance: () => 0.8,
-        success: { text: "You kept your job, though raises were frozen.", stats: { happiness: -4 } },
-        failure: { text: "You got the pink slip and were out of work overnight.", stats: { happiness: -12, health: -2 }, flags: { employed: false, job: "" }, income: 0 },
+        success: { text: T("You kept your job, though raises were frozen."), stats: { happiness: -4 } },
+        failure: { text: T("You got the pink slip and were out of work overnight."), stats: { happiness: -12, health: -2 }, flags: { employed: false, job: "" }, income: 0 },
       },
     };
-  return { text: "Prices kept rising and savings went less far.", stats: { happiness: -3 }, wealthPct: -0.05 };
+  return { text: T("Prices kept rising and savings went less far."), stats: { happiness: -3 }, wealthPct: -0.05 };
 };
 
 const crash = (s: LifeState): Effect | null =>
-  adult(s, 22) && s.wealth > 2000 ? { text: "The 401(k) statement was hard to look at.", stats: { happiness: -3 }, wealthPct: -0.1 } : null;
+  adult(s, 22) && s.wealth > 2000 ? { text: T("The 401(k) statement was hard to look at."), stats: { happiness: -3 }, wealthPct: -0.1 } : null;
 
 const pandemic = (s: LifeState): Effect | null => {
-  if (!adult(s)) return { text: "School moved to a laptop screen. You barely saw your friends.", stats: { relationships: -4, happiness: -2 } };
-  if (ownsBusiness(s.flags)) return { text: "Business dried up almost overnight. Just staying open was the job.", stats: { happiness: -6 }, incomePct: 0.8 };
-  return { text: "Masks, six feet apart, and a life lived mostly at home began.", stats: { relationships: -4, happiness: -3 } };
+  if (!adult(s)) return { text: T("School moved to a laptop screen. You barely saw your friends."), stats: { relationships: -4, happiness: -2 } };
+  if (ownsBusiness(s.flags)) return { text: T("Business dried up almost overnight. Just staying open was the job."), stats: { happiness: -6 }, incomePct: 0.8 };
+  return { text: T("Masks, six feet apart, and a life lived mostly at home began."), stats: { relationships: -4, happiness: -3 } };
 };
 
 const assetBoom = (s: LifeState): Effect | null => {
   if (!adult(s, 25)) return null;
-  if (s.flags.homeOwner) return { text: "Your house was suddenly worth a lot more.", wealthPct: 0.12, stats: { happiness: 2 } };
-  return { text: "Rents and home prices ran away from you. Bidding wars were everywhere.", stats: { happiness: -3 } };
+  if (s.flags.homeOwner) return { text: T("Your house was suddenly worth a lot more."), wealthPct: 0.12, stats: { happiness: 2 } };
+  return { text: T("Rents and home prices ran away from you. Bidding wars were everywhere."), stats: { happiness: -3 } };
 };
 
 const rateShock = (s: LifeState): Effect | null =>
-  adult(s, 22) ? { text: "Groceries, rent and gas all cost noticeably more.", stats: { happiness: -2 }, wealth: -150 } : null;
+  adult(s, 22) ? { text: T("Groceries, rent and gas all cost noticeably more."), stats: { happiness: -2 }, wealth: -150 } : null;
 
-const cheer = (text: string, happiness = 3) => () => ({ text, stats: { happiness } });
-const grief = (text: string, happiness = -3) => () => ({ text, stats: { happiness } });
+const cheer = (text: () => string, happiness = 3) => () => ({ text: text(), stats: { happiness } });
+const grief = (text: () => string, happiness = -3) => () => ({ text: text(), stats: { happiness } });
 
 export const US_NEWS: NewsItem[] = [
   // ── 1960s ──
@@ -67,7 +68,7 @@ export const US_NEWS: NewsItem[] = [
   n("1962-02", "과학", "John Glenn orbited the Earth."),
   n("1962-10", "세계", "The Cuban Missile Crisis brought the world to the edge of nuclear war.", { big: true }),
   n("1963-08", "사회", "At the March on Washington, Martin Luther King Jr. said 'I have a dream.'", { big: true }),
-  n("1963-11", "정치", "President Kennedy was assassinated in Dallas.", { big: true, impact: grief("The whole country stopped and watched the TV in shock.", -4) }),
+  n("1963-11", "정치", "President Kennedy was assassinated in Dallas.", { big: true, impact: grief(() => T("The whole country stopped and watched the TV in shock."), -4) }),
   n("1964-02", "연예", "The Beatles played The Ed Sullivan Show, and Beatlemania hit America.", { big: true }),
   n("1964-07", "사회", "President Johnson signed the Civil Rights Act."),
   n("1965-03", "세계", "The first US combat troops landed in Vietnam."),
@@ -76,10 +77,10 @@ export const US_NEWS: NewsItem[] = [
   n("1967-01", "스포츠", "The first Super Bowl was played; the Packers beat the Chiefs."),
   n("1967-07", "사회", "Riots broke out in Detroit and Newark during the 'long, hot summer.'"),
   n("1968-01", "세계", "The Tet Offensive shook confidence in the war in Vietnam."),
-  n("1968-04", "사회", "Martin Luther King Jr. was assassinated in Memphis.", { big: true, impact: grief("Cities burned, and the country grieved.", -4) }),
+  n("1968-04", "사회", "Martin Luther King Jr. was assassinated in Memphis.", { big: true, impact: grief(() => T("Cities burned, and the country grieved."), -4) }),
   n("1968-06", "정치", "Robert F. Kennedy was shot in Los Angeles."),
   n("1968-11", "정치", "Richard Nixon was elected president."),
-  n("1969-07", "과학", "Apollo 11 landed on the Moon. Neil Armstrong took one small step.", { big: true, impact: cheer("Everyone crowded around a TV to watch the Moon landing.", 4) }),
+  n("1969-07", "과학", "Apollo 11 landed on the Moon. Neil Armstrong took one small step.", { big: true, impact: cheer(() => T("Everyone crowded around a TV to watch the Moon landing."), 4) }),
   n("1969-08", "연예", "Half a million people gathered at Woodstock."),
   // ── 1970s ──
   n("1970-04", "사회", "The first Earth Day was held."),
@@ -95,7 +96,7 @@ export const US_NEWS: NewsItem[] = [
   n("1975-04", "세계", "Saigon fell, and the Vietnam War ended."),
   n("1975-06", "연예", "'Jaws' became the first summer blockbuster."),
   n("1976-04", "과학", "Steve Jobs and Steve Wozniak started Apple Computer in a garage."),
-  n("1976-07", "사회", "The country celebrated its Bicentennial with fireworks everywhere.", { big: true, impact: cheer("Fireworks lit up the Fourth of July for the 200th birthday.", 2) }),
+  n("1976-07", "사회", "The country celebrated its Bicentennial with fireworks everywhere.", { big: true, impact: cheer(() => T("Fireworks lit up the Fourth of July for the 200th birthday."), 2) }),
   n("1976-11", "정치", "Jimmy Carter was elected president."),
   n("1977-05", "연예", "'Star Wars' opened, and lines wrapped around theaters."),
   n("1977-07", "사회", "A blackout plunged New York City into darkness."),
@@ -105,7 +106,7 @@ export const US_NEWS: NewsItem[] = [
   n("1979-06", "경제", "A second oil shock brought back gas lines and odd-even rationing.", { impact: oilShock }),
   n("1979-11", "세계", "Iranian students seized the US embassy and took Americans hostage.", { big: true }),
   // ── 1980s ──
-  n("1980-02", "스포츠", "'Do you believe in miracles?' The US hockey team beat the Soviets at Lake Placid.", { big: true, impact: cheer("You screamed at the TV when the hockey team beat the Soviets.", 3) }),
+  n("1980-02", "스포츠", "'Do you believe in miracles?' The US hockey team beat the Soviets at Lake Placid.", { big: true, impact: cheer(() => T("You screamed at the TV when the hockey team beat the Soviets."), 3) }),
   n("1980-05", "과학", "Mount St. Helens erupted in Washington State."),
   n("1980-06", "연예", "CNN launched as the first 24-hour news channel."),
   n("1980-11", "정치", "Ronald Reagan was elected president."),
@@ -122,7 +123,7 @@ export const US_NEWS: NewsItem[] = [
   n("1984-07", "스포츠", "The Los Angeles Olympics opened; Carl Lewis won four golds.", { big: true }),
   n("1984-11", "정치", "Reagan won reelection, carrying 49 states."),
   n("1985-07", "연예", "Live Aid concerts in Philadelphia and London raised money for famine relief."),
-  n("1986-01", "과학", "The space shuttle Challenger broke apart after launch.", { big: true, impact: grief("Kids watching in classrooms saw the Challenger explode.", -3) }),
+  n("1986-01", "과학", "The space shuttle Challenger broke apart after launch.", { big: true, impact: grief(() => T("Kids watching in classrooms saw the Challenger explode."), -3) }),
   n("1986-04", "세계", "The Chernobyl nuclear disaster happened in the Soviet Union."),
   n("1986-11", "정치", "The Iran-Contra affair came to light."),
   n("1987-06", "세계", "In Berlin, Reagan said, 'Mr. Gorbachev, tear down this wall!'"),
@@ -146,7 +147,7 @@ export const US_NEWS: NewsItem[] = [
   n("1994-01", "경제", "NAFTA took effect."),
   n("1994-06", "사회", "Millions watched O. J. Simpson's white Bronco chase. The US hosted the World Cup.", { big: true }),
   n("1994-08", "스포츠", "A players' strike cancelled the rest of the baseball season and the World Series."),
-  n("1995-04", "사회", "The Oklahoma City bombing killed 168 people.", { big: true, impact: grief("The pictures from Oklahoma City were hard to look at.", -3) }),
+  n("1995-04", "사회", "The Oklahoma City bombing killed 168 people.", { big: true, impact: grief(() => T("The pictures from Oklahoma City were hard to look at."), -3) }),
   n("1995-08", "경제", "Windows 95 launched to midnight lines. Netscape's IPO kicked off the dot-com era."),
   n("1995-10", "사회", "O. J. Simpson was acquitted of murder."),
   n("1996-07", "스포츠", "The Atlanta Olympics opened; Kerri Strug vaulted on an injured ankle."),
@@ -163,7 +164,7 @@ export const US_NEWS: NewsItem[] = [
   n("2000-03", "경제", "The Nasdaq peaked, then the dot-com bubble burst.", { big: true }),
   n("2000-12", "정치", "After the Florida recount and Bush v. Gore, George W. Bush won the presidency."),
   n("2001-03", "경제", "The economy slid into recession as tech companies folded.", { impact: recession }),
-  n("2001-09", "사회", "Terrorists attacked the World Trade Center and the Pentagon. Nearly 3,000 people died.", { big: true, impact: grief("Everyone remembered exactly where they were that morning.", -5) }),
+  n("2001-09", "사회", "Terrorists attacked the World Trade Center and the Pentagon. Nearly 3,000 people died.", { big: true, impact: grief(() => T("Everyone remembered exactly where they were that morning."), -5) }),
   n("2001-10", "세계", "The war in Afghanistan began. Apple introduced the iPod."),
   n("2002-01", "경제", "Enron's collapse wiped out employees' retirement savings."),
   n("2003-02", "과학", "The space shuttle Columbia broke apart on reentry."),
@@ -174,7 +175,7 @@ export const US_NEWS: NewsItem[] = [
   n("2004-10", "스포츠", "The Red Sox won the World Series, ending an 86-year drought."),
   n("2004-11", "정치", "George W. Bush won reelection."),
   n("2005-02", "과학", "YouTube was founded."),
-  n("2005-08", "사회", "Hurricane Katrina flooded New Orleans.", { big: true, impact: grief("The images from New Orleans were hard to forget.", -3) }),
+  n("2005-08", "사회", "Hurricane Katrina flooded New Orleans.", { big: true, impact: grief(() => T("The images from New Orleans were hard to forget."), -3) }),
   n("2006-07", "과학", "Twitter launched."),
   n("2007-01", "과학", "Steve Jobs unveiled the iPhone.", { big: true }),
   n("2007-04", "사회", "A gunman killed 32 people at Virginia Tech."),
@@ -196,7 +197,7 @@ export const US_NEWS: NewsItem[] = [
   n("2012-07", "사회", "A gunman opened fire at a movie theater in Aurora, Colorado."),
   n("2012-10", "사회", "Hurricane Sandy flooded New York and New Jersey."),
   n("2012-11", "정치", "Obama won a second term."),
-  n("2012-12", "사회", "Twenty children and six adults were killed at Sandy Hook Elementary.", { big: true, impact: grief("Parents hugged their kids a little longer that week.", -4) }),
+  n("2012-12", "사회", "Twenty children and six adults were killed at Sandy Hook Elementary.", { big: true, impact: grief(() => T("Parents hugged their kids a little longer that week."), -4) }),
   n("2013-04", "사회", "Bombs exploded at the finish line of the Boston Marathon."),
   n("2013-06", "정치", "Edward Snowden revealed NSA mass surveillance."),
   n("2014-08", "사회", "Protests erupted in Ferguson, Missouri. The Ice Bucket Challenge went viral."),
@@ -206,7 +207,7 @@ export const US_NEWS: NewsItem[] = [
   n("2016-07", "연예", "Pokémon Go sent everyone outside staring at their phones."),
   n("2016-11", "정치", "Donald Trump won the presidential election. The Cubs won the World Series.", { big: true }),
   n("2017-01", "사회", "Millions joined the Women's March the day after the inauguration."),
-  n("2017-08", "과학", "A total solar eclipse crossed the country coast to coast.", { impact: cheer("You wore paper glasses and watched the eclipse.", 2) }),
+  n("2017-08", "과학", "A total solar eclipse crossed the country coast to coast.", { impact: cheer(() => T("You wore paper glasses and watched the eclipse."), 2) }),
   n("2017-10", "사회", "A gunman killed 60 people at a concert in Las Vegas. #MeToo spread."),
   n("2017-12", "경제", "Bitcoin neared $20,000 at the height of a crypto craze."),
   n("2018-02", "사회", "A shooting at Parkland, Florida, led students to march for gun control."),
@@ -237,8 +238,8 @@ export const US_NEWS: NewsItem[] = [
   n("2025-04", "경제", "Sweeping new tariffs rattled the stock market."),
   n("2025-05", "세계", "Robert Prevost of Chicago became Pope Leo XIV, the first American pope."),
   n("2026-02", "스포츠", "The Milan Cortina Winter Olympics were held."),
-  n("2026-06", "스포츠", "The World Cup opened in the US, Canada and Mexico.", { big: true, impact: cheer("World Cup fever filled the stadiums and sports bars.", 2) }),
-  n("2026-07", "사회", "The country celebrated its 250th birthday.", { big: true, impact: cheer("Fireworks lit up the sky for the semiquincentennial.", 2) }),
+  n("2026-06", "스포츠", "The World Cup opened in the US, Canada and Mexico.", { big: true, impact: cheer(() => T("World Cup fever filled the stadiums and sports bars."), 2) }),
+  n("2026-07", "사회", "The country celebrated its 250th birthday.", { big: true, impact: cheer(() => T("Fireworks lit up the sky for the semiquincentennial."), 2) }),
   // ── Already scheduled ──
   n("2028-07", "스포츠", "The Los Angeles Olympics opened."),
   n("2028-11", "정치", "Americans voted in a presidential election."),

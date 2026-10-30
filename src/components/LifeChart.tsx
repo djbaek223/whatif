@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { STAT_LABELS, type LifeState, type StatKey } from "@/lib/types";
 import { STAT_COLORS } from "./ui";
 import { L } from "@/lib/i18n";
-import { isUS } from "@/lib/region";
+import { isEn } from "@/lib/region";
 import { ageText } from "@/lib/format";
 
 const KEYS = Object.keys(STAT_LABELS) as StatKey[];
@@ -127,7 +127,7 @@ export function LifeChart({ life }: { life: LifeState }) {
             style={x(hp.age) > W / 2 ? { right: `${((W - x(hp.age)) / W) * 100 + 2}%` } : { left: `${(x(hp.age) / W) * 100 + 2}%` }}
           >
             <p className="font-semibold">
-              {ageText(hp.age)} · {hp.year}{isUS() ? "" : "년"}
+              {ageText(hp.age)} · {hp.year}{isEn() ? "" : "년"}
             </p>
             {KEYS.map((k) => (
               <p key={k} className="mt-0.5 flex items-center justify-between">
