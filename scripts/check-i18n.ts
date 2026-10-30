@@ -16,6 +16,11 @@ const walk = (dir: string) => {
 };
 walk(ROOT);
 
+const KR_ONLY = /^(csat|military|d-promo-exam|drivers-license|era-.*)$/;
+const krOnly = (o: ts.ObjectLiteralExpression, src: ts.SourceFile) =>
+  o.properties.some((p) => ts.isPropertyAssignment(p) && p.name.getText(src) === "id" && ts.isStringLiteral(p.initializer) && KR_ONLY.test(p.initializer.text)) &&
+  o.properties.some((p) => p.name?.getText(src) === "minAge");
+
 /** Every key the code asks for, with the first place it is used. */
 export function keysInCode(): Map<string, string> {
   const keys = new Map<string, string>();
@@ -25,6 +30,8 @@ export function keysInCode(): Map<string, string> {
       if (!keys.has(key)) keys.set(key, `${path.relative(ROOT, file)}:${src.getLineAndCharacterOfPosition(node.getStart(src)).line + 1}`);
     };
     const visit = (node: ts.Node) => {
+      // Events that only happen in Korean lives (events.ts KR_ONLY, era-*) are never shown in English.
+      if (ts.isObjectLiteralExpression(node) && krOnly(node, src)) return;
       if (ts.isCallExpression(node) && node.expression.getText(src) === "L" && node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) add(node.arguments[0].text, node);
       if (ts.isTaggedTemplateExpression(node) && node.tag.getText(src) === "L") {
         const t = node.template;
