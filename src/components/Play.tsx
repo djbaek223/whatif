@@ -189,6 +189,7 @@ export function PlayView({
                   saveKeysPref(!keys);
                   setKeys(!keys);
                 }}
+                feedback={feedbackHref(`${life.profile.name || "나"} · ${age}세 · ${formatMi(life.mi)}`)}
                 onQuit={handlers.onQuit}
               />
             </div>
@@ -561,7 +562,16 @@ function BigMomentIntro({ pending, onDone }: { pending: PendingChoice; onDone: (
   );
 }
 
-/** Sound and leaving live behind ⋯ so the control row holds only what moves time. */
+const FEEDBACK_TO = "dj.baek223@gmail.com";
+
+/** A mail draft whose subject starts with [WhatIf], so feedback can be filtered in the inbox. Where the player was goes in the body. */
+function feedbackHref(where: string) {
+  const subject = "[WhatIf] 의견";
+  const body = `\n\n\n---\n플레이 중이던 곳: ${where}`;
+  return `mailto:${FEEDBACK_TO}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+/** Sound, feedback and leaving live behind ⋯ so the control row holds only what moves time. */
 function PlayMenu({
   sound,
   onSound,
@@ -569,6 +579,7 @@ function PlayMenu({
   onNews,
   keys,
   onKeys,
+  feedback,
   onQuit,
 }: {
   sound: boolean;
@@ -577,6 +588,7 @@ function PlayMenu({
   onNews: (m: NewsMode) => void;
   keys: boolean;
   onKeys: () => void;
+  feedback: string;
   onQuit: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -682,6 +694,13 @@ function PlayMenu({
             </span>
             키보드 단축키
           </button>
+          <a href={feedback} role="menuitem" className={item} onClick={() => setOpen(false)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-10 6L2 7" />
+            </svg>
+            의견 보내기
+          </a>
           <button type="button" role="menuitem" className={item} onClick={onQuit}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
