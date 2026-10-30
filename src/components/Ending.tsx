@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatWealth, statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
+import { BoardDialog, PublishDialog, endingSig, publishedId } from "./Board";
 import { BadgeCollection } from "./GameFx";
 import { LifeChart } from "./LifeChart";
 import { Button, Card, StatBars } from "./ui";
@@ -25,19 +26,17 @@ export function EndingView({
   onNewTurningPoint: () => void;
   onHome: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [writing, setWriting] = useState(false);
+  const [board, setBoard] = useState(false);
+  const [posted, setPosted] = useState<string | null>(null);
+  // An ending posted earlier from this browser shows "게시판에서 보기" instead of posting it twice.
+  const sig = ending ? endingSig(life, ending) : "";
+  useEffect(() => {
+    if (sig) setPosted(publishedId(sig)); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [sig]);
   if (!ending) {
     return <EndingWait />;
   }
-  const share = async () => {
-    const text = L`[What If] ${ending.title}\n${life.deathAge}세 · ${statusLabel(life)}\n"${ending.epitaph}"\nhttps://whatif.damoai.net`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
 
   return (
     <div className="space-y-6 py-6">
@@ -124,14 +123,34 @@ export function EndingView({
           <Button variant="ghost" className="flex-1" onClick={onNewTurningPoint}>
             {L("다른 변곡점 고르기")}
           </Button>
-          <Button variant="ghost" className="flex-1" onClick={share}>
-            {copied ? L("복사했어요") : L("결과 복사")}
+          <Button variant="ghost" className="flex-1" aria-haspopup="dialog" onClick={() => (posted ? setBoard(true) : setWriting(true))}>
+            {posted ? L("게시판에서 보기") : L("회고록 게시")}
           </Button>
         </div>
         <button className="w-full py-3 text-sm text-stone-500 hover:underline dark:text-stone-400" onClick={onHome}>
           {L("처음으로")}
         </button>
       </div>
+
+      <PublishDialog
+        open={writing}
+        life={life}
+        ending={ending}
+        onClose={() => setWriting(false)}
+        onPublished={(id) => {
+          setPosted(id);
+          setWriting(false);
+          setBoard(true);
+        }}
+      />
+      <BoardDialog
+        open={board}
+        focus={posted}
+        onClose={() => {
+          setBoard(false);
+          setPosted(publishedId(sig)); // deleted from the board: offer posting again
+        }}
+      />
     </div>
   );
 }
