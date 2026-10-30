@@ -17,7 +17,7 @@ const fail = (m: string) => failures.push(m);
 /** A life at its graduation, with the grad-school option promising 고려대학교 대학원. */
 function atGraduation(): LifeState {
   const life = createLife(profile, tp, fallbackOpening(profile, tp));
-  const s: LifeState = { ...life, flags: { ...life.flags, education: "university", school: "경희대학교" }, pending: null };
+  const s: LifeState = { ...life, flags: { ...life.flags, education: "university", school: "경희대학교", eduUntil: life.mi }, pending: null }; // the last month of the course, so the degree that opens 대학원 is earned
   const pending = pendingFor(eventById("graduation")!, s);
   const grad = pending.options.find((o) => o.id === "grad-school")!;
   grad.plan = { ...grad.plan, kind: "enroll", place: "고려대학교 대학원", tuition: 1100 };
@@ -54,7 +54,7 @@ for (const [text, place, want] of [
 // 3. An AI-written option that names 고려대 in its outcome.
 {
   const base = atGraduation();
-  const life: LifeState = { ...base, flags: { ...base.flags, education: "done" }, pending: { eventId: "personal", title: "…", scene: "", options: [], freeText: true } };
+  const life: LifeState = { ...base, flags: { ...base.flags, education: "done", degree: "bachelor" }, pending: { eventId: "personal", title: "…", scene: "", options: [], freeText: true } };
   const filled = fillMoment(life, `personal@${life.mi}`, {
     title: "대학원", type: "work", keywords: ["대학원"], tone: "담담함", scene: "…",
     options: [

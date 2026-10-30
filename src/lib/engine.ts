@@ -2,9 +2,14 @@ import {
   ABROAD,
   MORTGAGE_RATE,
   betterTier,
+  DEGREE_RANK,
+  degreePay,
+  fitTier,
   guessTier,
+  isMedical,
   pickAbroad,
   pickCompany,
+  pickFaculty,
   pickGradSchool,
   pickHome,
   pickUniversity,
@@ -16,12 +21,15 @@ import {
   tuitionFor,
   type CompanyTier,
 } from "./catalog";
+import { ADULT_AGE, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
+import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
 import { EVENTS, ageAt, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth } from "./format";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
 import { LAST_REAL_NEWS_MI, futureCandidates, newsBetween, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
 import { Rng, newSeed } from "./rng";
+import { DEGREE_LABELS } from "./types";
 import type {
   Category,
   CustomChange,
@@ -35,6 +43,7 @@ import type {
   PendingOption,
   Preset,
   Profile,
+  Degree,
   StatKey,
   Stats,
   Theme,
@@ -193,6 +202,9 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     // Children who already exist at the turning point get rough birth months, oldest first.
     kidsBorn: Array.from({ length: Math.max(0, Math.min(5, init.children)) }, (_, i) => mi - 36 - (Math.min(5, init.children) - 1 - i) * 30),
   };
+  flags.degree = startDegree(flags, profile, age);
+  if (flags.education === "university" || flags.education === "graduate")
+    flags.program = programFor(flags.education, school, flags.degree);
   const stats: Stats = {
     health: clamp(opening.stats.health),
     happiness: clamp(opening.stats.happiness),
@@ -246,7 +258,17 @@ export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningR
     rares: [],
   };
   life.memory = [`${stamp(life)}: 변곡점에서 출발 (${statusLabel(life)})`];
+  life.expense = Object.fromEntries(monthlyCosts(life).map((e) => [e.label, e.amount]));
   return life;
+}
+
+/** The degree held at the turning point: a working adult who names a university in the profile finished it. */
+function startDegree(f: LifeFlags, profile: Profile, age: number): Degree {
+  if (f.education !== "done") return degreeOf(f);
+  if (f.school) return degreeOf(f);
+  const uni = profile.university.trim();
+  if (uni && age >= 22) return programFor("university", uni, "high");
+  return age >= 18 ? "high" : "none";
 }
 
 /** Whether the choice's new school state is possible at this age; otherwise it is ignored ("same"). */
@@ -361,27 +383,39 @@ const won = (manwon: number) => formatWealth(Math.round(manwon));
 const ORDINAL = ["", "첫째", "둘째", "셋째", "넷째", "다섯째"];
 const yearsWorked = (s: LifeState) => Math.floor((s.flags.workMonths ?? 0) / 12);
 
-/** Hiring tier from how much this person knows, for "find any job" outcomes. */
+/** Hiring tier from the education stat, for "find any job" outcomes, within what the degree allows. */
 function autoTier(s: LifeState, rng: Rng): CompanyTier {
   const k = s.stats.knowledge;
-  if (k >= 75) return rng.pick(["large", "it", "public", "foreign"] as const);
-  if (k >= 60) return rng.pick(["mid", "public", "startup", "large"] as const);
-  if (k >= 45) return rng.pick(["mid", "small", "small"] as const);
-  return rng.pick(["small", "contract", "field"] as const);
+  const d = degreeOf(s.flags);
+  // A PhD or a medical degree is a profession of its own; most of them work in it.
+  if (d === "phd" && rng.chance(0.4)) return rng.pick(["professor", "research"] as const);
+  if (isMedical(s.profile.major) && d !== "none" && d !== "high" && d !== "college" && rng.chance(0.8)) return "doctor";
+  const tier =
+    k >= 75 ? rng.pick(["large", "it", "public", "foreign"] as const)
+    : k >= 60 ? rng.pick(["mid", "public", "startup", "large"] as const)
+    : k >= 45 ? rng.pick(["mid", "small", "small"] as const)
+    : rng.pick(["small", "contract", "field"] as const);
+  return fitTier(tier, d, s.profile.major);
 }
+
+/** The league this person can actually join when aiming at this one. */
+const reachable = (s: LifeState, tier: CompanyTier) => fitTier(tier, degreeOf(s.flags), s.profile.major);
 
 const shortTown = (s: LifeState) => (s.profile.hometown || "서울").trim().split(/\s/)[0].replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "") || "서울";
 
 function planHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, plan?: OptionPlan): Required<Pick<OptionPlan, "place" | "tier" | "salary">> {
-  const tier = (plan?.tier as CompanyTier | undefined) ?? (spec.tier === "auto" ? autoTier(s, rng) : spec.tier);
-  let place = plan?.place ?? pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`);
+  const tier = (plan?.tier as CompanyTier | undefined) ?? (spec.tier === "auto" ? autoTier(s, rng) : reachable(s, spec.tier));
+  let place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`));
   if (tier === "civil" && !plan?.place) place = `${shortTown(s)}${place === "시청" ? "" : " "}${place}`;
-  return { place, tier, salary: plan?.salary ?? salaryFor(rng, tier, yearsWorked(s)) };
+  return { place, tier, salary: plan?.salary ?? Math.round((salaryFor(rng, tier, yearsWorked(s)) * degreePay(tier, degreeOf(s.flags))) / 50) * 50 };
 }
 
 function planSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"]>, plan?: OptionPlan) {
-  const tier = (plan?.tier as CompanyTier | undefined) ?? betterTier(rng, tierOf(s.flags.company) ?? guessTier(`${s.flags.company ?? ""} ${s.flags.job}`));
-  const place = plan?.place ?? pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${s.flags.job}`, s.flags.company);
+  const current = tierOf(s.flags.company) ?? guessTier(`${s.flags.company ?? ""} ${s.flags.job}`);
+  // A move never takes someone into a league their degree doesn't open (they stay in their own).
+  const better = betterTier(rng, current);
+  const tier = (plan?.tier as CompanyTier | undefined) ?? (reachable(s, better) === better ? better : current);
+  const place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${s.flags.job}`, s.flags.company));
   const raised = Math.round((s.income * 12 * spec.payPct) / 50) * 50;
   // Moving up a league can pay more than the usual bump; no league pays past its ceiling.
   // Near the ceiling a move still has to pay a little more, or nobody would take it.
@@ -427,7 +461,15 @@ function doHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, out: 
   if (ownsBusiness(s.flags)) out.texts.push(`${eulReul(s.flags.company || "하던 일")} 정리했다.`);
   s.flags = { ...s.flags, employed: true, selfEmployed: false, job: title, company: p.place };
   s.income = Math.round(p.salary / 12);
-  out.texts.push(p.tier === "civil" ? `${p.place}에 ${withRo(title)} 발령받았다. 연봉 ${won(p.salary)}.` : `${p.place}에 ${withRo(title)} 입사했다. 연봉 ${won(p.salary)}.`);
+  out.texts.push(
+    p.tier === "civil"
+      ? `${p.place}에 ${withRo(title)} 발령받았다. 연봉 ${won(p.salary)}.`
+      : p.tier === "professor"
+        ? `${p.place} ${withRo(title)} 임용되었다. 연봉 ${won(p.salary)}.`
+        : p.tier === "doctor"
+          ? `${p.place}에서 ${withRo(title)} 일하게 되었다. 연봉 ${won(p.salary)}.`
+          : `${p.place}에 ${withRo(title)} 입사했다. 연봉 ${won(p.salary)}.`,
+  );
   out.payShown = true;
 }
 
@@ -460,6 +502,8 @@ const LADDERS = [
   ["팀원", "팀장", "본부장"],
   ["9급 공무원", "8급 공무원", "7급 공무원", "6급 공무원", "5급 공무원", "4급 공무원"],
   ["연구원", "선임연구원", "책임연구원", "수석연구원"],
+  ["조교수", "부교수", "정교수"],
+  ["전공의", "전문의", "과장", "병원장"],
 ];
 
 function doPromote(s: LifeState, out: Applied) {
@@ -478,6 +522,7 @@ function doEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>, o
   const p = planEnroll(s, rng, spec, plan);
   s.flags.school = p.place;
   s.flags.tuition = p.tuition;
+  s.flags.program = programFor(spec.level, p.place, degreeOf(s.flags));
   const major = s.profile.major.trim();
   if (spec.level === "abroad") out.texts.push(`${p.place} 박사 과정에 합격했다. 학비는 면제되고 생활비 장학금(월 150만원)을 받는다.`);
   else {
@@ -503,6 +548,9 @@ function doBuyHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>,
 }
 
 function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { texts: [], delta: {} }, plan?: OptionPlan): Applied {
+  // A course whose last month has passed is a degree earned, before anything (a new course, a job) replaces it.
+  creditDegree(s);
+  const eduBefore = s.flags.education;
   const base = typeof effect.text === "function" ? effect.text(s) : effect.text;
   const text = effect.alt?.length ? rng.pick([base, ...effect.alt]) : base;
   if (text) out.texts.push(text);
@@ -536,7 +584,9 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
     s.flags.selfEmployed = undefined;
   }
   if (s.flags.education !== "highschool") s.flags.retaking = undefined;
-  if (effect.eduYears) startCourse(s.flags, s.mi, effect.eduYears);
+  if (eduBefore === "highschool" && s.flags.education !== "highschool") creditHighSchool(s.flags);
+  // Medical school takes six years (예과 2 + 본과 4).
+  if (effect.eduYears) startCourse(s.flags, s.mi, effect.enroll?.level === "university" && isMedical(s.profile.major) ? 6 : effect.eduYears);
   if (effect.busyMonths) s.flags.busyUntil = Math.max(s.flags.busyUntil, s.mi + effect.busyMonths);
   if (effect.retake) out.texts.push(startRetake(s));
   if (effect.enlist) out.texts.push(...enlist(s));
@@ -609,6 +659,8 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
       out.push(b.entered !== undefined && b.entered > s.mi ? `합격: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}, ${formatMi(b.entered)} 입학` : `입학: ${b.school}${b.education === "graduate" ? " (대학원)" : ""}`);
     else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(`학업 마침${a.school ? `: ${a.school}` : ""}`);
   }
+  if (degreeOf(b) !== degreeOf(a) && DEGREE_RANK[degreeOf(b)] >= DEGREE_RANK.college)
+    out.push(`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${a.school ?? b.school})` : ""}`);
   if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(`${(b.retakes ?? 1) >= 2 ? "삼수" : "재수"} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
   if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
   if (b.partner !== a.partner)
@@ -843,6 +895,8 @@ function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: st
   }
   if (!named || !(e?.hire || e?.switchJob)) return undefined;
   const tier = tierOf(named) ?? guessTier(named);
+  // A named employer the degree doesn't reach (삼성전자 for a high school graduate) isn't taken; the option's own plan stands.
+  if (reachable(s, tier) !== tier) return undefined;
   const kind = e.switchJob && employee(s.flags) ? "switch" : "hire";
   return { kind, risky, place: named, tier, salary: salaryFor(rng, tier, yearsWorked(s)), ...(kind === "switch" ? { from: s.income * 12 } : {}) };
 }
@@ -879,7 +933,7 @@ export function allowedChanges(s: LifeState): CustomChange[] {
   if (ownsBusiness(f)) out.push("hire", "closeBusiness");
   if (f.employed && age >= 50) out.push("retire");
   if (age >= 18 && age < 60 && (f.education === "done" || f.education === "highschool")) out.push("enrollUniversity");
-  if (age >= 22 && age < 60 && f.education === "done" && !!f.school) out.push("enrollGraduate");
+  if (age >= 22 && age < 60 && f.education === "done" && degreeOf(f) !== "phd" && ["bachelor", "master"].includes(degreeOf(f))) out.push("enrollGraduate");
   if (!f.homeOwner && s.wealth >= 6000) out.push("buyHome");
   if (f.partner === "married" && age <= 45 && f.children < 5) out.push("addChild");
   if (single && age >= 16) out.push("startDating");
@@ -974,6 +1028,8 @@ export function fillMoment(state: LifeState, key: string, res: MomentResult): Li
     }
     // The narrator may pick the employer, but a reach for a top league is a gamble for someone who isn't ready.
     const tier = place && (change === "hire" || (change === "switchJob" && employee(s.flags))) ? (tierOf(place) ?? guessTier(place)) : undefined;
+    // A place the degree doesn't open (대기업 for a high school graduate, a professorship without a PhD) contradicts the life: drop it.
+    if (tier && reachable(s, tier) !== tier) continue;
     if (tier && ["large", "it", "foreign"].includes(tier) && s.stats.knowledge < 65) c.chance = Math.min(c.chance, 0.5);
     custom[id] = c;
     const effect = customEffect(c);
@@ -1114,24 +1170,16 @@ function drift(s: LifeState, months: number) {
   const happyTarget = 38 + s.stats.relationships * 0.2 + s.stats.health * 0.1 + settled + money;
   s.stats.happiness = clamp(s.stats.happiness + (happyTarget - s.stats.happiness) * 0.03 * months);
 
-  // Money: adults pay their own living costs.
-  if (age >= 20) {
-    // Money is in today's won (real terms), so prices stay flat and raises are real raises.
-    // Kids cost about 70만원 a month until 19, plus university tuition (900만원 a year) from 19 to 22.
-    const kidAges = f.kidsBorn?.length === f.children ? f.kidsBorn.map((b) => (s.mi - b) / 12) : Array(f.children).fill(10);
-    const kids = kidAges.reduce((sum, a) => sum + (a < 19 ? 70 : a < 23 ? 75 : 0), 0);
-    const interest = f.homeOwner && f.mortgage ? (f.mortgage * MORTGAGE_RATE) / 12 : 0;
-    const living = 215 + kids + (f.homeOwner ? 0 : 50) + interest;
-    const student = f.education === "university" || f.education === "graduate" || f.education === "highschool";
-    const share = f.employed ? 1 : student ? 0.2 : 0.8; // students lean on family support
-    s.wealth += Math.round((s.income - living * share) * months);
+  // Money: adults earn and pay fixed monthly costs (budget.ts): rent or upkeep, living, children, tuition.
+  // Money is in today's won (real terms), so prices stay flat and raises are real raises.
+  if (age >= ADULT_AGE) {
+    s.wealth += Math.round((s.income - costTotal(monthlyCosts(s))) * months);
     // Repaying principal moves cash into the home, so net worth doesn't change; only the loan shrinks.
     if (f.mortgage) f.mortgage = Math.max(0, Math.round(f.mortgage - Math.max(30, f.mortgage / 240) * months));
-  }
-  // Tuition while enrolled; parents cover half until 24.
-  // No tuition before the first March or while on military leave.
+  } else s.wealth -= tuitionOnly(s) * months; // an early entrant still pays tuition
+  // A finished course is a degree; the tuition stops.
+  creditDegree(s);
   const enrolled = (f.education === "university" || f.education === "graduate") && s.mi <= f.eduUntil;
-  if (enrolled && f.tuition && s.mi >= (f.eduFrom ?? 0) && !inService(s)) s.wealth -= Math.round((f.tuition / 12) * months * (age <= 24 ? 0.5 : 1));
   if (!enrolled && f.tuition) f.tuition = undefined;
   if (f.employed) f.workMonths = (f.workMonths ?? 0) + months;
   // Yearly raise.
@@ -1146,6 +1194,7 @@ function drift(s: LifeState, months: number) {
   if (f.education === "highschool" && (f.retaking === undefined ? age >= 21 : age >= 23)) {
     f.education = "done";
     f.retaking = undefined;
+    creditHighSchool(f);
   }
 }
 
@@ -1305,11 +1354,15 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
   const months = turnLength(s);
   const prevYear = Math.floor(s.mi / 12);
   s.mi += months;
+  const before = structuredClone(s.flags);
   drift(s, months);
+  remember(s, before);
   const age = ageOf(s);
   const year = Math.floor(s.mi / 12);
   const entries: LogEntry[] = [];
   let stop: StopReason = null;
+  const costs = noteCosts(s);
+  if (costs) entries.push(costs);
 
   if (year !== prevYear) s.history.push({ year, stats: { ...s.stats } });
 
@@ -1369,7 +1422,7 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
     if (!happened) {
       // Keep only the latest routine line between notable entries so the feed stays readable.
       const last = s.log.at(-1);
-      if (last?.kind === "turn" && entries.length === 0) s.log.pop();
+      if (last?.kind === "turn" && !last.tag && entries.length === 0) s.log.pop();
       entries.push({ mi: s.mi, kind: "turn", ...statusLine(s, rng) });
     }
 
@@ -1383,6 +1436,14 @@ export function advanceTurn(state: LifeState): { state: LifeState; stop: StopRea
   s.log.push(...entries);
   s.rng = rng.state;
   return { state: s, stop };
+}
+
+/** A feed line when this month's fixed costs moved by 20만원 or more since the last turn (a wedding, a home, a child's 학원). */
+function noteCosts(s: LifeState): LogEntry | null {
+  const items = monthlyCosts(s);
+  const change = costChange(s.expense, items, ageOf(s));
+  s.expense = Object.fromEntries(items.map((e) => [e.label, e.amount]));
+  return change ? { mi: s.mi, kind: "turn", tag: "budget", ...change } : null;
 }
 
 /** Runs turns until something needs the player (a choice, the present day, or death). */
@@ -1449,6 +1510,13 @@ export function payLabel(s: LifeState): string {
   return `월 ${won(s.income)}`;
 }
 
+/** "월 305만원 (월세 95만원 · 생활비 220만원)", or who pays when nothing does yet. */
+export function costLine(s: LifeState): string {
+  const items = monthlyCosts(s);
+  if (!items.length) return inService(s) ? "없음 (군 복무 중)" : "없음 (부모님이 부담)";
+  return `${won(costTotal(items))} (${costBreakdown(items)})`;
+}
+
 /** Plain facts about this life right now, for the narrator. Everything it writes must agree with these. */
 export function lifeFacts(s: LifeState): string {
   const f = s.flags;
@@ -1473,13 +1541,15 @@ export function lifeFacts(s: LifeState): string {
     `시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
     `성향: ${s.profile.mbti || "MBTI 미입력"}. ${s.profile.personality || ""}`.trim(),
     `학업: ${study}`,
+    `학력: ${degreeFacts(s)}`,
     ...timelineFacts(s).map((t) => `날짜: ${t}`),
     `일: ${work}`,
     `연애·결혼: ${partner}`,
     `자녀: ${kids}`,
     `집: ${home}`,
     `순자산: ${formatWealth(s.wealth)}`,
-    `능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 지식 ${s.stats.knowledge}, 관계 ${s.stats.relationships}`,
+    `월 고정지출: ${costLine(s)}`,
+    `능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 교육 ${s.stats.knowledge}, 관계 ${s.stats.relationships}`,
     s.flags.pet ? "반려동물과 함께 삶" : "",
   ]
     .filter(Boolean)

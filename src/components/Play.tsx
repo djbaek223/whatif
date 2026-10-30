@@ -1,6 +1,8 @@
 "use client";
 
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { costBreakdown, costTotal, monthlyCosts } from "@/lib/budget";
+import { degreeTag } from "@/lib/education";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
 import { sceneOf, type SceneState } from "@/lib/scene";
@@ -169,11 +171,7 @@ export function PlayView({
             <div className="flex shrink-0 items-start gap-1">
               <div className="text-right">
                 <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
-                <p className="text-xs text-stone-500 tabular-nums dark:text-stone-400">
-                  자산 {formatWealth(life.wealth)}
-                  {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
-                </p>
-                {pay && <p className="text-xs text-stone-500 tabular-nums sm:hidden lg:block dark:text-stone-400">{pay}</p>}
+                <MoneyLine life={life} pay={pay} />
               </div>
               <PlayMenu
                 sound={sound}
@@ -203,7 +201,7 @@ export function PlayView({
             </LifeScene>
           </div>
           <div className="mt-2.5">
-            <StatBars stats={life.stats} compact flash={fx.swing} flashKey={fx.swingKey} />
+            <StatBars stats={life.stats} compact flash={fx.swing} flashKey={fx.swingKey} notes={{ knowledge: degreeTag(life) }} />
           </div>
         </header>
 
@@ -1278,6 +1276,72 @@ function RareLine({ entry }: { entry: LogEntry }) {
   );
 }
 
+/** Wealth and pay in the header; a press opens this month's fixed costs, item by item, and what is left over. */
+function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const items = monthlyCosts(life);
+  const total = costTotal(items);
+  const left = life.income - total;
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <div ref={box} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls="money-detail"
+        className="-mr-1 rounded px-1 text-right text-xs text-stone-500 tabular-nums hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
+      >
+        <span className="block">
+          자산 {formatWealth(life.wealth)}
+          {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
+          <span aria-hidden className="ml-0.5 inline-block text-[10px]">{open ? "▴" : "▾"}</span>
+        </span>
+        {pay && <span className="block sm:hidden lg:block">{pay}</span>}
+        {total > 0 && <span className="hidden lg:block">고정지출 월 {formatWealth(total)}</span>}
+        <span className="sr-only">, 월 고정지출 자세히 보기</span>
+      </button>
+      {open && (
+        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs shadow-lg dark:border-stone-800 dark:bg-stone-900">
+          <p className="font-semibold text-stone-700 dark:text-stone-200">매달 들어오고 나가는 돈</p>
+          <dl className="mt-2 space-y-1 tabular-nums">
+            <div className="flex justify-between gap-2">
+              <dt className="text-stone-600 dark:text-stone-400">수입</dt>
+              <dd>월 {formatWealth(Math.max(0, life.income))}</dd>
+            </div>
+            {items.map((e) => (
+              <div key={e.label} className="flex justify-between gap-2">
+                <dt className="text-stone-600 dark:text-stone-400">{e.label}</dt>
+                <dd>-{formatWealth(e.amount)}</dd>
+              </div>
+            ))}
+            {!items.length && <div className="text-stone-500 dark:text-stone-400">{ageOf(life) < 20 ? "아직은 부모님이 생활비를 대 주신다." : "지금은 나가는 고정지출이 없다."}</div>}
+            {items.length > 0 && (
+              <div className="flex justify-between gap-2 border-t border-stone-200 pt-1 font-semibold dark:border-stone-700">
+                <dt>매달 {left >= 0 ? "남는 돈" : "모자라는 돈"}</dt>
+                <dd className={left >= 0 ? "text-sky-700 dark:text-sky-300" : "text-amber-700 dark:text-amber-300"}>{formatWealth(Math.abs(left))}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }) {
   return (
     <Card className="space-y-4 border-indigo-300 dark:border-indigo-800">
@@ -1297,8 +1361,9 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
             자산 {formatWealth(life.wealth)}
             {payLabel(life) && ` · ${payLabel(life)}`}
           </p>
+          {monthlyCosts(life).length > 0 && <p className="text-xs text-stone-500 dark:text-stone-400">고정지출 월 {formatWealth(costTotal(monthlyCosts(life)))}: {costBreakdown(monthlyCosts(life))}</p>}
           <div className="mt-3">
-            <StatBars stats={life.stats} compact />
+            <StatBars stats={life.stats} compact notes={{ knowledge: degreeTag(life) }} />
           </div>
         </div>
       </div>

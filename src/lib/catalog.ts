@@ -1,8 +1,22 @@
 // Concrete names and prices: employers, schools, salaries, tuition and homes.
 // Money is in today's 만원 like the rest of the engine, so a 1998 salary reads in 2026 terms.
 import type { Rng } from "./rng";
+import type { Degree } from "./types";
 
-export type CompanyTier = "large" | "it" | "foreign" | "public" | "civil" | "mid" | "small" | "startup" | "research" | "contract" | "field";
+export type CompanyTier =
+  | "large"
+  | "it"
+  | "foreign"
+  | "public"
+  | "civil"
+  | "mid"
+  | "small"
+  | "startup"
+  | "research"
+  | "contract"
+  | "field"
+  | "professor"
+  | "doctor";
 
 interface Company {
   name: string;
@@ -98,6 +112,15 @@ const COMPANIES: Company[] = [
   { name: "대우조선 협력업체", tier: "field", since: 1994 },
   { name: "SK하이닉스 이천공장 생산라인", tier: "field", since: 2012 },
   { name: "삼성전자 기흥공장 생산라인", tier: "field" },
+  { name: "서울대학교병원", tier: "doctor" },
+  { name: "서울아산병원", tier: "doctor", since: 1989 },
+  { name: "삼성서울병원", tier: "doctor", since: 1994 },
+  { name: "세브란스병원", tier: "doctor" },
+  { name: "서울성모병원", tier: "doctor", since: 2009 },
+  { name: "분당서울대학교병원", tier: "doctor", since: 2003 },
+  { name: "부산대학교병원", tier: "doctor" },
+  { name: "경북대학교병원", tier: "doctor" },
+  { name: "전남대학교병원", tier: "doctor" },
 ];
 
 /** Starting salary range (annual, 만원, today's won) for a new graduate. Experienced hires get more. */
@@ -113,6 +136,8 @@ export const SALARY: Record<CompanyTier, [number, number]> = {
   startup: [3300, 4500],
   contract: [2500, 2800],
   field: [2800, 3400],
+  professor: [6500, 7500],
+  doctor: [6000, 8000],
 };
 
 export const TIER_LABEL: Record<CompanyTier, string> = {
@@ -127,6 +152,8 @@ export const TIER_LABEL: Record<CompanyTier, string> = {
   startup: "스타트업",
   contract: "계약직",
   field: "현장직",
+  professor: "대학 교수",
+  doctor: "병원 의사",
 };
 
 const TITLE: Record<CompanyTier, string> = {
@@ -141,13 +168,59 @@ const TITLE: Record<CompanyTier, string> = {
   startup: "팀원",
   contract: "계약직 사원",
   field: "생산직 사원",
+  professor: "조교수",
+  doctor: "전공의",
 };
 
 const RANK = ["large", "it", "foreign", "public", "research", "mid", "startup", "civil", "small", "field", "contract"] as const;
 
+// ── Degrees and who hires whom ─────────────────────
+
+export const DEGREE_RANK: Record<Degree, number> = { none: 0, high: 1, college: 2, bachelor: 3, master: 4, phd: 5 };
+
+/** The least schooling each kind of employer takes: a degree for the big companies, a master's for a research institute, a PhD to teach. */
+export const TIER_NEEDS: Record<CompanyTier, Degree> = {
+  large: "bachelor",
+  it: "bachelor",
+  foreign: "bachelor",
+  public: "college",
+  research: "master",
+  professor: "phd",
+  doctor: "bachelor", // and a medical degree, see MEDICAL
+  mid: "high",
+  civil: "high",
+  startup: "none",
+  small: "none",
+  field: "none",
+  contract: "none",
+};
+
+/** A medical school major: the only way to become a doctor. Veterinary, oriental and dental medicine, nursing and biomedical engineering are other paths. */
+export const isMedical = (major: string) => /의예|의학|의대|의과/.test(major) && !/수의|한의|치의|간호|의학공학|생의학|의공/.test(major);
+
+export function canWorkAt(tier: CompanyTier, degree: Degree, major: string): boolean {
+  if (DEGREE_RANK[degree] < DEGREE_RANK[TIER_NEEDS[tier]]) return false;
+  return tier !== "doctor" || isMedical(major);
+}
+
+/** The best league this person can join at or below the one asked for: a high school graduate aiming at 대기업 ends up at a 중견기업. */
+export function fitTier(tier: CompanyTier, degree: Degree, major: string): CompanyTier {
+  if (canWorkAt(tier, degree, major)) return tier;
+  const i = RANK.indexOf(tier as (typeof RANK)[number]);
+  const below = (i < 0 ? RANK.slice(RANK.indexOf("research")) : RANK.slice(i + 1)).filter((t) => canWorkAt(t, degree, major));
+  return below[0] ?? "contract";
+}
+
+/** Graduate degrees pay more where they count: companies, labs and the public sector. */
+export function degreePay(tier: CompanyTier, degree: Degree): number {
+  if (!["large", "it", "foreign", "public", "research"].includes(tier)) return 1;
+  return degree === "phd" ? 1.18 : degree === "master" ? 1.08 : 1;
+}
+
 export function tierOf(company: string | undefined): CompanyTier | undefined {
   if (!company) return undefined;
-  return COMPANIES.find((c) => c.name === company || company.includes(c.name))?.tier;
+  // An exact name first: "삼성전자 기흥공장 생산라인" is a factory line, not 삼성전자's head office.
+  return (COMPANIES.find((c) => c.name === company) ?? COMPANIES.find((c) => company.includes(c.name)))?.tier;
 }
 
 /** Picks an employer of the tier that existed that year, preferring ones that fit the major. */
@@ -167,6 +240,8 @@ export function salaryFor(rng: Rng, tier: CompanyTier, yearsExp: number): number
 }
 
 export function titleFor(tier: CompanyTier, yearsExp: number): string {
+  if (tier === "professor") return yearsExp >= 12 ? "정교수" : yearsExp >= 6 ? "부교수" : "조교수";
+  if (tier === "doctor") return yearsExp >= 12 ? "과장" : yearsExp >= 4 ? "전문의" : "전공의";
   if (tier === "civil") return yearsExp >= 15 ? "6급 공무원" : yearsExp >= 7 ? "7급 공무원" : "9급 공무원";
   if (tier === "research") return yearsExp >= 10 ? "책임연구원" : yearsExp >= 4 ? "선임연구원" : "연구원";
   if (tier === "contract" || tier === "field" || tier === "startup") return TITLE[tier];
@@ -180,6 +255,7 @@ export function titleFor(tier: CompanyTier, yearsExp: number): string {
 /** A tier one step better (or the same when already at the top), for job moves. */
 export function betterTier(rng: Rng, tier: CompanyTier | undefined): CompanyTier {
   if (!tier) return rng.pick(["mid", "small", "large"] as const);
+  if (tier === "professor" || tier === "doctor") return tier; // a move to another university or hospital
   const i = RANK.indexOf(tier as (typeof RANK)[number]);
   if (i <= 0) return rng.pick(["large", "it", "foreign"] as const);
   return rng.chance(0.35) ? RANK[Math.max(0, i - 1)] : tier;
@@ -191,6 +267,8 @@ export function guessTier(name: string): CompanyTier {
   if (known) return known;
   if (/공무원|구청|시청|군청|도청|주민센터|세무서/.test(name)) return "civil";
   if (/공사|공단|공기업/.test(name)) return "public";
+  if (/교수/.test(name)) return "professor";
+  if (/의사|병원|의원|전공의|전문의|레지던트|인턴의/.test(name)) return "doctor";
   if (/연구원|연구소/.test(name)) return "research";
   if (/스타트업|벤처|창업/.test(name)) return "startup";
   if (/계약직|아르바이트|알바|인턴/.test(name)) return "contract";
@@ -233,6 +311,11 @@ export function pickUniversity(rng: Rng, knowledge: number, fromProfile?: string
 export function pickGradSchool(rng: Rng, knowledge: number, undergrad?: string): string {
   if (undergrad && rng.chance(0.5)) return `${undergrad} 대학원`;
   return `${rng.pick(UNIVERSITIES[knowledge >= 70 ? "top" : "seoul"])} 대학원`;
+}
+
+/** A university to teach at: one a step or two below where one studied is the usual first post. */
+export function pickFaculty(rng: Rng, knowledge: number): string {
+  return rng.pick(UNIVERSITIES[knowledge >= 80 ? rng.pick(["top", "seoul"] as const) : knowledge >= 65 ? rng.pick(["seoul", "national"] as const) : "regional"]);
 }
 
 const ABROAD_SCHOOLS = ["미국 UC버클리", "미국 미시간대", "미국 일리노이대", "영국 임페리얼칼리지", "독일 뮌헨공대", "일본 도쿄대", "미국 퍼듀대", "싱가포르국립대"];
