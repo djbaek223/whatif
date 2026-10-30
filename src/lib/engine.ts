@@ -1,4 +1,5 @@
 import {
+  ABROAD,
   MORTGAGE_RATE,
   betterTier,
   DEGREE_RANK,
@@ -14,6 +15,7 @@ import {
   pickUniversity,
   salaryFor,
   SALARY,
+  schoolIn,
   tierOf,
   titleFor,
   tuitionFor,
@@ -790,6 +792,8 @@ export function intentFromText(text: string, s: LifeState): Intent | null {
   return null;
 }
 
+const withSaid = (i: Intent | null, place?: string): Intent | null => (i && place?.trim() ? { ...i, place: place.trim() } : i);
+
 /** The big changes an effect makes (or makes if its gamble works), in the narrator's terms. */
 function changesOf(e: Effect | undefined, s: LifeState): Set<CustomChange> {
   const out = new Set<CustomChange>();
@@ -840,12 +844,18 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
   }
   // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
   // even if the closest option was about staying at the company.
-  const wish = freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : intentFromText(freeText, s)) : null;
+  const wish = freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null;
   if (wish && allowedChanges(s).includes(wish.change) && !changesOf(effect, s).has(wish.change)) {
     const text = wish.change === "startBusiness" && employee(s.flags) ? "사표를 냈다." : (INTENT_TEXT[wish.change] ?? "");
     effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
     if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: "창업 자금" };
     plan = undefined;
+  }
+  // Where it happens is the player's too: "미국 대학 석사" studies in the US, not at the school the nearest option named.
+  const own = freeText?.trim() && effect ? ownPlan(freeText, effect, s, rng, intent?.place) : undefined;
+  if (own) {
+    if (plan?.place) effect = unnamed(effect!, plan.place);
+    plan = own;
   }
   // A pool moment played as written (auto-decide, or no narrator) is noted here, since it wasn't when it came up.
   if (pending.slot) {
@@ -864,6 +874,39 @@ export function resolveChoice(state: LifeState, optionId: string, freeText?: str
   s.pending = null;
   s.rng = rng.state;
   return s;
+}
+
+/**
+ * The school or employer the player named in their own words, for the change the effect makes.
+ * Undefined when they named none, and the option's own plan stands.
+ */
+function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: string): OptionPlan | undefined {
+  const e = effect.hire || effect.switchJob || effect.enroll ? effect : effect.risk?.success;
+  const risky = e !== effect;
+  const named = said?.trim().slice(0, 30);
+  if (e?.enroll) {
+    const level = e.enroll.level;
+    const korean = schoolIn(text);
+    // A country alone ("미국") is not a school; the engine picks one there.
+    let place = korean ?? (ABROAD.test(text) ? pickAbroad(rng, text) : named && !new RegExp(`^(${ABROAD.source})$`).test(named) ? named : undefined);
+    if (!place) return undefined;
+    if (level === "graduate" && !/대학원/.test(place)) place = `${place} 대학원`;
+    return { kind: "enroll", risky, place, tuition: tuitionFor(place, level) };
+  }
+  if (!named || !(e?.hire || e?.switchJob)) return undefined;
+  const tier = tierOf(named) ?? guessTier(named);
+  // A named employer the degree doesn't reach (삼성전자 for a high school graduate) isn't taken; the option's own plan stands.
+  if (reachable(s, tier) !== tier) return undefined;
+  const kind = e.switchJob && employee(s.flags) ? "switch" : "hire";
+  return { kind, risky, place: named, tier, salary: salaryFor(rng, tier, yearsWorked(s)), ...(kind === "switch" ? { from: s.income * 12 } : {}) };
+}
+
+/** Drops an outcome line that names the option's own school or company, once the player picked another. */
+function unnamed(effect: Effect, place: string): Effect {
+  const core = place.split(/\s/)[0].replace(/대학교$/, "대").replace(/학교$/, "");
+  const clean = (x: Effect): Effect => (typeof x.text === "string" && x.text.includes(core) ? { ...x, text: "" } : x);
+  const out = clean(effect);
+  return out.risk ? { ...out, risk: { ...out.risk, success: clean(out.risk.success) } } : out;
 }
 
 /** Drops a choice that couldn't be written (an AI moment whose call failed), as if it never came up. */

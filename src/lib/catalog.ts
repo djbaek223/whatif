@@ -294,6 +294,7 @@ const UNIVERSITIES: Record<SchoolTier, string[]> = {
 /** Yearly tuition (만원). National universities charge about half of private ones. */
 export function tuitionFor(school: string, level: "university" | "graduate" | "abroad"): number {
   if (level === "abroad") return 0; // funded PhD: tuition waived, a stipend instead
+  if (level === "graduate" && ABROAD.test(school)) return 6000; // a self-funded master's abroad
   const national = /서울대|KAIST|포항공과|부산대|경북대|전남대|충남대|충북대|강원대|전북대|경상국립대|서울시립대|국립/.test(school);
   if (level === "graduate") return national ? 600 : 1100;
   if (/전문대/.test(school)) return 700;
@@ -317,8 +318,27 @@ export function pickFaculty(rng: Rng, knowledge: number): string {
   return rng.pick(UNIVERSITIES[knowledge >= 80 ? rng.pick(["top", "seoul"] as const) : knowledge >= 65 ? rng.pick(["seoul", "national"] as const) : "regional"]);
 }
 
-export function pickAbroad(rng: Rng): string {
-  return rng.pick(["미국 UC버클리", "미국 미시간대", "미국 일리노이대", "영국 임페리얼칼리지", "독일 뮌헨공대", "일본 도쿄대", "미국 퍼듀대", "싱가포르국립대"]);
+const ABROAD_SCHOOLS = ["미국 UC버클리", "미국 미시간대", "미국 일리노이대", "영국 임페리얼칼리지", "독일 뮌헨공대", "일본 도쿄대", "미국 퍼듀대", "싱가포르국립대"];
+
+/** Words that put a school (or the plan to study) abroad. */
+export const ABROAD = /미국|영국|독일|프랑스|일본|중국|캐나다|호주|네덜란드|스위스|싱가포르|홍콩|해외|유학/;
+
+/** A school abroad; in the country the player named ("미국 대학 석사"), if they named one. */
+export function pickAbroad(rng: Rng, words = ""): string {
+  const country = words.match(ABROAD)?.[0];
+  if (!country || country === "해외" || country === "유학") return rng.pick(ABROAD_SCHOOLS);
+  const there = ABROAD_SCHOOLS.filter((x) => x.startsWith(country));
+  return there.length ? rng.pick(there) : `${country}의 대학`;
+}
+
+/** A Korean university named in the player's own words ("서울대 대학원 간다" → 서울대학교), if any. */
+export function schoolIn(text: string): string | undefined {
+  const t = text.replace(/\s/g, "");
+  if (/카이스트/i.test(t)) return "KAIST";
+  if (/포스텍/.test(t)) return "포항공과대학교";
+  return Object.values(UNIVERSITIES)
+    .flat()
+    .find((u) => t.includes(u) || t.includes(u.replace(/학교$/, "")));
 }
 
 // ── Homes ──────────────────────────────────────────
