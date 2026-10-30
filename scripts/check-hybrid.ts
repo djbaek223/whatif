@@ -36,7 +36,7 @@ const OUTCOME = "그날의 결정은 생각보다 오래 마음에 남았다. �
 const EPISODES: EpisodeResult[] = [
   { title: "동네 산책", type: "daily", text: "저녁을 먹고 동네를 한 바퀴 걸었다. 새로 생긴 빵집 앞에서 한참을 서 있었다.", stats: { health: 1, happiness: 1, knowledge: 0, relationships: 0 }, money: 0, keywords: ["산책", "빵집"] },
   { title: "오랜 친구", type: "relation", text: "고등학교 친구에게서 안부 문자가 왔다. 짧은 답장을 보내고 한참 웃었다.", stats: { health: 0, happiness: 2, knowledge: 0, relationships: 2 }, money: 0, keywords: ["친구", "문자"] },
-  { title: "작은 지출", type: "money", text: "고장 난 전기밥솥을 새로 샀다. 생각보다 비쌌지만 밥맛이 달라졌다.", stats: { health: 0, happiness: 1, knowledge: 0, relationships: 0 }, money: -20, keywords: ["밥솥"] },
+  { title: "감기", type: "health", text: "환절기 감기가 길게 갔다. 일주일 내내 목이 잠겨 있었다.", stats: { health: -3, happiness: -2, knowledge: 0, relationships: 0 }, money: -20, keywords: ["감기"] },
 ];
 
 function fakeMoment(req: Extract<NarrateRequest, { kind: "moment" }>): MomentResult {
