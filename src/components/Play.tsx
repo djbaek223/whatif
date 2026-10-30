@@ -9,6 +9,7 @@ import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
 import type { LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
 import { AboutDialog, versionLabel } from "./About";
+import { BoardDialog } from "./Board";
 import { FeedbackDialog } from "./Feedback";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
 import { LifeScene } from "./LifeScene";
@@ -600,7 +601,7 @@ function BigMomentIntro({ pending, showTitle, onDone }: { pending: PendingChoice
   );
 }
 
-/** Sound, feedback, the about sheet and leaving live behind ⋯ so the control row holds only what moves time. */
+/** Sound, the memoir board, feedback, the about sheet and leaving live behind ⋯ so the control row holds only what moves time. */
 function PlayMenu({
   sound,
   onSound,
@@ -623,6 +624,7 @@ function PlayMenu({
   const [open, setOpen] = useState(false);
   const [writing, setWriting] = useState(false);
   const [reading, setReading] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -732,6 +734,21 @@ function PlayMenu({
             className={item}
             onClick={() => {
               setOpen(false);
+              setBrowsing(true);
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
+            </svg>
+            {L("회고록 게시판")}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="dialog"
+            className={item}
+            onClick={() => {
+              setOpen(false);
               setWriting(true);
             }}
           >
@@ -770,6 +787,13 @@ function PlayMenu({
         open={reading}
         onClose={() => {
           setReading(false);
+          trigger.current?.focus();
+        }}
+      />
+      <BoardDialog
+        open={browsing}
+        onClose={() => {
+          setBrowsing(false);
           trigger.current?.focus();
         }}
       />

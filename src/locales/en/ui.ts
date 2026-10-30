@@ -8,8 +8,8 @@ export const UI_EN: Record<string, string> = {
   "능력치, 돈, 성공과 실패, 수명은 규칙 엔진이 확률로 정하고, AI는 그 결과를 장면과 문장으로만 써요. 실제 사건 뉴스는 그 시절 기록을 바탕으로 해요.":
     "A rules engine rolls the odds on your stats, money, successes and failures, and how long you live. The AI only turns those results into scenes and sentences. The news comes from the record of those years.",
   "내 정보는요": "What about my data?",
-  "입력한 정보와 진행 기록은 이 기기 브라우저에만 암호화해 저장되고, 서버에는 남지 않아요. 장면을 쓰는 동안만 AI에 필요한 내용이 전달돼요.":
-    "What you enter and your progress are encrypted and kept only in this browser, never on our servers. The AI gets only what it needs, only while it writes a scene.",
+  "입력한 정보와 진행 기록은 이 기기 브라우저에만 암호화해 저장되고, 서버에는 남지 않아요. 장면을 쓰는 동안만 AI에 필요한 내용이 전달되고, 회고록은 직접 게시할 때만 게시판에 올라가요.":
+    "What you enter and your progress are encrypted and kept only in this browser, never on our servers. The AI gets only what it needs, only while it writes a scene, and a memoir goes on the board only if you post it.",
   "참고해 주세요": "Good to know",
   "실제 미래를 예측하는 서비스가 아니라, 다른 선택을 상상해 보는 놀이예요. 결과는 같은 선택이어도 매번 달라져요.":
     "This doesn't predict the future. It's a game for imagining a different choice. The same choice can turn out differently every time.",
@@ -64,7 +64,6 @@ export const UI_EN: Record<string, string> = {
   "예: 2010 03": "e.g. 2010 03",
 
   // Ending
-  "[What If] {0}\n{1}세 · {2}\n\"{3}\"\nhttps://whatif.damoai.net": "[What If] {0}\nAge {1} · {2}\n\"{3}\"\nhttps://whatif.damoai.net/en",
   "마지막 모습": "At the end",
   "남긴 자산": "Left behind",
   "현실과의 비교": "Compared with real life",
@@ -76,9 +75,37 @@ export const UI_EN: Record<string, string> = {
   "광고 영역 (출시 때 연결)": "Ad space (connected at launch)",
   "같은 변곡점에서 다시 살아보기": "Live again from the same turning point",
   "다른 변곡점 고르기": "Pick another turning point",
-  "복사했어요": "Copied",
-  "결과 복사": "Copy result",
+  "게시판에서 보기": "See it on the board",
+  "회고록 게시": "Post memoir",
   "처음으로": "Home",
+
+  // Memoir board
+  "게시판이 아직 준비되지 않았어요.": "The board isn't set up yet.",
+  "잠시 뒤에 다시 올려 주세요. 짧은 시간에 너무 많이 올렸어요.": "Too many posts in a short time. Please try again in a bit.",
+  "올리지 못했어요. 잠시 뒤 다시 시도해 주세요.": "Couldn't post it. Please try again in a moment.",
+  "회고록 게시하기": "Post your memoir",
+  "회고록 게시판에 올리면 누구나 읽을 수 있어요. 이름과 학교 이름은 ○○로 가려 두었어요. 더 빼고 싶은 내용은 직접 고쳐 주세요.":
+    "Anyone can read what's on the memoir board. Your name and school names are already hidden as ○○. Edit out anything else you'd rather keep private.",
+  "필명": "Pen name",
+  "비워 두면 익명": "Leave blank to stay anonymous",
+  "제목": "Title",
+  "다른 사람이 읽어도 괜찮은 내용인지 확인했어요. 프로필(생일, 학교, MBTI 등)은 올라가지 않아요.":
+    "I've checked it's fine for others to read. Your profile (birthday, schools, MBTI and so on) is never posted.",
+  "올리는 중": "Posting",
+  "게시하기": "Post",
+  "올린 글은 이 브라우저에서 언제든 게시판에서 지울 수 있어요.": "You can take it down from the board any time, from this browser.",
+  "이 회고록을 게시판에서 지울까요?": "Take this memoir down from the board?",
+  "지우지 못했어요. 잠시 뒤 다시 시도해 주세요.": "Couldn't take it down. Please try again in a moment.",
+  "목록": "All memoirs",
+  "회고록 게시판": "Memoir board",
+  "익명": "Anonymous",
+  "내 글 지우기": "Take down my memoir",
+  "불러오는 중": "Loading",
+  "게시판을 불러오지 못했어요.": "Couldn't load the board.",
+  "다시 시도": "Try again",
+  "아직 올라온 회고록이 없어요. 인생을 끝까지 살고 첫 회고록을 올려 보세요.": "No memoirs yet. Live a life to the end and post the first one.",
+  "내 글": "Mine",
+  "{0}세": "age {0}",
 
   // Feedback
   "{0}\n\n---\n플레이 중이던 곳: {1}": "{0}\n\n---\nWhere I was in the game: {1}",

@@ -15,7 +15,7 @@ export const versionLabel = `v${APP_VERSION}${APP_COMMIT ? ` · ${APP_COMMIT}` :
 const POINTS: { title: string; body: string }[] = [
   { get title() { return L("어떻게 흘러가나요"); }, get body() { return L("프로필과 돌아가고 싶은 순간을 고르면, 그때부터 한 달 또는 몇 달씩 시간이 흐르고 입시, 취업, 결혼 같은 갈림길마다 직접 고르며 끝까지 살아봐요."); } },
   { get title() { return L("누가 정하나요"); }, get body() { return L("능력치, 돈, 성공과 실패, 수명은 규칙 엔진이 확률로 정하고, AI는 그 결과를 장면과 문장으로만 써요. 실제 사건 뉴스는 그 시절 기록을 바탕으로 해요."); } },
-  { get title() { return L("내 정보는요"); }, get body() { return L("입력한 정보와 진행 기록은 이 기기 브라우저에만 암호화해 저장되고, 서버에는 남지 않아요. 장면을 쓰는 동안만 AI에 필요한 내용이 전달돼요."); } },
+  { get title() { return L("내 정보는요"); }, get body() { return L("입력한 정보와 진행 기록은 이 기기 브라우저에만 암호화해 저장되고, 서버에는 남지 않아요. 장면을 쓰는 동안만 AI에 필요한 내용이 전달되고, 회고록은 직접 게시할 때만 게시판에 올라가요."); } },
   { get title() { return L("참고해 주세요"); }, get body() { return L("실제 미래를 예측하는 서비스가 아니라, 다른 선택을 상상해 보는 놀이예요. 결과는 같은 선택이어도 매번 달라져요."); } },
 ];
 
