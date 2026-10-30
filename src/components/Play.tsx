@@ -8,6 +8,7 @@ import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabe
 import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
 import type { LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
+import { AboutDialog, versionLabel } from "./About";
 import { FeedbackDialog } from "./Feedback";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
 import { LifeScene } from "./LifeScene";
@@ -597,7 +598,7 @@ function BigMomentIntro({ pending, showTitle, onDone }: { pending: PendingChoice
   );
 }
 
-/** Sound, feedback and leaving live behind ⋯ so the control row holds only what moves time. */
+/** Sound, feedback, the about sheet and leaving live behind ⋯ so the control row holds only what moves time. */
 function PlayMenu({
   sound,
   onSound,
@@ -619,6 +620,7 @@ function PlayMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [writing, setWriting] = useState(false);
+  const [reading, setReading] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -737,14 +739,38 @@ function PlayMenu({
             </svg>
             의견 보내기
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="dialog"
+            className={item}
+            onClick={() => {
+              setOpen(false);
+              setReading(true);
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            서비스 소개
+          </button>
           <button type="button" role="menuitem" className={item} onClick={onQuit}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
             </svg>
             저장하고 나가기
           </button>
+          <p className="border-t border-stone-100 px-4 pt-2 pb-1.5 text-[11px] text-stone-500 tabular-nums dark:border-stone-800 dark:text-stone-400">What If {versionLabel}</p>
         </div>
       )}
+      <AboutDialog
+        open={reading}
+        onClose={() => {
+          setReading(false);
+          trigger.current?.focus();
+        }}
+      />
       <FeedbackDialog
         open={writing}
         where={where}
