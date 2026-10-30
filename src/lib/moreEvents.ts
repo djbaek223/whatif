@@ -3,6 +3,7 @@
 // Jobs, pay and homes go through the engine's hire / switchJob / buyHome effects, never fixed names or numbers.
 import type { EventDef } from "./events";
 import type { LifeState } from "./types";
+import { onCampus, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 
 const year = (s: LifeState) => Math.floor(s.mi / 12);
@@ -12,7 +13,7 @@ const kidAges = (s: LifeState) => (s.flags.kidsBorn ?? []).map((b) => Math.floor
 const hasKidAged = (lo: number, hi = lo) => (s: LifeState) => kidAges(s).some((a) => a >= lo && a <= hi);
 const single = (s: LifeState) => s.flags.partner === "none" || s.flags.partner === "divorced" || s.flags.partner === "widowed";
 const married = (s: LifeState) => s.flags.partner === "married";
-const student = (s: LifeState) => s.flags.education === "school" || s.flags.education === "highschool";
+const student = (s: LifeState) => s.flags.education === "school" || (s.flags.education === "highschool" && !retaking(s));
 const working = (s: LifeState) => s.flags.employed && !s.flags.retired;
 const civil = (s: LifeState) => /공무원/.test(s.flags.job);
 /** Months since a chain step happened; -1 when it never did. */
@@ -1533,7 +1534,7 @@ const AGE_FILL: EventDef[] = [
     maxAge: 34,
     perYear: 0.2,
     once: true,
-    when: (s) => single(s) && (s.flags.education === "university" || s.flags.employed),
+    when: (s) => single(s) && (onCampus(s) || s.flags.employed),
     intro: "",
     effect: { text: "처음으로 내 방을 얻어 독립했다. 첫날 밤 라면을 끓여 먹으며 이상하게 설렜다.", stats: { happiness: 4, health: -1 }, wealth: -300, note: "보증금과 살림살이" },
   },

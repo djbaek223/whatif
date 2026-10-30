@@ -62,6 +62,13 @@ export interface LifeFlags {
   homeArea?: string;
   homeValue?: number; // 만원, current market price of the home
   mortgage?: number; // 만원, outstanding loan
+  // School and service dates (see timeline.ts); missing in lives saved before them.
+  entered?: number; // month index the current course began, or begins when admitted ahead of March
+  eduFrom?: number; // month index classes (re)start: the entrance month, or the term after military leave
+  retaking?: number; // preparing for another exam (재수): month index of that exam season
+  retakes?: number; // exam retakes so far
+  serviceFrom?: number; // month index of enlistment
+  serviceUntil?: number; // month index of discharge
 }
 
 /** What a choice is about. Temperament and past choices make some themes come up more often. */

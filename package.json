@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "validate:events": "tsx scripts/validate-events.ts",
     "check:memory": "tsx scripts/check-memory.ts",
-    "check:hybrid": "tsx scripts/check-hybrid.ts"
+    "check:hybrid": "tsx scripts/check-hybrid.ts",
+    "check:timeline": "tsx scripts/check-timeline.ts"
   },
   "dependencies": {
     "next": "16.4.2",

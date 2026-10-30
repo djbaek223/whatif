@@ -6,6 +6,7 @@
 import { CORE_EVENTS, ageOf, type Effect, type EventDef } from "./events";
 import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
+import { timelineConflict } from "./timeline";
 import { ownsBusiness } from "./work";
 
 const CORE = new Set(CORE_EVENTS.map((e) => e.id));
@@ -23,7 +24,7 @@ const POOL_ONLY = new Set([
 function lasting(e: Effect | undefined): boolean {
   if (!e) return false;
   if (e.flags || e.hire || e.switchJob || e.promote || e.enroll || e.buyHome || e.startBusiness || e.addChild) return true;
-  if (e.income !== undefined || e.incomePct || e.eduYears || e.busyMonths || e.homeValuePct) return true;
+  if (e.income !== undefined || e.incomePct || e.eduYears || e.busyMonths || e.homeValuePct || e.enlist || e.retake) return true;
   return lasting(e.risk?.success) || lasting(e.risk?.failure);
 }
 
@@ -60,7 +61,7 @@ export function conflictIn(text: string, s: LifeState): string | null {
   if (f.children === 0 && KIDS.test(text)) return "자녀";
   if (!f.homeOwner && OWN_HOME.test(text)) return "자가";
   if (ageOf(s) < 19 && ADULT.test(text)) return "나이";
-  return null;
+  return timelineConflict(text, s);
 }
 
 /** conflictIn over several pieces of text at once. */

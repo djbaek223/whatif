@@ -2,6 +2,7 @@
 // Kept apart from events.ts, which holds the big forks (exams, jobs, marriage, retirement).
 import type { EventDef } from "./events";
 import type { LifeState } from "./types";
+import { inService, onCampus, retaking } from "./timeline";
 import { employee } from "./work";
 
 const kidAges = (s: LifeState) => (s.flags.kidsBorn ?? []).map((b) => Math.floor((s.mi - b) / 12));
@@ -9,8 +10,7 @@ const hasKidAged = (lo: number, hi = lo) => (s: LifeState) => kidAges(s).some((a
 const single = (s: LifeState) => s.flags.partner === "none" || s.flags.partner === "divorced" || s.flags.partner === "widowed";
 const year = (s: LifeState) => Math.floor(s.mi / 12);
 const month = (s: LifeState) => (s.mi % 12) + 1;
-const student = (s: LifeState) => s.flags.education === "school" || s.flags.education === "highschool";
-const inService = (s: LifeState) => s.flags.military && s.mi < s.flags.busyUntil && s.profile.gender === "남";
+const student = (s: LifeState) => s.flags.education === "school" || (s.flags.education === "highschool" && !retaking(s));
 const jobless = (s: LifeState) => !s.flags.employed && !s.flags.retired && s.flags.education === "done";
 
 export const LIFE_EVENTS: EventDef[] = [
@@ -68,7 +68,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 19,
     perYear: 0.3,
     cooldown: 10,
-    when: (s) => s.flags.education === "highschool",
+    when: (s) => s.flags.education === "highschool" && !retaking(s),
     intro: "",
     effect: {
       text: "모의고사 성적표를 받아 들고 한숨을 쉬었다.",
@@ -143,7 +143,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 26,
     perYear: 0.4,
     cooldown: 10,
-    when: (s) => s.flags.education === "university",
+    when: onCampus,
     intro: "",
     effect: {
       text: "과 MT에서 밤새 게임을 하고 새벽에 라면을 끓였다.",
@@ -158,7 +158,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 27,
     perYear: 0.35,
     cooldown: 10,
-    when: (s) => s.flags.education === "university",
+    when: onCampus,
     intro: "",
     effect: {
       text: "학기 말 성적이 나왔다.",
@@ -176,7 +176,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 27,
     perYear: 0.3,
     cooldown: 12,
-    when: (s) => s.flags.education === "university" || (s.flags.education === "highschool" && s.mi % 12 < 2),
+    when: (s) => onCampus(s) || (s.flags.education === "highschool" && s.mi % 12 < 2),
     intro: "",
     effect: {
       text: "편의점 야간 아르바이트로 용돈을 벌었다.",
@@ -192,7 +192,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 23,
     perYear: 0.5,
     once: true,
-    when: (s) => s.flags.education === "university",
+    when: onCampus,
     intro: "학기 초, 동아리 홍보 부스가 늘어섰다.",
     choices: [
       { id: "band", label: "밴드 동아리에 들어간다", effect: { text: "합주실에서 기타를 잡았다. 축제 무대에도 섰다.", stats: { happiness: 6, relationships: 5 } } },
@@ -208,7 +208,7 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 26,
     perYear: 0.2,
     once: true,
-    when: (s) => s.flags.education === "university" && year(s) >= 1995,
+    when: (s) => onCampus(s) && year(s) >= 1995,
     intro: "교환학생 선발 공고가 떴다. 한 학기 동안 외국에서 공부할 수 있다.",
     choices: [
       { id: "go", label: "지원해서 떠난다", effect: { text: "낯선 나라의 기숙사에서 한 학기를 보냈다. 세상이 넓다는 걸 알았다.", stats: { knowledge: 7, happiness: 6, relationships: -2 }, wealth: -800 } },
