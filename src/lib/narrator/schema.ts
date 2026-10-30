@@ -11,7 +11,7 @@ export const OpeningSchema = z.object({
       knowledge: z.number().int(),
       relationships: z.number().int(),
     })
-    .describe("변곡점 시점의 능력치, 각각 0~100"),
+    .describe("변곡점 시점의 능력치, 각각 0~100. knowledge는 교육(공부·학업 성취·자격)"),
   era: z.string().describe("변곡점 시점의 시대 배경. 2~3문단, 감각적인 디테일 포함."),
   situation: z.string().describe("그 시점의 '나'가 처한 상황과 고민을 2인칭으로 쓴 한 문단. 마지막은 결정을 묻는 문장."),
   initial: z.object({
@@ -77,7 +77,7 @@ export const MomentSchema = z.object({
         money: z.number().int().describe("이 선택으로 드는 돈(음수)이나 들어오는 돈(양수), 만원. 없으면 0"),
         stats: z
           .object({ health: z.number().int(), happiness: z.number().int(), knowledge: z.number().int(), relationships: z.number().int() })
-          .describe("능력치 변화, 각각 -10~10"),
+          .describe("능력치 변화, 각각 -10~10. knowledge는 교육(공부·학위·자격)"),
         chance: z.number().describe("성공 확률 0~1. 결과가 확실하면 1"),
         outcome: z.string().describe("이 선택을 했을 때(성공했을 때) 일어난 일, 과거형 1~2문장"),
         failure: z.string().describe("chance가 1보다 작을 때 실패하면 일어난 일, 과거형 1문장. 아니면 빈 문자열"),
@@ -105,7 +105,7 @@ const EpisodeSchema = z.object({
   title: z.string().describe("10자 이내 제목"),
   type: z.enum(["daily", "relation", "work", "money", "health", "chance"]),
   text: z.string().describe("선택 없이 지나가는 일, 과거형 1~2문장"),
-  stats: z.object({ health: z.number().int(), happiness: z.number().int(), knowledge: z.number().int(), relationships: z.number().int() }).describe("각각 -4~4, 대부분 0"),
+  stats: z.object({ health: z.number().int(), happiness: z.number().int(), knowledge: z.number().int(), relationships: z.number().int() }).describe("각각 -4~4, 대부분 0. knowledge는 교육"),
   money: z.number().int().describe("만원. 대부분 0"),
   keywords: z.array(z.string()).describe("핵심 키워드 1~2개"),
 });

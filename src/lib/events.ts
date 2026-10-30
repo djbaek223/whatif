@@ -1,4 +1,5 @@
-import type { CompanyTier } from "./catalog";
+import { DEGREE_RANK, isMedical, type CompanyTier } from "./catalog";
+import { degreeOnLeaving } from "./education";
 import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
@@ -190,6 +191,7 @@ export const CORE_EVENTS: EventDef[] = [
       {
         id: "big-company",
         label: "대기업 공채에 도전한다",
+        when: (s) => DEGREE_RANK[degreeOnLeaving(s)] >= DEGREE_RANK.bachelor,
         effect: {
           text: "자기소개서를 수십 장 썼다.",
           flags: { education: "done" },
@@ -206,6 +208,32 @@ export const CORE_EVENTS: EventDef[] = [
               stats: { happiness: -4 },
               hire: { tier: "small" },
             },
+          },
+        },
+      },
+      {
+        id: "doctor",
+        label: "의사 국가고시를 보고 수련의 과정을 밟는다",
+        when: (s) => isMedical(s.profile.major) && DEGREE_RANK[degreeOnLeaving(s)] >= DEGREE_RANK.bachelor,
+        effect: {
+          text: "국가고시에 합격해 의사 면허를 받았다. 인턴 생활이 시작되었다.",
+          stats: { knowledge: 6, health: -4, happiness: 4 },
+          flags: { education: "done" },
+          intense: 6,
+          hire: { tier: "doctor" },
+        },
+      },
+      {
+        id: "trade",
+        label: "전공을 살려 바로 취업한다",
+        when: (s) => degreeOnLeaving(s) === "college",
+        effect: {
+          text: "전공 실습 때 다진 손으로 이력서를 냈다.",
+          flags: { education: "done" },
+          risk: {
+            chance: knowledgeOdds(0.6),
+            success: { text: "전공을 살려 취업했다.", stats: { happiness: 8 }, hire: { tier: "mid" } },
+            failure: { text: "원하던 곳은 아니었지만 일을 시작했다.", stats: { happiness: -3 }, hire: { tier: "small" } },
           },
         },
       },
@@ -237,6 +265,7 @@ export const CORE_EVENTS: EventDef[] = [
       {
         id: "grad-school",
         label: "대학원에 진학한다",
+        when: (s) => DEGREE_RANK[degreeOnLeaving(s)] >= DEGREE_RANK.bachelor,
         effect: {
           text: "연구실 생활이 시작되었다.",
           stats: { knowledge: 10, happiness: -2 },
@@ -282,8 +311,8 @@ export const CORE_EVENTS: EventDef[] = [
     maxAge: 45,
     perYear: 1,
     once: true,
-    when: (s) => s.flags.education === "graduate" && s.mi >= s.flags.eduUntil,
-    intro: "학위 논문이 통과되었다.",
+    when: (s) => s.flags.education === "graduate" && s.mi >= s.flags.eduUntil && degreeOnLeaving(s) !== "phd",
+    intro: "석사 학위 논문이 통과되었다.",
     choices: [
       {
         id: "research",
@@ -308,6 +337,18 @@ export const CORE_EVENTS: EventDef[] = [
         },
       },
       {
+        id: "phd",
+        label: "국내 박사 과정에 진학한다",
+        effect: {
+          text: "연구실에 남아 박사 과정을 시작했다.",
+          stats: { knowledge: 8, happiness: -3 },
+          flags: { education: "graduate" },
+          eduYears: 4,
+          income: 120,
+          enroll: { level: "graduate" },
+        },
+      },
+      {
         id: "industry",
         label: "기업 연구직으로 간다",
         effect: {
@@ -316,6 +357,43 @@ export const CORE_EVENTS: EventDef[] = [
           flags: { education: "done" },
           hire: { tier: "large", title: "연구원" },
         },
+      },
+    ],
+  },
+  {
+    id: "phd-done",
+    title: "박사 학위 이후",
+    minAge: 26,
+    maxAge: 55,
+    perYear: 1,
+    once: true,
+    when: (s) => s.flags.education === "graduate" && s.mi >= s.flags.eduUntil && degreeOnLeaving(s) === "phd",
+    intro: (s) => `${s.flags.school ? `${s.flags.school}에서 ` : ""}박사 학위를 받았다. 긴 터널 끝에서 다음 길을 정해야 한다.`,
+    theme: "career",
+    choices: [
+      {
+        id: "professor",
+        label: "교수 임용에 도전한다",
+        effect: {
+          text: "논문 목록을 정리해 여러 대학에 지원서를 냈다.",
+          flags: { education: "done" },
+          intense: 6,
+          risk: {
+            chance: knowledgeOdds(0.25),
+            success: { text: "교수 임용 최종 합격 통보를 받았다.", stats: { happiness: 15, knowledge: 4 }, hire: { tier: "professor" } },
+            failure: { text: "임용의 문턱은 높았다. 우선 연구소에 자리를 잡고 다음 공고를 기다리기로 했다.", stats: { happiness: -6 }, hire: { tier: "research" } },
+          },
+        },
+      },
+      {
+        id: "institute",
+        label: "국책 연구소에 들어간다",
+        effect: { text: "박사급 연구원으로 연구소에 들어갔다.", stats: { happiness: 6 }, flags: { education: "done" }, hire: { tier: "research", title: "선임연구원" } },
+      },
+      {
+        id: "industry",
+        label: "기업 연구소로 간다",
+        effect: { text: "박사급 대우를 받고 기업 연구소에 들어갔다.", stats: { happiness: 5 }, flags: { education: "done" }, hire: { tier: "large", title: "책임연구원" } },
       },
     ],
   },

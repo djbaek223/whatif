@@ -166,9 +166,11 @@ export function StatBars({
   compact = false,
   flash,
   flashKey = 0,
+  notes,
 }: {
   stats: Stats;
   compact?: boolean;
+  notes?: Partial<Record<StatKey, string>>; // a short word beside the label, e.g. the degree beside 교육
   flash?: Partial<Record<StatKey, "up" | "down">>; // gauges that just jumped or dropped a lot
   flashKey?: number; // changes with every new swing so the glow plays again
 }) {
@@ -177,7 +179,10 @@ export function StatBars({
       {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
         <div key={k} className="min-w-0">
           <div className="flex items-baseline justify-between text-xs">
-            <span className="text-stone-600 dark:text-stone-400">{STAT_LABELS[k]}</span>
+            <span className="truncate text-stone-600 dark:text-stone-400">
+              {STAT_LABELS[k]}
+              {notes?.[k] && <span className="ml-1 text-[10px] text-stone-500 dark:text-stone-400">{notes[k]}</span>}
+            </span>
             <span className="font-semibold tabular-nums">{stats[k]}</span>
           </div>
           <div className="relative mt-1">

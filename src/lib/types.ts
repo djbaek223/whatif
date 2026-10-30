@@ -1,10 +1,11 @@
+// "knowledge" is shown as 교육 (schooling and learning); the key stays so saved lives and the narrator schema keep working.
 export type StatKey = "health" | "happiness" | "knowledge" | "relationships";
 export type Stats = Record<StatKey, number>;
 
 export const STAT_LABELS: Record<StatKey, string> = {
   health: "건강",
   happiness: "행복",
-  knowledge: "지식",
+  knowledge: "교육",
   relationships: "관계",
 };
 
@@ -36,6 +37,18 @@ export interface TurningPoint {
 }
 
 export type Education = "school" | "highschool" | "university" | "graduate" | "done";
+/** Highest finished schooling. Jobs ask for a degree (see catalog.ts TIER_NEEDS). */
+export type Degree = "none" | "high" | "college" | "bachelor" | "master" | "phd";
+
+export const DEGREE_LABELS: Record<Degree, string> = {
+  none: "중졸",
+  high: "고졸",
+  college: "전문대졸",
+  bachelor: "대졸",
+  master: "석사",
+  phd: "박사",
+};
+
 export type Partner = "none" | "dating" | "married" | "divorced" | "widowed";
 
 export interface LifeFlags {
@@ -69,6 +82,9 @@ export interface LifeFlags {
   retakes?: number; // exam retakes so far
   serviceFrom?: number; // month index of enlistment
   serviceUntil?: number; // month index of discharge
+  // Degrees (education.ts); missing in lives saved before them, then read from education and school.
+  degree?: Degree; // highest degree finished
+  program?: Degree; // the degree the current course leads to, credited once its last month has passed
 }
 
 /** What a choice is about. Temperament and past choices make some themes come up more often. */
@@ -249,6 +265,7 @@ export interface LifeState {
   hybrid?: boolean; // false: every event plays from the pool, as before the hybrid events (missing means on)
   episodes?: { key: string; born: number; items: Episode[] }; // everyday moments written ahead (hybrid.ts)
   threads?: { text: string; due: number }[]; // follow-ups the narrator left, told in a later moment once due
+  expense?: Record<string, number>; // 만원 / 월 by item (budget.ts), as of the last turn, to tell the player when fixed costs change
   memory?: string[]; // every lasting change to this life ("34세(2019년 3월): 카페 창업"), kept for good and given to the narrator
 }
 

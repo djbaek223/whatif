@@ -12,7 +12,8 @@
     "validate:events": "tsx scripts/validate-events.ts",
     "check:memory": "tsx scripts/check-memory.ts",
     "check:hybrid": "tsx scripts/check-hybrid.ts",
-    "check:timeline": "tsx scripts/check-timeline.ts"
+    "check:timeline": "tsx scripts/check-timeline.ts",
+    "check:budget": "tsx scripts/check-budget.ts"
   },
   "dependencies": {
     "next": "16.4.2",
