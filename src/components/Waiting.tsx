@@ -71,7 +71,7 @@ export const SCENE_LATE_MS = 9000;
  * doesn't report progress), so the bar eases toward the end and never claims to be done.
  * Screen readers get one status line from the panel instead of each step change; this is all visual.
  */
-export function SceneWait({ elapsed, optionSlots }: { elapsed: number; optionSlots: number }) {
+export function SceneWait({ elapsed }: { elapsed: number }) {
   const step = SCENE_STEPS.findLastIndex((s) => elapsed >= s.at);
   const late = elapsed >= SCENE_LATE_MS;
   const progress = Math.min(0.92, 1 - Math.exp(-elapsed / 5000));
@@ -123,13 +123,6 @@ export function SceneWait({ elapsed, optionSlots }: { elapsed: number; optionSlo
         <div className="shimmer h-3 w-11/12 rounded-full" />
         <div className="shimmer h-3 w-3/5 rounded-full" />
       </div>
-      {optionSlots > 0 && (
-        <div className="space-y-2 pt-1">
-          {Array.from({ length: optionSlots }, (_, i) => (
-            <div key={i} className="h-12 rounded-xl border-2 border-dashed border-stone-200 dark:border-stone-800" />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

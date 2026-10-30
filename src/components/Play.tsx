@@ -496,7 +496,7 @@ function ChoicePanel({
           {pending.title}
         </h2>
         {sceneLoading ? (
-          <SceneWait elapsed={waited} optionSlots={pending.options.length ? 0 : 2} />
+          <SceneWait elapsed={waited} />
         ) : (
           <>
             <p className={`mt-1 leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300 ${long && !more ? "line-clamp-3 lg:line-clamp-none" : ""}`}>{pending.scene}</p>
@@ -512,60 +512,65 @@ function ChoicePanel({
           </>
         )}
       </div>
-      <div className="space-y-2">
-        {pending.options.map((o, i) => (
-          <Button key={o.id} variant="choice" disabled={busy || sceneLoading} onClick={() => onChoose(o.id)} aria-keyshortcuts={keys && i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
-            {keys && (
-              <Kbd className="mt-0.5 hidden lg:inline-flex" hidden>
-                {i + 1}
-              </Kbd>
-            )}
-            <span className="min-w-0">
-              {o.label}
-              {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
-            </span>
-          </Button>
-        ))}
-      </div>
-      {ai &&
-        pending.freeText &&
-        (writing ? (
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Textarea
-                rows={1}
-                value={free}
-                onChange={(e) => setFree(e.target.value)}
-                placeholder="나라면 이렇게 하겠다"
-                aria-label="직접 쓰기"
-                maxLength={200}
-                autoFocus
-              />
-            </div>
-            <Button
-              variant="ghost"
-              disabled={busy || free.trim().length < 2}
-              onClick={() => {
-                onChooseFree(free);
-                setFree("");
-              }}
-              className="flex items-center gap-2"
-            >
-              {busy && <Spinner />}
-              {busy ? "읽는 중" : "결정"}
-            </Button>
+      {/* The options arrive with the finished scene, so the player reads it before choosing. */}
+      {!sceneLoading && (
+        <div className="space-y-3 motion-safe:animate-[fadein_400ms_ease-out]">
+          <div className="space-y-2">
+            {pending.options.map((o, i) => (
+              <Button key={o.id} variant="choice" disabled={busy} onClick={() => onChoose(o.id)} aria-keyshortcuts={keys && i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
+                {keys && (
+                  <Kbd className="mt-0.5 hidden lg:inline-flex" hidden>
+                    {i + 1}
+                  </Kbd>
+                )}
+                <span className="min-w-0">
+                  {o.label}
+                  {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
+                </span>
+              </Button>
+            ))}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setWriting(true)}
-            disabled={busy || sceneLoading}
-            className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
-          >
-            <PencilIcon />
-            직접 쓰기
-          </button>
-        ))}
+          {ai &&
+            pending.freeText &&
+            (writing ? (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Textarea
+                    rows={1}
+                    value={free}
+                    onChange={(e) => setFree(e.target.value)}
+                    placeholder="나라면 이렇게 하겠다"
+                    aria-label="직접 쓰기"
+                    maxLength={200}
+                    autoFocus
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  disabled={busy || free.trim().length < 2}
+                  onClick={() => {
+                    onChooseFree(free);
+                    setFree("");
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  {busy && <Spinner />}
+                  {busy ? "읽는 중" : "결정"}
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setWriting(true)}
+                disabled={busy}
+                className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
+              >
+                <PencilIcon />
+                직접 쓰기
+              </button>
+            ))}
+        </div>
+      )}
     </div>
   );
 }
