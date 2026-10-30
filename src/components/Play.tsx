@@ -8,6 +8,7 @@ import { loadSoundPref, setSound, sfx } from "@/lib/sound";
 import type { LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
 import { LifeScene } from "./LifeScene";
+import { SCENE_LATE_MS, SceneWait } from "./Waiting";
 import { Button, Card, DeltaChips, Segmented, Spinner, StatBars, Switch, Textarea } from "./ui";
 
 export type Speed = 1 | 2 | 4;
@@ -304,6 +305,21 @@ export function PlayView({
   );
 }
 
+/** Milliseconds since `active` turned on, ticking twice a second; 0 while off. */
+function useElapsed(active: boolean): number {
+  const [ms, setMs] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const start = Date.now();
+    const t = setInterval(() => setMs(Date.now() - start), 500);
+    return () => {
+      clearInterval(t);
+      setMs(0);
+    };
+  }, [active]);
+  return ms;
+}
+
 function turnName(months: number): string {
   if (months === 1) return "다음 달";
   if (months === 12) return "1년 뒤";
@@ -429,9 +445,25 @@ function ChoicePanel({
   const [more, setMore] = useState(false);
   const long = pending.scene.length > 110;
   const kind = pending.rare ? "✦ 희귀한 순간" : pending.small ? "작은 선택" : big ? "인생의 갈림길" : "선택의 순간";
+  const waited = useElapsed(sceneLoading);
+  const [waitedForScene] = useState(sceneLoading);
+  // One status line for screen readers. It starts empty so the choice itself is announced first, and the step
+  // changes in SceneWait stay silent; only the wait, a slow wait and the finished scene are read.
+  const status = sceneLoading
+    ? waited >= SCENE_LATE_MS
+      ? "조금 더 걸리고 있어요. 늦어지면 기본 이야기로 이어가요."
+      : waited > 0
+        ? "장면을 그리는 중이에요."
+        : ""
+    : waitedForScene
+      ? `장면이 준비됐어요. 선택지 ${pending.options.length}개 중에서 골라 주세요.`
+      : "";
 
   return (
-    <div className="rise-in space-y-3">
+    <div className="rise-in space-y-3" aria-busy={sceneLoading}>
+      <p role="status" className="sr-only">
+        {status}
+      </p>
       <div>
         <div className="flex items-center justify-between gap-2">
           <p className={`text-xs font-semibold tracking-wide ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
@@ -464,12 +496,7 @@ function ChoicePanel({
           {pending.title}
         </h2>
         {sceneLoading ? (
-          <div className="mt-2 space-y-2" aria-label="장면을 그리는 중이에요">
-            <div className="h-3 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-            <div className="h-3 w-11/12 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-            <div className="h-3 w-3/5 rounded-full bg-stone-200 motion-safe:animate-pulse dark:bg-stone-800" />
-            <p className="pt-0.5 text-xs text-stone-500 dark:text-stone-400">장면을 그리는 중이에요</p>
-          </div>
+          <SceneWait elapsed={waited} optionSlots={pending.options.length ? 0 : 2} />
         ) : (
           <>
             <p className={`mt-1 leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300 ${long && !more ? "line-clamp-3 lg:line-clamp-none" : ""}`}>{pending.scene}</p>
