@@ -31,6 +31,7 @@ import type { ClassifyResult, EndingResult, MomentResult, OpeningResult, SceneRe
 import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
+import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
 import { PlayView, type FreeResult } from "./Play";
 import { stopsProgress } from "@/lib/playUi";
@@ -54,7 +55,11 @@ interface Saved {
   tp: TurningPoint;
   life: LifeState | null;
   ending: EndingResult | null;
+  memoir?: MemoirPick; // missing in saves from before the question: an ending there was always written
 }
+
+/** The answer to "회고록을 써 드릴까요?" when a life ends; null until the player answers. */
+type MemoirPick = "write" | "skip" | null;
 
 
 const LANG_KEY = "whatif.lang";
@@ -92,6 +97,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const [tp, setTp] = useState<TurningPoint>(EMPTY_TP);
   const [life, setLife] = useState<LifeState | null>(null);
   const [ending, setEnding] = useState<EndingResult | null>(null);
+  const [memoir, setMemoir] = useState<MemoirPick>(null);
   const [ai, setAi] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [stored, setStored] = useState<StoredProfile | null>(null);
@@ -160,8 +166,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
-    writeProgress({ screen, profile, tp, life, ending } satisfies Saved, remember);
-  }, [screen, profile, tp, life, ending, remember]);
+    writeProgress({ screen, profile, tp, life, ending, memoir } satisfies Saved, remember);
+  }, [screen, profile, tp, life, ending, memoir, remember]);
 
   const eraseDevice = async () => {
     if (!confirm(L("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요."))) return;
@@ -184,6 +190,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     // Lives saved before AI-written moments existed pick them up when AI is on.
     setLife(saved.life ? { ...saved.life, ai } : null);
     setEnding(saved.ending);
+    // A memoir still being written when the page closed is asked about again rather than left waiting.
+    setMemoir(saved.ending ? (saved.memoir ?? "write") : saved.memoir === "skip" ? "skip" : null);
     setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
   };
 
@@ -228,10 +236,22 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     setScreen("play");
   }
 
-  async function finish(dead: LifeState) {
+  // The end of a life first says so and asks whether to write the memoir (EndingView); nothing is written until then.
+  function finish() {
+    setMemoir(null);
+    setEnding(null);
     setTimeout(() => setScreen("ending"), 1200);
-    const res = ai
-      ? await narrate<EndingResult>({
+  }
+
+  async function writeMemoir() {
+    if (!life?.dead) return;
+    const dead = life;
+    setMemoir("write");
+    setEnding(null);
+    window.scrollTo({ top: 0 }); // asked from the bottom of the skipped view: the memoir starts at its top
+    // The ad (phones, once ads are on) and the writing run together; the memoir shows when both are done.
+    const [res] = await Promise.all([ai
+      ? narrate<EndingResult>({
           kind: "ending",
           summary: lifeSummary(dead, 30),
           persona: dead.persona,
@@ -239,7 +259,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
           turningPoint: dead.turningPoint,
           deathAge: dead.deathAge ?? 0,
         })
-      : null;
+      : null, beforeMemoir()]);
+    if (lifeRef.current !== dead) return; // moved on to another life meanwhile
     setEnding(res ?? fallbackEnding(dead));
   }
 
@@ -255,7 +276,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     if (stop === "choice" && next.pending && stopsProgress(autoDecide, isBigChoice(next.pending))) setAuto(false);
     if (stop === "death") {
       setAuto(false);
-      finish(next);
+      finish();
     }
   }
 
@@ -469,7 +490,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
             onClosePresent: () => setPresentOpen(false),
             onQuit: () => {
               setAuto(false);
-              setSaved({ screen, profile, tp, life, ending });
+              setSaved({ screen, profile, tp, life, ending, memoir });
               setScreen("intro");
             },
           }}
@@ -480,6 +501,9 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
         <EndingView
           life={life}
           ending={ending}
+          memoir={memoir}
+          onWriteMemoir={writeMemoir}
+          onSkipMemoir={() => setMemoir("skip")}
           onReplay={() => startOpening(profile, tp)}
           onNewTurningPoint={() => {
             setLife(null);
