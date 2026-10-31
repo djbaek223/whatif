@@ -97,7 +97,7 @@ export function freshEpisodes(s: LifeState): Episode[] {
 /** Whether the next call should also write everyday moments: only when the queue is running low. */
 export const wantsEpisodes = (s: LifeState) => hybridOn(s) && (queueFits(s) ? s.episodes!.items.length : 0) < 2;
 
-const CATEGORIES = new Set<Category>(["daily", "relation", "work", "money", "health", "chance"]);
+const CATEGORIES = new Set<Category>(["daily", "relation", "work", "money", "health", "chance", "school", "family", "growth", "values"]);
 
 export interface RawEpisode {
   title: string;

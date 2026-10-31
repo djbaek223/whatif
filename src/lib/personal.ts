@@ -172,7 +172,7 @@ export function temperFactor(s: LifeState, weights: Partial<Record<Axis, number>
 const THEME_CATEGORY: Record<Theme, Category> = {
   career: "work",
   study: "daily",
-  family: "relation",
+  family: "family",
   love: "relation",
   risk: "money",
   money: "money",
@@ -191,7 +191,17 @@ const ID_CATEGORY: Record<string, Category> = {
   personal: "daily",
 };
 
+/**
+ * Older events moved to the finer kinds (school, family, learning and hobbies) when those were added, so the
+ * variety rule (engine SAME_KIND) tells a day at school from a day at home. Checked before an event's own category.
+ */
+const RECATEGORY: Record<string, Category> = Object.fromEntries([
+  ...["school-trip", "club", "mock-exam", "class-president", "grades", "bullying", "mt", "after-school", "exchange", "sports-day", "d-exam-eve", "d-homework", "d-group-project", "d-transfer-student", "d-talent-show"].map((id) => [id, "school"]),
+  ...["kid-first", "kid-sick", "kid-school", "kid-education", "kid-teen", "kid-leaves", "kid-wedding", "grandchild", "parent-death", "family-holiday", "holiday-nag", "couple-chores", "parental-leave", "parents-70", "sibling-wedding", "in-laws", "anniversary", "kid-middle-school", "family-trip", "kid-job", "grandkid-school", "grandkid-care", "kid-phone", "kid-adult", "spouse-dream", "kid-academy", "d-kid-sick-day", "d-kid-pet", "d-spouse-birthday", "d-parents-allowance", "d-move-near-kids", "newborn-nights", "newlywed"].map((id) => [id, "family"]),
+  ...["hobby", "certificate", "channel-start", "crew-join", "d-garden", "baduk-champ"].map((id) => [id, "growth"]),
+] as [string, Category][]);
+
 /** The category an event counts under: its own, a known one for older events, or one read from its theme. */
 export function eventCategory(ev: EventDef): Category {
-  return ev.category ?? ID_CATEGORY[ev.id] ?? THEME_CATEGORY[eventTheme(ev)];
+  return RECATEGORY[ev.id] ?? ev.category ?? ID_CATEGORY[ev.id] ?? THEME_CATEGORY[eventTheme(ev)];
 }
