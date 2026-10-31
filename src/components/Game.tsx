@@ -38,6 +38,7 @@ import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
 import { L } from "@/lib/i18n";
 import { countryFor, inRegion, langFor, setLang, setRegion, type Lang, type Region } from "@/lib/region";
+import { fromTag, LANG_COOKIE } from "@/lib/langPick";
 
 // Everyday moments, small dilemmas, follow-ups and rare moments written for each life (hybrid.ts).
 // NEXT_PUBLIC_WHATIF_HYBRID=0 turns it off for new lives: every event then plays from the pool.
@@ -64,19 +65,27 @@ const LANGS: { id: Lang; name: string }[] = [
   { id: "en", name: "English" },
 ];
 
-/** The language picked last time on this device (or the country picked before languages existed), else the browser's. */
-function guessLang(): Lang {
+/** The language picked last time on this device (or the country picked before languages existed). */
+function keptLang(): Lang | undefined {
   try {
     const kept = localStorage.getItem(LANG_KEY) ?? { us: "en", kr: "ko" }[localStorage.getItem("whatif.region") ?? ""];
     if (kept === "en" || kept === "ko") return kept;
   } catch {
-    // storage blocked: fall through to the browser
+    // storage blocked
   }
-  return /^en\b/i.test(navigator.language) ? "en" : "ko";
+  return undefined;
 }
 
-/** initialLang comes from the address: /en opens in English. */
-export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
+/** Keeps the pick as a cookie too, so the next visit is drawn in it from the first paint. */
+function keepLangCookie(l: Lang) {
+  document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
+}
+
+/**
+ * initialLang is the language the server drew the page in: /en is English; on / it is the visitor's earlier pick
+ * (cookie) or the browser's language, and `guessed` says a pick kept only on this device may still change it.
+ */
+export default function Game({ initialLang, guessed }: { initialLang?: Lang; guessed?: boolean } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
   const [lang, setLangState] = useState<Lang>(initialLang ?? "ko");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
@@ -116,6 +125,7 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
     setLangState(l);
     try {
       localStorage.setItem(LANG_KEY, l);
+      keepLangCookie(l);
     } catch {
       // not remembered; the address still says which
     }
@@ -124,7 +134,12 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
 
   // Restore the saved profile and game, and check whether the server has an AI key.
   useEffect(() => {
-    if (!initialLang) setLangState(guessLang()); // eslint-disable-line react-hooks/set-state-in-effect
+    // A pick from before the cookie existed lives only in storage: honor it and copy it to the cookie.
+    const kept = keptLang();
+    if (kept && (!initialLang || guessed)) {
+      setLangState(kept); // eslint-disable-line react-hooks/set-state-in-effect
+      if (!document.cookie.includes(`${LANG_COOKIE}=`)) keepLangCookie(kept);
+    } else if (!initialLang) setLangState(fromTag(navigator.languages?.[0] ?? navigator.language ?? ""));
     dropLegacySaves();
     loadProfile().then((sp) => {
       setStored(sp);
@@ -141,7 +156,7 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
       setScreen((s) => (s === "intro" ? "profile" : s));
     });
     aiAvailable().then(setAi);
-  }, [initialLang]);
+  }, [initialLang, guessed]);
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
