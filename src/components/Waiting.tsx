@@ -61,24 +61,16 @@ export function EndingWait() {
   );
 }
 
-const SCENE_STEPS = [
-  { at: 0, get label() { return L("순간 떠올리기"); }, get line() { return L("그때의 공기와 사람들을 떠올리고 있어요"); } },
-  { at: 2500, get label() { return L("장면 쓰기"); }, get line() { return L("장면을 한 줄씩 쓰고 있어요"); } },
-  { at: 5500, get label() { return L("선택지 다듬기"); }, get line() { return L("고를 수 있는 길을 다듬고 있어요"); } },
-];
 /** After this long the wait is called out as slow, and the player is told the story carries on without it. */
 export const SCENE_LATE_MS = 9000;
 
 /**
- * Shown in the choice panel while the narrator writes a scene. The steps follow elapsed time (the request
- * doesn't report progress), so the bar eases toward the end and never claims to be done.
- * Screen readers get one status line from the panel instead of each step change; this is all visual.
+ * Shown in the choice sheet while the narrator writes a scene. The request is one call that reports no progress,
+ * so the bar is indeterminate and there are no made-up steps; the skeleton below has the shape of what arrives
+ * (a few lines of scene, then the options). Screen readers get one status line from the sheet; this is all visual.
  */
 export function SceneWait({ elapsed }: { elapsed: number }) {
-  const step = SCENE_STEPS.findLastIndex((s) => elapsed >= s.at);
   const late = elapsed >= SCENE_LATE_MS;
-  const progress = Math.min(0.92, 1 - Math.exp(-elapsed / 5000));
-
   return (
     <div aria-hidden className="mt-2 space-y-3">
       <div className="overflow-hidden rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 dark:border-indigo-900/70 dark:bg-indigo-950/40">
@@ -93,38 +85,24 @@ export function SceneWait({ elapsed }: { elapsed: number }) {
             </svg>
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{late ? L("조금 더 걸리고 있어요") : L("장면을 그리는 중")}</p>
-            <p key={late ? "late" : step} className="truncate text-xs text-indigo-800/80 motion-safe:animate-[fadein_400ms_ease-out] dark:text-indigo-200/80">
-              {late ? L("늦어지면 기본 이야기로 바로 이어가요") : SCENE_STEPS[step].line}
+            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">{late ? L("조금 더 걸리고 있어요") : L("다음 장면이 펼쳐지고 있어요")}</p>
+            <p key={late ? "late" : "wait"} className="text-xs text-indigo-800/80 motion-safe:animate-[fadein_400ms_ease-out] dark:text-indigo-200/80">
+              {late ? L("늦어지면 기본 이야기로 바로 이어가요") : L("지금까지의 삶을 바탕으로 이 순간을 쓰고 있어요")}
             </p>
           </div>
         </div>
-        <div className="mt-3 h-1 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-900/60">
-          <div
-            className="h-full origin-left rounded-full bg-indigo-500 motion-safe:transition-transform motion-safe:duration-500 motion-safe:ease-linear dark:bg-indigo-400"
-            style={{ transform: `scaleX(${progress})` }}
-          />
+        <div className="indeterminate mt-3 h-1 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-900/60">
+          <span className="block h-full w-1/3 rounded-full bg-indigo-500 dark:bg-indigo-400" />
         </div>
-        <ol className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium">
-          {SCENE_STEPS.map((s, i) => (
-            <li key={s.label} className="flex min-w-0 items-center gap-1.5">
-              {i > 0 && <span className={`h-px w-3 shrink-0 ${i <= step ? "bg-indigo-400" : "bg-indigo-200 dark:bg-indigo-800"}`} />}
-              <span
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] ${
-                  i < step ? "bg-indigo-500 text-white dark:bg-indigo-400 dark:text-indigo-950" : i === step ? "bg-white text-indigo-700 ring-2 ring-indigo-500 dark:bg-stone-900 dark:text-indigo-300 dark:ring-indigo-400" : "bg-indigo-100 text-stone-500 dark:bg-indigo-900 dark:text-stone-400"
-                }`}
-              >
-                {i < step ? "✓" : i + 1}
-              </span>
-              <span className={`truncate ${i === step ? "text-indigo-900 dark:text-indigo-100" : i < step ? "text-indigo-700/80 dark:text-indigo-300/80" : "text-stone-500 dark:text-stone-400"}`}>{s.label}</span>
-            </li>
-          ))}
-        </ol>
       </div>
       <div className="space-y-2 px-0.5">
         <div className="shimmer h-3 rounded-full" />
         <div className="shimmer h-3 w-11/12 rounded-full" />
         <div className="shimmer h-3 w-3/5 rounded-full" />
+      </div>
+      <div className="space-y-2">
+        <div className="shimmer h-14 rounded-xl" />
+        <div className="shimmer h-14 rounded-xl" />
       </div>
     </div>
   );

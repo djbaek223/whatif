@@ -1,38 +1,43 @@
 "use client";
 
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { costBreakdown, costTotal, monthlyCosts } from "@/lib/budget";
-import { degreeTag } from "@/lib/education";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
+import { consequenceOf, degreeLine, markerFor, markerId, playMode, type Milestone } from "@/lib/playUi";
 import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
-import type { LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
+import type { LifeChapter, LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
 import { AboutDialog, versionLabel } from "./About";
 import { BoardDialog } from "./Board";
+import { ConsequenceView, DecisionPanel, type FreeResult, ProgressDock, TimelineDock } from "./Decision";
 import { FeedbackDialog } from "./Feedback";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
+import { LifeHud, useCompactHud } from "./LifeHud";
 import { LifeScene } from "./LifeScene";
-import { SCENE_LATE_MS, SceneWait } from "./Waiting";
-import { Button, Card, DeltaChips, Spinner, StatBars, Switch, Textarea } from "./ui";
+import { MilestoneDialog } from "./Milestones";
+import { Button, Card, DeltaChips, Spinner, StatBars } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 
+export type { FreeResult };
+
 export interface PlayHandlers {
   onStep: () => void;
-  onSkip: () => void;
-  onToggleAuto: () => void;
+  onProgress: () => void; // 선택까지 진행: time runs until the next choice that is the player's to make
+  onStop: () => void;
   onToggleAutoDecide: () => void;
   onChoose: (optionId: string) => void;
-  onChooseFree: (text: string) => void;
+  onChooseFree: (text: string, force?: boolean) => Promise<FreeResult>;
   onClosePresent: () => void;
   onQuit: () => void;
 }
 
 /**
- * Phones: a slim header on top, the story, and a dock at the bottom that turns into a sheet for each choice (it can be pulled down to read).
- * Desktop: the story on the left, and a sticky side column with the scene, stats, the choice and the controls.
- * The header and dock live in one <aside> that is display:contents on phones, so the same elements serve both layouts.
+ * Phones: the Life HUD fixed on top (compact once the timeline is scrolled), the timeline, and one thing at the
+ * bottom that depends on the mode: the step and progress buttons, the progress status with 멈추기, the choice sheet,
+ * or the choice's result. Desktop: the timeline on the left, and a sticky side column with the HUD and that panel.
+ * The HUD and the panel live in one <aside> that is display:contents on phones, so the same elements serve both.
  */
 export function PlayView({
   life,
@@ -54,12 +59,13 @@ export function PlayView({
   handlers: PlayHandlers;
 }) {
   const root = useRef<HTMLDivElement>(null);
-  const { following, jumpToLatest } = useFollowLatest(root);
+  const { following, jumpToLatest, scrollToMarker } = useFollowLatest(root);
   const age = ageOf(life);
   const fx = usePlayFx(life);
   const [sound, setSoundOn] = useState(loadSoundPref);
   const [news, setNews] = useState(loadNewsPref);
   const [keys, setKeys] = useState(loadKeysPref);
+  const [path, setPath] = useState(false);
   const pendingKey = pendingKeyOf(life);
   // Each new choice card rises in with a whoosh.
   useEffect(() => {
@@ -67,10 +73,16 @@ export function PlayView({
   }, [pendingKey]);
 
   const pending = life.pending;
-  const choosing = !!pending && !presentOpen;
   const big = !!pending && isBigChoice(pending);
-  const canAdvance = !pending && !life.dead && !presentOpen && !busy;
-  // The engine logs a choice event's title as it stops; the choice panel already shows it, so drop that line from the feed.
+
+  // The life just before the player's own choice, so the result step can show what it changed. Cleared when
+  // the player carries on. A choice picked for them during progress is not theirs, so it shows no result step.
+  const [chosenFrom, setChosenFrom] = useState<LifeState | null>(null);
+  const consequence = useMemo(() => (chosenFrom ? consequenceOf(chosenFrom, life) : null), [chosenFrom, life]);
+
+  const mode = playMode({ dead: life.dead, presentOpen, consequence: !!consequence, pending: !!pending, big, busy, auto, autoDecide });
+  const choosing = mode === "decision" || mode === "submitting-choice";
+  // The engine logs a choice event's title as it stops; the choice sheet already shows it, so drop that line from the feed.
   const last = life.log.at(-1);
   const hideLast = !!pending && last?.kind === "event" && last.mi === life.mi && last.text === pending.title;
   const feed = hideLast ? life.log.slice(0, -1) : life.log;
@@ -89,7 +101,7 @@ export function PlayView({
     return () => clearTimeout(t);
   }, [showIntro, pendingKey]);
 
-  // "선택까지" remembers where it started, so the sheet can say how much time went by.
+  // 선택까지 진행 remembers where it started, so the sheet can say how much time went by.
   const [skipFrom, setSkipFrom] = useState<number | null>(null);
   const skipped = choosing && skipFrom !== null && life.mi > skipFrom ? life.mi - skipFrom : 0;
   const act = {
@@ -97,18 +109,24 @@ export function PlayView({
       setSkipFrom(null);
       handlers.onStep();
     },
-    skip: () => {
+    progress: () => {
       setSkipFrom(life.mi);
-      handlers.onSkip();
+      handlers.onProgress();
     },
     choose: (id: string) => {
+      if (mode !== "decision") return; // one answer per choice, even with a double tap or a key held down
       setSkipFrom(null);
+      setChosenFrom(life);
       handlers.onChoose(id);
     },
-    chooseFree: (text: string) => {
+    chooseFree: async (text: string, force?: boolean) => {
       setSkipFrom(null);
-      handlers.onChooseFree(text);
+      const from = life;
+      const r = await handlers.onChooseFree(text, force);
+      if (r === "ok") setChosenFrom(from);
+      return r;
     },
+    carryOn: () => setChosenFrom(null),
   };
 
   const onKey = useEffectEvent((e: KeyboardEvent) => {
@@ -120,21 +138,23 @@ export function PlayView({
     if (e.key === "Escape" && showIntro) return setIntroSeen(pendingKey);
     // Single keys can be turned off in the ⋯ menu, for voice control and anyone who presses them by accident.
     if (!keys) return;
-    if (choosing) {
+    if (mode === "decision" && pending) {
       const n = Number(e.key);
-      if (n >= 1 && n <= pending.options.length && !busy && !sceneLoading) {
+      if (n >= 1 && n <= pending.options.length && !sceneLoading) {
         e.preventDefault();
         setIntroSeen(pendingKey);
         act.choose(pending.options[n - 1].id);
       }
-    } else if (e.key === " " && canAdvance && !auto) {
+    } else if (mode === "consequence" && e.key === "Enter") {
+      e.preventDefault();
+      act.carryOn();
+    } else if (mode === "timeline" && e.key === " ") {
       e.preventDefault();
       act.step();
-    } else if (e.key === "Enter" && canAdvance && !auto) {
+    } else if (mode === "timeline" && (e.key === "Enter" || e.key === "a" || e.key === "A")) {
       e.preventDefault();
-      act.skip();
-    }
-    if ((e.key === "a" || e.key === "A") && !presentOpen && !life.dead) handlers.onToggleAuto();
+      act.progress();
+    } else if (mode === "progressing" && (e.key === "a" || e.key === "A")) handlers.onStop();
   });
   useEffect(() => {
     const h = (e: KeyboardEvent) => onKey(e);
@@ -142,81 +162,123 @@ export function PlayView({
     return () => window.removeEventListener("keydown", h);
   }, []);
 
-  // Choosing, answering, folding the sheet and toggling auto play each take the focused control off the page.
+  // Choosing, answering, folding the sheet and starting or stopping progress each take the focused control off the page.
   // When that leaves focus nowhere, hand it to what took its place, so keyboard and screen reader users keep their spot.
   useEffect(() => {
     const a = document.activeElement;
     if (a && a !== document.body) return;
-    const target = choosing ? (collapsed ? "pill" : "choice") : presentOpen ? "present" : "controls";
+    const target = mode === "consequence" ? "consequence" : choosing ? (collapsed ? "pill" : "choice") : mode === "present" ? "present" : "controls";
     root.current?.querySelector<HTMLElement>(`[data-focus="${target}"]:not(:disabled)`)?.focus({ preventScroll: true });
-  }, [choosing, collapsed, pendingKey, presentOpen, auto, life.dead]);
+  }, [mode, choosing, collapsed, pendingKey]);
 
-  // During auto play every turn would be read aloud several times a second, so only the year and rare moments are.
-  const announce = choosing ? (sceneLoading ? L("선택의 순간") : L`선택의 순간: ${pending.title}`) : auto && !life.dead && !latest?.rare ? L`${Math.floor(life.mi / 12)}년` : latest?.text;
+  // During progress every turn would be read aloud several times a second, so only the year and rare moments are.
+  const announce =
+    mode === "consequence"
+      ? ""
+      : choosing && pending
+        ? sceneLoading
+          ? L("선택의 순간")
+          : L`선택의 순간: ${pending.title}`
+        : mode === "progressing" && !latest?.rare
+          ? L`${Math.floor(life.mi / 12)}년`
+          : latest?.text;
 
-  const pay = payLabel(life);
+  // The HUD is fixed on phones; a spacer holds its full height in the page, so turning compact never shifts the story.
+  const compact = useCompactHud();
+  const hud = useRef<HTMLElement>(null);
+  const [hudH, setHudH] = useState(0);
+  const compactRef = useRef(compact);
+  useLayoutEffect(() => {
+    compactRef.current = compact;
+  }, [compact]);
+  useLayoutEffect(() => {
+    const el = hud.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (!compactRef.current) setHudH(el.offsetHeight);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const goTo = (m: Milestone) => {
+    setPath(false);
+    // Reading the past: fold the choice sheet so the story has the screen; the pill brings it back.
+    if (choosing) setCollapsedKey(pendingKey);
+    const marks = [...(root.current?.querySelectorAll<HTMLElement>("[data-mi]") ?? [])].map((x) => Number(x.dataset.mi));
+    const mi = markerFor(m.mi, marks);
+    if (mi !== null) requestAnimationFrame(() => scrollToMarker(mi, hudH));
+  };
+
+  const sheetOpen = mode === "consequence" || (choosing && !collapsed);
+  const menu = (
+    <PlayMenu
+      sound={sound}
+      onSound={() => {
+        setSound(!sound);
+        setSoundOn(!sound);
+      }}
+      news={news}
+      onNews={(m) => {
+        saveNewsPref(m);
+        setNews(m);
+      }}
+      keys={keys}
+      onKeys={() => {
+        saveKeysPref(!keys);
+        setKeys(!keys);
+      }}
+      onPath={() => setPath(true)}
+      where={L`${life.profile.name || L("나")} · ${age}세 · ${formatMi(life.mi)}`}
+      onQuit={handlers.onQuit}
+    />
+  );
 
   return (
-    <div ref={root} className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-10">
+    <div ref={root} data-mode={mode} className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-10">
+      <div aria-hidden className="order-1 lg:hidden" style={{ height: hudH }} />
       <aside className="contents lg:sticky lg:top-0 lg:col-start-2 lg:row-start-1 lg:flex lg:max-h-dvh lg:flex-col lg:gap-4 lg:overflow-y-auto lg:overscroll-contain lg:-mx-2 lg:px-2 lg:py-6">
-        <header className="sticky top-0 z-10 order-1 -mx-4 border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-3 backdrop-blur dark:border-stone-800 lg:relative lg:z-20 lg:order-none lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-bold">
-                {life.profile.name || L("나")} · {ageText(age)}
-              </h1>
-              <p className="truncate text-xs text-stone-500 dark:text-stone-400">{statusLabel(life)}</p>
-            </div>
-            <div className="flex shrink-0 items-start gap-1">
-              <div className="text-right">
-                <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
-                <MoneyLine life={life} pay={pay} />
-              </div>
-              <PlayMenu
-                sound={sound}
-                onSound={() => {
-                  setSound(!sound);
-                  setSoundOn(!sound);
-                }}
-                news={news}
-                onNews={(m) => {
-                  saveNewsPref(m);
-                  setNews(m);
-                }}
-                keys={keys}
-                onKeys={() => {
-                  saveKeysPref(!keys);
-                  setKeys(!keys);
-                }}
-                where={L`${life.profile.name || L("나")} · ${age}세 · ${formatMi(life.mi)}`}
-                onQuit={handlers.onQuit}
-              />
-            </div>
-          </div>
-          <div className="mt-2">
-            <LifeScene scene={fx.scene} slim={choosing && !collapsed} paused={!(auto || fx.walking) || !!pending || life.dead || presentOpen}>
-              {fx.banner && <YearBanner year={fx.banner} onDone={fx.clearBanner} />}
-              {fx.roll && <DiceRoll roll={fx.roll} onDone={fx.clearRoll} />}
-            </LifeScene>
-          </div>
-          <div className="mt-2.5">
-            <StatBars stats={life.stats} compact flash={fx.swing} flashKey={fx.swingKey} notes={{ knowledge: degreeTag(life) }} />
-          </div>
+        <header
+          ref={hud}
+          aria-label={L("지금의 삶")}
+          data-compact={compact || undefined}
+          className={`fixed inset-x-0 top-0 z-20 mx-auto max-w-2xl border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-[var(--hud-pad-top)] backdrop-blur transition-[padding] duration-200 motion-reduce:transition-none dark:border-stone-800 lg:relative lg:inset-auto lg:z-20 lg:mx-0 lg:max-w-none lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none ${compact ? "pb-2" : "pb-3"}`}
+        >
+          <LifeHud
+            life={life}
+            compact={compact}
+            menu={menu}
+            flash={fx.swing}
+            flashKey={fx.swingKey}
+            scene={
+              <LifeScene scene={fx.scene} slim={compact || sheetOpen} paused={!(auto || fx.walking) || !!pending || life.dead || presentOpen}>
+                {fx.banner && <YearBanner year={fx.banner} onDone={fx.clearBanner} />}
+                {fx.roll && <DiceRoll roll={fx.roll} onDone={fx.clearRoll} />}
+              </LifeScene>
+            }
+          />
         </header>
 
-        {choosing ? (
+        {mode === "consequence" && consequence ? (
+          <section
+            aria-label={L("선택의 결과")}
+            className="sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[var(--sheet-max)] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-4 pb-[var(--dock-pad-bottom)] shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:border-stone-200 lg:p-5 lg:shadow-none dark:lg:border-stone-800"
+          >
+            <ConsequenceView c={consequence} when={formatMi(consequence.mi)} onDone={act.carryOn} />
+          </section>
+        ) : choosing && pending ? (
           <>
             {collapsed && (
-              <div className="sticky bottom-0 z-10 order-3 -mx-4 px-4 pt-2 pb-5 lg:hidden">
+              <div className="sticky bottom-0 z-10 order-3 -mx-4 px-4 pt-2 pb-[var(--dock-pad-bottom)] lg:hidden">
                 <button
                   type="button"
                   data-focus="pill"
                   onClick={() => setCollapsedKey(null)}
                   {...pillDrag}
                   aria-expanded={false}
-                  className="flex w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
+                  className="flex min-h-12 w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
                 >
-                  <span className="min-w-0 truncate">{sceneLoading ? L("장면을 그리는 중") : L`선택 대기 · ${pending.title}`}</span>
+                  <span className="min-w-0 truncate">{sceneLoading ? L("다음 장면이 펼쳐지고 있어요") : L`선택의 순간 · ${pending.title}`}</span>
                   <span className="flex shrink-0 items-center gap-1 text-sm">
                     {L("펼치기")}
                     <Chevron up />
@@ -227,7 +289,7 @@ export function PlayView({
             <section
               ref={sheetRef}
               aria-label={L("선택의 순간")}
-              className={`sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-5 shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
+              className={`sheet-up sticky bottom-0 z-10 order-3 -mx-4 max-h-[var(--sheet-max)] overflow-y-auto overscroll-contain rounded-t-3xl bg-white px-4 pt-1 pb-[var(--dock-pad-bottom)] shadow-[0_-10px_30px_rgb(0_0_0/0.10)] dark:bg-stone-900 dark:shadow-[0_-10px_30px_rgb(0_0_0/0.5)] lg:static lg:order-none lg:mx-0 lg:max-h-none lg:overflow-visible lg:rounded-2xl lg:border lg:p-5 lg:shadow-none ${
                 pending.rare ? "border-2 border-b-0 border-amber-400 dark:border-amber-500 lg:border-b-2" : "lg:border-stone-200 dark:lg:border-stone-800"
               } ${collapsed ? "max-lg:hidden" : ""}`}
             >
@@ -236,327 +298,59 @@ export function PlayView({
                 onClick={() => setCollapsedKey(pendingKey)}
                 aria-label={L("선택 창 내리고 이야기 읽기")}
                 aria-expanded
-                className="mx-auto flex h-6 w-16 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden"
+                className="mx-auto flex h-8 w-16 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden"
               >
                 <span aria-hidden className="h-1.5 w-10 rounded-full bg-stone-300 dark:bg-stone-600" />
               </button>
-              <ChoicePanel
+              <DecisionPanel
                 key={pendingKey}
                 pending={pending}
                 when={formatMi(life.mi)}
                 big={big}
                 skipped={skipped}
                 ai={ai}
-                auto={auto}
                 keys={keys}
                 busy={busy}
                 sceneLoading={sceneLoading}
                 onChoose={act.choose}
                 onChooseFree={act.chooseFree}
-                onStopAuto={handlers.onToggleAuto}
-                onCollapse={() => setCollapsedKey(pendingKey)}
               />
             </section>
           </>
-        ) : (
-          <div className="sticky bottom-0 z-10 order-3 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-5 backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:rounded-2xl lg:border lg:bg-white lg:p-4 lg:backdrop-blur-none dark:lg:bg-stone-900">
-            {!following && <JumpButton onClick={jumpToLatest} className="absolute -top-14 left-1/2 -translate-x-1/2 lg:hidden" />}
-            {life.dead ? (
-              <p className="flex items-center justify-center gap-2 text-center text-stone-500 dark:text-stone-400" role="status">
+        ) : mode === "present" ? null : (
+          <div className="sticky bottom-0 z-10 order-3 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-[var(--dock-pad-bottom)] backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:rounded-2xl lg:border lg:bg-white lg:p-4 lg:backdrop-blur-none dark:lg:bg-stone-900">
+            {!following && <CurrentPositionButton onClick={jumpToLatest} className="absolute -top-14 left-1/2 -translate-x-1/2 lg:hidden" />}
+            {mode === "ending" ? (
+              <p className="flex items-center justify-center gap-2 text-center text-stone-600 dark:text-stone-400" role="status">
                 <Spinner />
                 {L("삶이 끝났습니다. 회고록을 쓰는 중...")}
               </p>
+            ) : mode === "progressing" ? (
+              <ProgressDock when={formatMi(life.mi)} autoDecide={autoDecide} keys={keys} onStop={handlers.onStop} onToggleAutoDecide={handlers.onToggleAutoDecide} />
             ) : (
-              <ControlBar
-                months={turnLength(life)}
-                auto={auto}
-                autoDecide={autoDecide}
-                canAdvance={canAdvance}
-                presentOpen={presentOpen}
-                keys={keys}
-                handlers={handlers}
-                onStep={act.step}
-                onSkip={act.skip}
-              />
+              <TimelineDock months={turnLength(life)} keys={keys} onStep={act.step} onProgress={act.progress} />
             )}
           </div>
         )}
       </aside>
 
-      <div className="order-2 flex-1 py-4 lg:col-start-1 lg:row-start-1 lg:min-h-dvh lg:py-8">
-        <Feed feed={feed} news={news} />
+      {/* While the sheet leads, the story behind it steps back; folding the sheet brings it forward again. */}
+      <div className={`order-2 flex-1 py-4 transition-opacity duration-300 motion-reduce:transition-none lg:col-start-1 lg:row-start-1 lg:min-h-dvh lg:py-8 ${sheetOpen ? "max-lg:opacity-60" : ""}`}>
+        <Feed feed={feed} news={news} chapters={life.chapters} />
         <p aria-live="polite" className="sr-only">
           {announce}
         </p>
         {presentOpen && <PresentCard life={life} onClose={handlers.onClosePresent} />}
         {!following && (
           <div className="sticky bottom-6 hidden justify-center pt-4 lg:flex">
-            <JumpButton onClick={jumpToLatest} />
+            <CurrentPositionButton onClick={jumpToLatest} />
           </div>
         )}
       </div>
 
-      {showIntro && <BigMomentIntro pending={pending} showTitle={!sceneLoading} onDone={() => setIntroSeen(pendingKey)} />}
+      {showIntro && pending && <BigMomentIntro pending={pending} showTitle={!sceneLoading} onDone={() => setIntroSeen(pendingKey)} />}
       {fx.toast && <BadgeToast ids={fx.toast.ids} toastKey={fx.toast.key} onDone={fx.clearToast} />}
-    </div>
-  );
-}
-
-/** Milliseconds since `active` turned on, ticking twice a second; 0 while off. */
-function useElapsed(active: boolean): number {
-  const [ms, setMs] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const start = Date.now();
-    const t = setInterval(() => setMs(Date.now() - start), 500);
-    return () => {
-      clearInterval(t);
-      setMs(0);
-    };
-  }, [active]);
-  return ms;
-}
-
-function turnName(months: number): string {
-  if (months === 1) return L("다음 달");
-  if (months === 12) return L("1년 뒤");
-  return L`${months}개월 뒤`;
-}
-
-function spanName(months: number): string {
-  const y = Math.floor(months / 12);
-  const m = months % 12;
-  return [y && L`${y}년`, m && L`${m}개월`].filter(Boolean).join(" ");
-}
-
-/** The controls between choices, laid out like a player: step, skip, and play/pause with its delegation. */
-function ControlBar({
-  months,
-  auto,
-  autoDecide,
-  canAdvance,
-  presentOpen,
-  keys,
-  handlers,
-  onStep,
-  onSkip,
-}: {
-  months: number;
-  auto: boolean;
-  autoDecide: boolean;
-  canAdvance: boolean;
-  presentOpen: boolean;
-  keys: boolean;
-  handlers: PlayHandlers;
-  onStep: () => void;
-  onSkip: () => void;
-}) {
-  if (auto)
-    return (
-      <div className="space-y-2">
-        <Button data-focus="controls" className="flex w-full items-center justify-center gap-2" onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined}>
-          <PauseIcon />
-          {L("멈추기")}
-        </Button>
-        <Switch checked={autoDecide} onChange={handlers.onToggleAutoDecide}>
-          {L("선택도 맡기기")}
-        </Switch>
-        <p className="text-xs text-stone-500 dark:text-stone-400">
-          {autoDecide ? L("작은 선택은 성격대로 대신 골라요. 큰 결정은 멈춰서 물어봐요.") : L("선택이 오면 멈추고 기다려요.")}
-        </p>
-      </div>
-    );
-  return (
-    <div className="space-y-2">
-      <div className="flex gap-2">
-        <Button className="flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap" disabled={!canAdvance} onClick={onStep} aria-keyshortcuts={keys ? "Space" : undefined} data-focus="controls">
-          {turnName(months)}
-          <span aria-hidden>→</span>
-        </Button>
-        {/* The icons give way on the narrowest phones so all three fit on one row. */}
-        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={!canAdvance} onClick={onSkip} aria-keyshortcuts={keys ? "Enter" : undefined}>
-          <span className="flex max-[359px]:hidden">
-            <SkipIcon />
-          </span>
-          {L("선택까지")}
-        </Button>
-        <Button variant="ghost" className="flex shrink-0 items-center gap-1.5 px-3 whitespace-nowrap sm:px-3.5" disabled={presentOpen} onClick={handlers.onToggleAuto} aria-keyshortcuts={keys ? "A" : undefined} aria-label={L("자동 재생")} data-focus="controls">
-          <span className="flex max-[359px]:hidden">
-            <PlayIcon />
-          </span>
-          {L("자동")}
-        </Button>
-      </div>
-      <p className={`hidden text-xs text-stone-500 dark:text-stone-400 ${keys ? "lg:block" : ""}`}>
-        <Kbd>Space</Kbd> {turnName(months)} · <Kbd>Enter</Kbd> {L("선택까지 ·")} <Kbd>A</Kbd> {L("자동 ·")} <Kbd>1</Kbd>~<Kbd>4</Kbd> {L("선택")}
-      </p>
-    </div>
-  );
-}
-
-function ChoicePanel({
-  pending,
-  when,
-  big,
-  skipped,
-  ai,
-  auto,
-  keys,
-  busy,
-  sceneLoading,
-  onChoose,
-  onChooseFree,
-  onStopAuto,
-  onCollapse,
-}: {
-  pending: PendingChoice;
-  when: string;
-  big: boolean;
-  skipped: number;
-  ai: boolean;
-  auto: boolean;
-  keys: boolean;
-  busy: boolean;
-  sceneLoading: boolean;
-  onChoose: (id: string) => void;
-  onChooseFree: (text: string) => void;
-  onStopAuto: () => void;
-  onCollapse: () => void;
-}) {
-  const [free, setFree] = useState("");
-  const [writing, setWriting] = useState(false);
-  const [more, setMore] = useState(false);
-  const long = pending.scene.length > 110;
-  const kind = pending.rare ? L("✦ 희귀한 순간") : pending.small ? L("작은 선택") : big ? L("인생의 갈림길") : L("선택의 순간");
-  const waited = useElapsed(sceneLoading);
-  const [waitedForScene] = useState(sceneLoading);
-  // One status line for screen readers. It starts empty so the choice itself is announced first, and the step
-  // changes in SceneWait stay silent; only the wait, a slow wait and the finished scene are read.
-  const status = sceneLoading
-    ? waited >= SCENE_LATE_MS
-      ? L("조금 더 걸리고 있어요. 늦어지면 기본 이야기로 이어가요.")
-      : waited > 0
-        ? L("장면을 그리는 중이에요.")
-        : ""
-    : waitedForScene
-      ? L`장면이 준비됐어요. 선택지 ${pending.options.length}개 중에서 골라 주세요.`
-      : "";
-
-  return (
-    // While loading, the panel itself takes focus in place of the title, which stays hidden until the scene is written.
-    <div className="rise-in space-y-3 outline-none" aria-busy={sceneLoading} tabIndex={sceneLoading ? -1 : undefined} data-focus={sceneLoading ? "choice" : undefined}>
-      <p role="status" className="sr-only">
-        {status}
-      </p>
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <p className={`text-xs font-semibold tracking-wide ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-            {kind} <span className="font-normal text-stone-500 tabular-nums dark:text-stone-400">· {when}</span>
-          </p>
-          <div className="flex shrink-0 items-center gap-1">
-            {auto && (
-              <button
-                type="button"
-                onClick={onStopAuto}
-                className="-my-1 flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:bg-indigo-950 dark:text-indigo-300"
-                aria-label={L("자동 재생 중, 눌러서 멈추기")}
-              >
-                <PlayIcon small />
-                {L("자동 재생 중 · 멈추기")}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onCollapse}
-              className="-my-2 -mr-2 flex items-center gap-0.5 px-2 py-2 text-xs text-stone-500 hover:text-stone-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:hidden dark:text-stone-400 dark:hover:text-stone-200"
-            >
-              {L("내리기")}
-              <Chevron />
-            </button>
-          </div>
-        </div>
-        {skipped > 0 && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{L`${spanName(skipped)}을 건너뛰었어요.`}</p>}
-        {!sceneLoading && (
-          <h2 tabIndex={-1} data-focus="choice" className="mt-1 text-lg font-bold text-balance outline-none">
-            {pending.title}
-          </h2>
-        )}
-        {sceneLoading ? (
-          <SceneWait elapsed={waited} />
-        ) : (
-          <>
-            <p className={`mt-1 leading-relaxed whitespace-pre-line text-stone-700 dark:text-stone-300 ${long && !more ? "line-clamp-3 lg:line-clamp-none" : ""}`}>{pending.scene}</p>
-            {long && (
-              <button
-                type="button"
-                onClick={() => setMore(!more)}
-                className="-my-1 py-1 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline lg:hidden dark:text-indigo-300"
-              >
-                {more ? L("접기") : L("더 보기")}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-      {/* The options arrive with the finished scene, so the player reads it before choosing. */}
-      {!sceneLoading && (
-        <div className="space-y-3 motion-safe:animate-[fadein_400ms_ease-out]">
-          <div className="space-y-2">
-            {pending.options.map((o, i) => (
-              <Button key={o.id} variant="choice" disabled={busy} onClick={() => onChoose(o.id)} aria-keyshortcuts={keys && i < 9 ? String(i + 1) : undefined} className="flex items-start gap-3">
-                {keys && (
-                  <Kbd className="mt-0.5 hidden lg:inline-flex" hidden>
-                    {i + 1}
-                  </Kbd>
-                )}
-                <span className="min-w-0">
-                  {o.label}
-                  {o.detail && <span className="mt-0.5 block text-xs font-normal text-stone-500 dark:text-stone-400">{o.detail}</span>}
-                </span>
-              </Button>
-            ))}
-          </div>
-          {ai &&
-            pending.freeText &&
-            (writing ? (
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Textarea
-                    rows={1}
-                    value={free}
-                    onChange={(e) => setFree(e.target.value)}
-                    placeholder={L("나라면 이렇게 하겠다")}
-                    aria-label={L("직접 쓰기")}
-                    maxLength={200}
-                    autoFocus
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  disabled={busy || free.trim().length < 2}
-                  onClick={() => {
-                    onChooseFree(free);
-                    setFree("");
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  {busy && <Spinner />}
-                  {busy ? L("읽는 중") : L("결정")}
-                </Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setWriting(true)}
-                disabled={busy}
-                className="-my-1 flex items-center gap-1.5 py-2 text-sm font-semibold text-indigo-700 underline-offset-2 hover:underline disabled:opacity-40 dark:text-indigo-300"
-              >
-                <PencilIcon />
-                {L("직접 쓰기")}
-              </button>
-            ))}
-        </div>
-      )}
+      <MilestoneDialog open={path} life={life} onClose={() => setPath(false)} onPick={goTo} />
     </div>
   );
 }
@@ -589,6 +383,7 @@ function PlayMenu({
   onNews,
   keys,
   onKeys,
+  onPath,
   where,
   onQuit,
 }: {
@@ -598,6 +393,7 @@ function PlayMenu({
   onNews: (m: NewsMode) => void;
   keys: boolean;
   onKeys: () => void;
+  onPath: () => void;
   where: string;
   onQuit: () => void;
 }) {
@@ -655,6 +451,23 @@ function PlayMenu({
       </button>
       {open && (
         <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
+          <button
+            type="button"
+            role="menuitem"
+            aria-haspopup="dialog"
+            className={`${item} border-b border-stone-100 font-semibold dark:border-stone-800`}
+            onClick={() => {
+              setOpen(false);
+              onPath();
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="6" cy="19" r="2" />
+              <circle cx="18" cy="5" r="2" />
+              <path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7" />
+            </svg>
+            {L("지나온 길")}
+          </button>
           <button
             type="button"
             role="menuitemcheckbox"
@@ -789,27 +602,19 @@ function PlayMenu({
   );
 }
 
-function JumpButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
+/**
+ * Shown only while the player reads the past: back to now. A quiet pill, so it never outranks the panel below.
+ * It hides itself once the timeline is back at the bottom (useFollowLatest).
+ */
+function CurrentPositionButton({ onClick, className = "" }: { onClick: () => void; className?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 ${className}`}
+      className={`min-h-11 rounded-full border border-indigo-200 bg-white/95 px-4 py-2 text-sm font-semibold whitespace-nowrap text-indigo-700 shadow-md backdrop-blur hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:border-indigo-900 dark:bg-stone-900/95 dark:text-indigo-300 dark:hover:bg-indigo-950 ${className}`}
     >
-      {L("↓ 최신 내용 보기")}
+      {L("↓ 현재로 돌아가기")}
     </button>
-  );
-}
-
-// Pass a display class (inline-flex, or hidden lg:inline-flex) in className, so it can't fight a built-in one.
-function Kbd({ children, className = "inline-flex", hidden = false }: { children: ReactNode; className?: string; hidden?: boolean }) {
-  return (
-    <kbd
-      aria-hidden={hidden || undefined}
-      className={`min-w-5 items-center justify-center rounded border border-stone-300 bg-stone-50 px-1 font-sans text-[11px] leading-4 font-semibold text-stone-600 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-300 ${className}`}
-    >
-      {children}
-    </kbd>
   );
 }
 
@@ -819,41 +624,6 @@ function Chevron({ up = false }: { up?: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" {...icon} aria-hidden>
       <path d={up ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6"} />
-    </svg>
-  );
-}
-
-function PlayIcon({ small = false }: { small?: boolean }) {
-  const s = small ? 12 : 16;
-  return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M7 4.5v15l12.5-7.5z" />
-    </svg>
-  );
-}
-
-function PauseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <rect x="6" y="4.5" width="4" height="15" rx="1" />
-      <rect x="14" y="4.5" width="4" height="15" rx="1" />
-    </svg>
-  );
-}
-
-function SkipIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M4 5v14l9-7zM13 5v14l7-7z" />
-      <rect x="19" y="5" width="2.2" height="14" rx="1" />
-    </svg>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" {...icon} aria-hidden>
-      <path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z" />
     </svg>
   );
 }
@@ -1015,6 +785,8 @@ function useSwipeUp(onSwipe: () => void) {
   };
 }
 
+const smooth = (): ScrollBehavior => (window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth");
+
 function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
   const [following, setFollowing] = useState(true);
   const followingRef = useRef(true);
@@ -1048,7 +820,7 @@ function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
     scrollToEnd("auto");
     // Watching size instead of log length also catches same-length updates, scene text and the choice panel.
     const ro = new ResizeObserver(() => {
-      if (followingRef.current) scrollToEnd("smooth");
+      if (followingRef.current) scrollToEnd(smooth());
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -1056,10 +828,23 @@ function useFollowLatest(root: RefObject<HTMLDivElement | null>) {
 
   const jumpToLatest = useCallback(() => {
     setFollow(true);
-    scrollToEnd("smooth");
+    scrollToEnd(smooth());
   }, [setFollow, scrollToEnd]);
 
-  return { following, jumpToLatest };
+  /** Scrolls to a month's date marker, below the fixed HUD; following stops, so 현재로 돌아가기 appears. */
+  const scrollToMarker = useCallback(
+    (mi: number, offset: number) => {
+      const el = document.querySelector<HTMLElement>(`[data-mi="${mi}"]`);
+      if (!el) return;
+      setFollow(false);
+      const top = el.getBoundingClientRect().top + window.scrollY - offset - 12;
+      window.scrollTo({ top: Math.max(0, top), behavior: smooth() });
+      el.querySelector("span")?.animate?.([{ boxShadow: "0 0 0 4px rgb(99 102 241 / 0.5)" }, { boxShadow: "0 0 0 0 transparent" }], { duration: 1200 });
+    },
+    [setFollow],
+  );
+
+  return { following, jumpToLatest, scrollToMarker };
 }
 
 export type NewsMode = "full" | "headline" | "hidden";
@@ -1109,7 +894,7 @@ type FeedItem =
   | { type: "date"; mi: number }
   | { type: "world"; items: LogEntry[] }
   | { type: "reaction"; entry: LogEntry; headline: string }
-  | { type: "choice"; title: string; picked: string; outcome?: LogEntry }
+  | { type: "choice"; title: string; picked: string; outcome?: LogEntry; changes: string[] }
   | { type: "line"; entry: LogEntry };
 
 /** "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가…" → its first sentence. */
@@ -1118,10 +903,12 @@ function headlineOf(text: string): string {
 }
 
 /**
- * Sorts the log into what the feed draws: a date pill per month, the month's headlines in one box off the spine,
- * how a headline touched this life as the player's own line, and each choice (title, answer, result) as one card.
+ * Sorts the log into what the feed draws: a date marker per month, the month's headlines in one box off the spine,
+ * how a headline touched this life as the player's own line, and each choice (title, answer, result, what changed)
+ * as one card. A choice's lasting changes are the ones the engine recorded with its result (LifeChapter.at).
  */
-function feedItems(feed: LogEntry[]): FeedItem[] {
+function feedItems(feed: LogEntry[], chapters: LifeChapter[] = []): FeedItem[] {
+  const changesAt = new Map(chapters.map((c) => [c.at, c.items]));
   const out: FeedItem[] = [];
   for (let i = 0; i < feed.length; i++) {
     const e = feed[i];
@@ -1145,7 +932,7 @@ function feedItems(feed: LogEntry[]): FeedItem[] {
       const title = titled ? e.text : c.text.split(": ")[0];
       const picked = c.text.slice(title.length + 2) || c.text;
       const outcome = feed[i + 1]?.kind === "outcome" && feed[i + 1].mi === c.mi ? feed[++i] : undefined;
-      out.push({ type: "choice", title, picked, outcome });
+      out.push({ type: "choice", title, picked, outcome, changes: outcome ? (changesAt.get(i) ?? []) : [] });
       continue;
     }
     out.push({ type: "line", entry: e });
@@ -1153,17 +940,20 @@ function feedItems(feed: LogEntry[]): FeedItem[] {
   return out;
 }
 
-/** The feed as a timeline: the line and its dots belong to the player alone; the world sits beside it, folded. */
-function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
-  const items = useMemo(() => feedItems(feed), [feed]);
+/**
+ * The feed as a timeline. Three weights: a fork in the road is a card with a filled node, an important event is a
+ * bold line with a filled node, and everyday notes are plain lines with a hollow one. The world sits off the line.
+ */
+function Feed({ feed, news, chapters }: { feed: LogEntry[]; news: NewsMode; chapters?: LifeChapter[] }) {
+  const items = useMemo(() => feedItems(feed, chapters), [feed, chapters]);
   return (
     <ol className="relative space-y-2.5 pl-6 before:absolute before:top-3 before:bottom-2 before:left-[7px] before:w-0.5 before:rounded-full before:bg-indigo-100 dark:before:bg-indigo-950">
       {items.map((it, i) => {
         switch (it.type) {
           case "date":
             return (
-              <li key={i} className={`-ml-6 ${i === 0 ? "" : "pt-3"}`}>
-                <span className="relative inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 tabular-nums dark:bg-indigo-950 dark:text-indigo-300">
+              <li key={i} id={markerId(it.mi)} data-mi={it.mi} className={`-ml-6 scroll-mt-4 ${i === 0 ? "" : "pt-3"}`}>
+                <span className="relative inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 tabular-nums dark:bg-indigo-950 dark:text-indigo-300">
                   {formatMi(it.mi)}
                 </span>
               </li>
@@ -1173,7 +963,7 @@ function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
           case "reaction":
             return (
               <Spine key={i}>
-                <span className="block truncate text-xs font-semibold text-amber-700 dark:text-amber-400">↳ {it.headline}</span>
+                <span className="block truncate text-xs font-semibold text-amber-800 dark:text-amber-400">📻 {it.headline}</span>
                 <span className="leading-relaxed">
                   {it.entry.text}
                   <DeltaChips delta={it.entry.delta} money={it.entry.money} />
@@ -1181,7 +971,7 @@ function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
               </Spine>
             );
           case "choice":
-            return <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} />;
+            return <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} changes={it.changes} />;
           case "line":
             return <LogLine key={i} entry={it.entry} />;
         }
@@ -1190,13 +980,13 @@ function Feed({ feed, news }: { feed: LogEntry[]; news: NewsMode }) {
   );
 }
 
-/** A spot on the player's line. Filled dots mark the moments that changed the course. */
-function Spine({ children, filled = false, className = "" }: { children: ReactNode; filled?: boolean; className?: string }) {
+/** A spot on the player's line. Filled dots mark the moments that changed the course; a big one is larger. */
+function Spine({ children, filled = false, big = false, className = "" }: { children: ReactNode; filled?: boolean; big?: boolean; className?: string }) {
   return (
     <li className={`relative ${className}`}>
       <span
         aria-hidden
-        className={`absolute top-[7px] -left-[22px] h-2.5 w-2.5 rounded-full border-2 border-indigo-500 dark:border-indigo-400 ${
+        className={`absolute rounded-full border-2 border-indigo-500 dark:border-indigo-400 ${big ? "top-3 -left-[24px] h-3.5 w-3.5" : "top-[7px] -left-[22px] h-2.5 w-2.5"} ${
           filled ? "bg-indigo-500 dark:bg-indigo-400" : "bg-[var(--background)]"
         }`}
       />
@@ -1205,22 +995,33 @@ function Spine({ children, filled = false, className = "" }: { children: ReactNo
   );
 }
 
-/** The world's news for one date. Full or headline-only follows the ⋯ menu setting; the box itself has no toggle. */
+/**
+ * The world's news for one date, off the player's line: real headlines from the record (or the imagined future,
+ * marked as such), never mixed with what the story made up. Full or headline-only follows the ⋯ menu setting.
+ */
 function WorldBox({ items, open }: { items: LogEntry[]; open: boolean }) {
+  const imagined = (n: LogEntry) => {
+    const cat = (n.tag ?? "").split(" · ")[0];
+    return cat === "가상" || cat === L("가상");
+  };
+  const kind = items.every(imagined) ? L("상상한 미래") : L("실제 기록");
   return (
-    <li className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2 text-[13px] text-stone-600 dark:border-amber-900 dark:bg-amber-950/20 dark:text-stone-400">
-      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">{L("그때 세상은 ·")} {items.length}</p>
+    <li className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-3 py-2 text-[13px] text-stone-700 dark:border-amber-900 dark:bg-amber-950/20 dark:text-stone-400">
+      <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-400">
+        <span aria-hidden>📻 </span>
+        {L("그때 세상은")} <span className="font-normal">· {kind} {items.length}</span>
+      </p>
       <ul className={open ? "mt-1 space-y-1.5" : "mt-0.5"}>
         {items.map((n, j) => {
           const [cat, month] = (n.tag ?? "").split(" · ");
           return open ? (
             <li key={j}>
-              {n.tag && <span className="block text-[11px] font-semibold text-amber-700/80 dark:text-amber-400/80">{`${month} · ${cat}`}</span>}
+              {n.tag && <span className="block text-[11px] font-semibold text-amber-800/90 dark:text-amber-400/80">{`${month} · ${cat}`}</span>}
               <span className="whitespace-pre-line leading-relaxed">{n.text.split("\n")[0]}</span>
             </li>
           ) : (
             <li key={j} className="truncate">
-              {month && <span className="mr-1.5 text-[11px] font-semibold text-amber-700 tabular-nums dark:text-amber-400">{month}</span>}
+              {month && <span className="mr-1.5 text-[11px] font-semibold text-amber-800 tabular-nums dark:text-amber-400">{month}</span>}
               {headlineOf(n.text)}
             </li>
           );
@@ -1230,19 +1031,27 @@ function WorldBox({ items, open }: { items: LogEntry[]; open: boolean }) {
   );
 }
 
-function ChoiceCard({ title, picked, outcome }: { title: string; picked: string; outcome?: LogEntry }) {
+/** A fork in the road as it was lived: the question, the answer, what happened, what changed in the life, then the gauges. */
+function ChoiceCard({ title, picked, outcome, changes }: { title: string; picked: string; outcome?: LogEntry; changes: string[] }) {
   const rare = !!outcome?.rare;
+  const system = !!outcome && (Object.values(outcome.delta ?? {}).some((v) => v) || !!outcome.money);
   return (
-    <Spine filled>
-      <div className={`rounded-xl px-3.5 py-2.5 ${rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/50" : "bg-indigo-50 dark:bg-indigo-950/60"}`}>
-        <p className={`text-[11px] font-semibold ${rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
-          {rare ? L("✦ 희귀한 순간") : L("선택")} · {title}
+    <Spine filled big>
+      <div className={`rounded-xl px-4 py-3 ${rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950/50" : "border border-indigo-200 bg-indigo-50 dark:border-indigo-900 dark:bg-indigo-950/60"}`}>
+        <p className={`text-[11px] font-semibold ${rare ? "text-amber-800 dark:text-amber-300" : "text-indigo-700 dark:text-indigo-300"}`}>
+          {rare ? L("✦ 희귀한 순간") : L("인생의 갈림길")} · {title}
         </p>
-        <p className="font-semibold text-indigo-800 dark:text-indigo-200">{picked}</p>
-        {outcome && (
-          <p className="mt-1 leading-relaxed">
-            {outcome.text}
-            <DeltaChips delta={outcome.delta} money={outcome.money} />
+        <p className="mt-0.5 font-semibold text-indigo-900 dark:text-indigo-100">{picked}</p>
+        {outcome?.text && <p className="mt-1.5 leading-relaxed whitespace-pre-line">{outcome.text}</p>}
+        {changes.length > 0 && (
+          <div className="mt-2 border-t border-indigo-200/70 pt-2 dark:border-indigo-900">
+            <p className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">{L("삶의 변화")}</p>
+            <p className="text-sm font-medium">{changes.join(" · ")}</p>
+          </div>
+        )}
+        {system && (
+          <p className="mt-2">
+            <DeltaChips delta={outcome?.delta} money={outcome?.money} />
           </p>
         )}
       </div>
@@ -1258,7 +1067,7 @@ function LogLine({ entry }: { entry: LogEntry }) {
       return null;
     case "turn":
       return (
-        <Spine className="text-sm text-stone-500 dark:text-stone-400">
+        <Spine className="text-sm text-stone-600 dark:text-stone-400">
           {entry.facts?.map((f) => (
             <span key={f} className="mr-1 inline-block rounded-full border border-stone-300 px-2 py-px text-xs text-stone-600 tabular-nums dark:border-stone-700 dark:text-stone-300">
               {f}
@@ -1281,13 +1090,13 @@ function LogLine({ entry }: { entry: LogEntry }) {
     case "present":
     case "milestone":
       return (
-        <Spine filled>
+        <Spine filled big>
           <p className="rounded-xl border border-indigo-300 px-4 py-3 font-semibold text-indigo-800 dark:border-indigo-800 dark:text-indigo-300">{entry.text}</p>
         </Spine>
       );
     case "death":
       return (
-        <Spine filled>
+        <Spine filled big>
           <p className="rounded-xl bg-stone-900 px-4 py-3 text-center font-semibold text-stone-50 dark:bg-stone-100 dark:text-stone-900">{entry.text}</p>
         </Spine>
       );
@@ -1296,81 +1105,15 @@ function LogLine({ entry }: { entry: LogEntry }) {
 
 function RareLine({ entry }: { entry: LogEntry }) {
   return (
-    <Spine filled>
+    <Spine filled big>
       <div className="rounded-xl border-2 border-amber-400 bg-amber-50 px-4 py-3 dark:border-amber-500 dark:bg-amber-950/50">
-        <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{L("✦ 희귀한 순간")}</p>
+        <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">{L("✦ 희귀한 순간")}</p>
         <p className="mt-0.5 font-semibold leading-relaxed">
           {entry.text}
           <DeltaChips delta={entry.delta} money={entry.money} />
         </p>
       </div>
     </Spine>
-  );
-}
-
-/** Wealth and pay in the header; a press opens this month's fixed costs, item by item, and what is left over. */
-function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const items = monthlyCosts(life);
-  const total = costTotal(items);
-  const left = life.income - total;
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("pointerdown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("pointerdown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
-  return (
-    <div ref={box} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        aria-controls="money-detail"
-        className="-mr-1 rounded px-1 text-right text-xs text-stone-500 tabular-nums hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
-      >
-        <span className="block">
-          {L("자산")} {formatWealth(life.wealth)}
-          {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
-          <span aria-hidden className="ml-0.5 inline-block text-[10px]">{open ? "▴" : "▾"}</span>
-        </span>
-        {pay && <span className="block sm:hidden lg:block">{pay}</span>}
-        {total > 0 && <span className="hidden lg:block">{L("고정지출 월")} {formatWealth(total)}</span>}
-        <span className="sr-only">{L(", 월 고정지출 자세히 보기")}</span>
-      </button>
-      {open && (
-        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs shadow-lg dark:border-stone-800 dark:bg-stone-900">
-          <p className="font-semibold text-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
-          <dl className="mt-2 space-y-1 tabular-nums">
-            <div className="flex justify-between gap-2">
-              <dt className="text-stone-600 dark:text-stone-400">{L("수입")}</dt>
-              <dd>{L("월")} {formatWealth(Math.max(0, life.income))}</dd>
-            </div>
-            {items.map((e) => (
-              <div key={e.label} className="flex justify-between gap-2">
-                <dt className="text-stone-600 dark:text-stone-400">{e.label}</dt>
-                <dd>-{formatWealth(e.amount)}</dd>
-              </div>
-            ))}
-            {!items.length && <div className="text-stone-500 dark:text-stone-400">{ageOf(life) < 20 ? L("아직은 부모님이 생활비를 대 주신다.") : L("지금은 나가는 고정지출이 없다.")}</div>}
-            {items.length > 0 && (
-              <div className="flex justify-between gap-2 border-t border-stone-200 pt-1 font-semibold dark:border-stone-700">
-                <dt>{L("매달")} {left >= 0 ? L("남는 돈") : L("모자라는 돈")}</dt>
-                <dd className={left >= 0 ? "text-sky-700 dark:text-sky-300" : "text-amber-700 dark:text-amber-300"}>{formatWealth(Math.abs(left))}</dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1389,13 +1132,14 @@ function PresentCard({ life, onClose }: { life: LifeState; onClose: () => void }
         <div className="rounded-xl bg-indigo-50 p-4 dark:bg-indigo-950">
           <p className="text-xs text-stone-600 dark:text-stone-400">{L("이 가지의 나 ·")} {ageText(ageOf(life))}</p>
           <p className="mt-1 text-[15px] font-semibold">{statusLabel(life)}</p>
+          {degreeLine(life) && <p className="text-xs text-stone-600 dark:text-stone-400">{degreeLine(life)}</p>}
           <p className="text-sm text-stone-600 dark:text-stone-400">
             {L("자산")} {formatWealth(life.wealth)}
             {payLabel(life) && ` · ${payLabel(life)}`}
           </p>
           {monthlyCosts(life).length > 0 && <p className="text-xs text-stone-500 dark:text-stone-400">{L("고정지출 월")} {formatWealth(costTotal(monthlyCosts(life)))}: {costBreakdown(monthlyCosts(life))}</p>}
           <div className="mt-3">
-            <StatBars stats={life.stats} compact notes={{ knowledge: degreeTag(life) }} />
+            <StatBars stats={life.stats} compact />
           </div>
         </div>
       </div>

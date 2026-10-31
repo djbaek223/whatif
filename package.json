@@ -19,7 +19,9 @@
     "check:i18n": "tsx scripts/check-i18n.ts",
     "simulate:us": "tsx scripts/simulate-us.ts",
     "check:langs": "tsx scripts/check-langs.ts",
-    "check:period": "tsx scripts/check-period.ts"
+    "check:period": "tsx scripts/check-period.ts",
+    "check:play": "tsx scripts/check-play.ts",
+    "test": "npm run -s check:play && npm run -s check:i18n && npm run -s check:memory && npm run -s check:budget && npm run -s check:timeline"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

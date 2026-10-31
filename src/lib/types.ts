@@ -1,4 +1,4 @@
-// "knowledge" is shown as 교육 (schooling and learning); the key stays so saved lives and the narrator schema keep working.
+// "knowledge" is shown as 지식; the degree (학력) is a separate profile line. The key stays so saved lives and the narrator schema keep working.
 import { L } from "./i18n";
 import type { Lang, Region } from "./region";
 export type StatKey = "health" | "happiness" | "knowledge" | "relationships";
@@ -7,7 +7,7 @@ export type Stats = Record<StatKey, number>;
 export const STAT_LABELS: Record<StatKey, string> = {
   get health() { return L("건강"); },
   get happiness() { return L("행복"); },
-  get knowledge() { return L("교육"); },
+  get knowledge() { return L("지식"); },
   get relationships() { return L("관계"); },
 };
 
@@ -225,6 +225,14 @@ export interface LogEntry {
   facts?: string[]; // turn only: job and pay, drawn as chips before the text
 }
 
+/** Lasting changes made at one moment: the month, the log index the change came with, and what changed. */
+export interface LifeChapter {
+  mi: number;
+  at: number; // life.log.length when it happened: the entries from here on belong to the same moment
+  items: string[];
+  tags?: string[]; // the chapters that began (engine markChapters): job, business, married, child, home, school, graduated, retired, ...
+}
+
 export interface ChoiceRecord {
   mi: number;
   age: number;
@@ -271,6 +279,7 @@ export interface LifeState {
   episodes?: { key: string; born: number; items: Episode[] }; // everyday moments written ahead (hybrid.ts)
   threads?: { text: string; due: number }[]; // follow-ups the narrator left, told in a later moment once due
   expense?: Record<string, number>; // 만원 / 월 by item (budget.ts), as of the last turn, to tell the player when fixed costs change
+  chapters?: LifeChapter[]; // the same lasting changes for the screen (milestones, a choice's 삶의 변화); missing in older saves
   memory?: string[]; // every lasting change to this life ("34세(2019년 3월): 카페 창업"), kept for good and given to the narrator
 }
 

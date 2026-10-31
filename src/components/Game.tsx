@@ -6,7 +6,6 @@ import { withBadges } from "@/lib/badges";
 import { eraHints } from "@/lib/era";
 import {
   advanceTurn,
-  advanceUntilStop,
   allowedChanges,
   autoPick,
   createLife,
@@ -33,7 +32,8 @@ import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
-import { PlayView } from "./Play";
+import { PlayView, type FreeResult } from "./Play";
+import { stopsProgress } from "@/lib/playUi";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
 import { L } from "@/lib/i18n";
@@ -94,6 +94,11 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
   const [presentOpen, setPresentOpen] = useState(false);
   const [draft, setDraft] = useState<WizardDraft | null>(null); // answers restored after a refresh
   const personalized = useRef<string | null>(null);
+  // The life as last rendered, so an answer that comes back after the choice moved on is dropped, not applied twice.
+  const lifeRef = useRef<LifeState | null>(null);
+  useEffect(() => {
+    lifeRef.current = life;
+  }, [life]);
 
   // A life on screen keeps the country and language it was started in; before that, the language picked on the
   // first screen and the country answered in the questions (the wizard sets it while it is open).
@@ -226,8 +231,13 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
   function afterAdvance(prev: LifeState, advanced: LifeState, stop: StopReason) {
     const next = withBadges(advanced);
     setLife(next);
-    // Auto play stays on through the present-day card and choices; it only waits for them.
-    if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) setPresentOpen(true);
+    // 선택까지 진행 runs until the player has something to do: the present-day card, a choice
+    // (with 선택도 맡기기, only a big one; small ones are picked on the next tick), or the end.
+    if (next.log.slice(prev.log.length).some((e) => e.kind === "present")) {
+      setPresentOpen(true);
+      setAuto(false);
+    }
+    if (stop === "choice" && next.pending && stopsProgress(autoDecide, isBigChoice(next.pending))) setAuto(false);
     if (stop === "death") {
       setAuto(false);
       finish(next);
@@ -240,34 +250,40 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
     afterAdvance(life, r.state, r.stop);
   };
 
-  const skip = () => {
-    if (!life) return;
-    const r = advanceUntilStop(life);
-    afterAdvance(life, r.state, r.stop);
-  };
-
   const choose = (optionId: string, freeText?: string, intent?: Intent | null) => {
     if (!life?.pending) return;
     setLife(withBadges(resolveChoice(life, optionId, freeText, intent)));
   };
 
-  async function chooseFree(text: string) {
-    if (!life?.pending) return;
-    setBusy(true);
-    const res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })), allowed: allowedChanges(life) });
-    const id = life.pending.options.some((o) => o.id === res?.choiceId) ? res!.choiceId : life.pending.options[0].id;
-    setBusy(false);
+  // The player's own words: the narrator reads which option they are closest to and what they change.
+  // If it can't be reached the words are kept and the player can try again, or go on with the engine reading them alone.
+  async function chooseFree(text: string, force = false): Promise<FreeResult> {
+    if (!life?.pending || busy) return "stale";
+    const key = pendingKeyOf(life);
+    let res: ClassifyResult | null = null;
+    if (!force) {
+      setBusy(true);
+      res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })), allowed: allowedChanges(life) });
+      setBusy(false);
+      if (!res) return "failed";
+    }
+    // Another answer already settled this choice while the narrator was reading (a second tap, a reload): drop this one.
+    const cur = lifeRef.current;
+    if (!cur?.pending || pendingKeyOf(cur) !== key) return "stale";
+    const id = cur.pending.options.some((o) => o.id === res?.choiceId) ? res!.choiceId : cur.pending.options[0].id;
     // What the player wrote decides the life change and where it happens; without the narrator, the engine reads both from the words.
-    choose(id, text, res ? { change: res.change, title: res.jobTitle, place: res.place } : null);
+    setLife(withBadges(resolveChoice(cur, id, text, res ? { change: res.change, title: res.jobTitle, place: res.place } : null)));
+    return "ok";
   }
 
-  // Auto play: one turn per tick until the player turns it off. A choice or the present-day card pauses it,
-  // and it carries on once they're answered (or right away with auto-decide, except for the big forks).
+  // 선택까지 진행: one turn per tick until the next choice is the player's to make (afterAdvance stops it there),
+  // or until they press 멈추기. With 선택도 맡기기, small choices are picked by temperament and time runs on.
   const tick = useEffectEvent(() => {
     if (!life || life.dead) return setAuto(false);
-    if (presentOpen) return;
+    if (presentOpen) return setAuto(false);
     if (life.pending) {
-      if (!autoDecide || sceneLoading || isBigChoice(life.pending)) return;
+      if (stopsProgress(autoDecide, isBigChoice(life.pending))) return setAuto(false);
+      if (sceneLoading) return; // a moment that is still being written
       const id = autoPick(life);
       if (id) choose(id);
       return;
@@ -426,8 +442,12 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
           presentOpen={presentOpen}
           handlers={{
             onStep: step,
-            onSkip: skip,
-            onToggleAuto: () => setAuto((a) => !a),
+            onProgress: () => {
+              // The first turn moves at once; the rest follow on the tick. afterAdvance turns it off again if a choice is already here.
+              setAuto(true);
+              step();
+            },
+            onStop: () => setAuto(false),
             onToggleAutoDecide: () => setAutoDecide((a) => !a),
             onChoose: (id) => choose(id),
             onChooseFree: chooseFree,
