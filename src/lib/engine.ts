@@ -26,6 +26,7 @@ import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOn
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth, monthName } from "./format";
+import { anachronism, canon, existedIn, periodFacts, periodize } from "./period";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, isCore, stockEpisodes, takeEpisode } from "./hybrid";
 import { sinceChapter } from "./storyEvents";
 import { futureCandidates, lastRealNewsMi, newsBetween, newsText, type NewsItem } from "./news";
@@ -193,8 +194,10 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
   const jobTitle = (init.jobTitle || "").trim();
   const workYears = employed ? Math.max(0, age - 26) : 0;
   const tier = guessTier(`${init.company ?? ""} ${jobTitle}`);
+  // A company the narrator named that didn't exist yet (삼성전자 in 1967) gives way to one that did.
+  const named = init.company?.trim() && existedIn(init.company, Math.floor(mi / 12)) ? init.company.trim() : "";
   const company = employed
-    ? init.company?.trim() || (GENERIC_JOB.test(jobTitle) || !jobTitle ? pickCompany(rng, tier, Math.floor(mi / 12), `${profile.major} ${jobTitle}`) : "")
+    ? named || (GENERIC_JOB.test(jobTitle) || !jobTitle || init.company?.trim() ? pickCompany(rng, tier, Math.floor(mi / 12), `${profile.major} ${jobTitle}`) : "")
     : "";
   const school = init.school?.trim() || (init.education === "university" || init.education === "graduate" ? profile.university.trim() : "");
   const uni = init.education === "university" ? uniDates(profile, mi, age) : null;
@@ -229,7 +232,8 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     relationships: clamp(opening.stats.relationships),
   };
   // Three suggested paths; the fourth is the user's own words, as in every later choice.
-  const options = opening.choices.slice(0, 3).map((c, i) => ({
+  const choices = inPeriodChoices(opening.choices.slice(0, 3), Math.floor(mi / 12));
+  const options = choices.map((c, i) => ({
     id: String(i),
     label: c.original ? L`${c.label} (원래의 길)` : c.label,
   }));
@@ -255,7 +259,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     flags,
     log: [{ mi, kind: "era", text: opening.era }],
     pending,
-    openingChoices: opening.choices.slice(0, 3),
+    openingChoices: choices,
     rng: seed,
     cooldowns: {},
     done: [],
@@ -279,6 +283,15 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
   life.memory = [L`${stamp(life)}: 변곡점에서 출발 (${statusLabel(life)})`];
   life.expense = Object.fromEntries(monthlyCosts(life).map((e) => [e.label, e.amount]));
   return life;
+}
+
+/**
+ * Drops a suggested path that belongs to another time (a laptop in 1976), keeping the real one and at least two.
+ * A path whose words fit but whose place doesn't is kept; the engine picks a place of the time when it is taken.
+ */
+function inPeriodChoices(choices: OpeningChoice[], year: number): OpeningChoice[] {
+  const fits = choices.filter((c) => c.original || !anachronism(`${c.label} ${c.jobTitle ?? ""}`, year));
+  return fits.length >= 2 ? fits : choices;
 }
 
 /** The degree held at the turning point: a working adult who names a university in the profile finished it. */
@@ -424,7 +437,7 @@ const shortTown = (s: LifeState) => (s.profile.hometown || L("서울")).trim().s
 
 function planHire(s: LifeState, rng: Rng, spec: NonNullable<Effect["hire"]>, plan?: OptionPlan): Required<Pick<OptionPlan, "place" | "tier" | "salary">> {
   const tier = (plan?.tier as CompanyTier | undefined) ?? (spec.tier === "auto" ? autoTier(s, rng) : reachable(s, spec.tier));
-  let place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`));
+  let place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge, Math.floor(s.mi / 12)) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${spec.title ?? ""}`));
   if (tier === "civil" && !plan?.place)
     place = isUS()
       ? place === "City Hall" ? `${s.profile.hometown.split(",")[0].trim() || "the city"} City Hall` : place
@@ -437,7 +450,7 @@ function planSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"
   // A move never takes someone into a league their degree doesn't open (they stay in their own).
   const better = betterTier(rng, current);
   const tier = (plan?.tier as CompanyTier | undefined) ?? (reachable(s, better) === better ? better : current);
-  const place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${s.flags.job}`, s.flags.company));
+  const place = plan?.place ?? (tier === "professor" ? pickFaculty(rng, s.stats.knowledge, Math.floor(s.mi / 12)) : pickCompany(rng, tier, Math.floor(s.mi / 12), `${s.profile.major} ${s.flags.job}`, s.flags.company));
   const raised = Math.round((s.income * 12 * spec.payPct) / 50) * 50;
   // Moving up a league can pay more than the usual bump; no league pays past its ceiling.
   // Near the ceiling a move still has to pay a little more, or nobody would take it.
@@ -451,10 +464,10 @@ function planEnroll(s: LifeState, rng: Rng, spec: NonNullable<Effect["enroll"]>,
   let place = plan?.place;
   if (!place) {
     if (spec.level === "abroad") place = pickAbroad(rng);
-    else if (spec.level === "graduate") place = pickGradSchool(rng, k, s.flags.school || own);
-    else if (spec.pick === "better") place = pickUniversity(rng, Math.min(95, k + 18));
-    else if (spec.pick === "profile" || spec.pick === "fit") place = own || pickUniversity(rng, k);
-    else place = pickUniversity(rng, k);
+    else if (spec.level === "graduate") place = pickGradSchool(rng, k, s.flags.school || own, Math.floor(s.mi / 12));
+    else if (spec.pick === "better") place = pickUniversity(rng, Math.min(95, k + 18), undefined, Math.floor(s.mi / 12));
+    else if (spec.pick === "profile" || spec.pick === "fit") place = own || pickUniversity(rng, k, undefined, Math.floor(s.mi / 12));
+    else place = pickUniversity(rng, k, undefined, Math.floor(s.mi / 12));
   }
   return { place, tuition: plan?.tuition ?? tuitionFor(place, spec.level) };
 }
@@ -471,7 +484,7 @@ function capPay(s: LifeState, before: number) {
 }
 
 function planHome(s: LifeState, rng: Rng, mode: NonNullable<Effect["buyHome"]>, plan?: OptionPlan) {
-  const area = plan?.place && plan.price ? { name: plan.place, price: plan.price } : pickHome(rng, s.wealth, s.profile.hometown, mode === "cheap");
+  const area = plan?.place && plan.price ? { name: plan.place, price: plan.price } : pickHome(rng, s.wealth, s.profile.hometown, mode === "cheap", Math.floor(s.mi / 12));
   // Keep some cash back for living; borrow the rest.
   const down = Math.min(area.price, Math.max(0, s.wealth - Math.max(500, s.wealth * 0.15)));
   return { place: area.name, price: area.price, loan: Math.max(0, area.price - down) };
@@ -575,7 +588,12 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   creditDegree(s);
   const eduBefore = s.flags.education;
   const base = typeof effect.text === "function" ? effect.text(s) : effect.text;
-  const text = effect.alt?.length ? rng.pick([base, ...effect.alt]) : base;
+  // Another way of saying it is picked only from the ones that fit the year (no laptop in 1976).
+  const year = Math.floor(s.mi / 12);
+  const all = effect.alt?.length ? [base, ...effect.alt] : [];
+  const fit = canon(() => (effect.alt?.length ? [typeof effect.text === "function" ? effect.text(s) : effect.text, ...effect.alt] : []).map((w) => !!w && !anachronism(w, year)));
+  const ways = all.filter((_, i) => fit[i]);
+  const text = periodize((ways.length ? rng.pick(ways) : base) ?? "", year);
   if (text) out.texts.push(text);
   if (effect.stats) {
     for (const [k, v] of Object.entries(effect.stats) as [StatKey, number][]) {
@@ -781,17 +799,17 @@ export function planDetail(p: OptionPlan | undefined): string | undefined {
 
 /** Lists the choices of an event that apply to this life right now, with names and money filled in. */
 export function pendingFor(ev: EventDef, s: LifeState, rng: Rng = new Rng(s.rng)): PendingChoice {
+  const year = Math.floor(s.mi / 12);
   return {
     ...(ev.rare ? { rare: true } : {}),
     ...(ev.small ? { small: true } : {}),
     eventId: ev.id,
-    title: ev.title,
-    scene: labelOf(ev.intro, s),
-    options: (ev.choices ?? [])
-      .filter((c) => !c.when || c.when(s))
+    title: periodize(ev.title, year),
+    scene: periodize(labelOf(ev.intro, s), year),
+    options: inPeriodOptions(ev, s)
       .map((c) => {
         const plan = planFor(c.effect, s, rng);
-        const o: PendingOption = { id: c.id, label: labelOf(c.label, s), theme: effectTheme(c.effect) };
+        const o: PendingOption = { id: c.id, label: periodize(labelOf(c.label, s), year), theme: effectTheme(c.effect) };
         if (plan) {
           o.plan = plan;
           o.detail = planDetail(plan);
@@ -800,6 +818,31 @@ export function pendingFor(ev: EventDef, s: LifeState, rng: Rng = new Rng(s.rng)
       }),
     freeText: true,
   };
+}
+
+// ── The times ──────────────────────────────────────────
+
+const effectText = (e: Effect | undefined, s: LifeState): string =>
+  e ? [typeof e.text === "function" ? e.text(s) : e.text, effectText(e.risk?.success, s), effectText(e.risk?.failure, s)].filter(Boolean).join("\n") : "";
+
+/** An event's choices that can happen in this life now and fit the year (no 스타트업 option in 1975). */
+function inPeriodOptions(ev: EventDef, s: LifeState) {
+  const year = Math.floor(s.mi / 12);
+  const fit = canon(() => (ev.choices ?? []).map((c) => !anachronism(`${labelOf(c.label, s)}\n${effectText(c.effect, s)}`, year)));
+  return (ev.choices ?? []).filter((c, i) => (!c.when || c.when(s)) && fit[i]);
+}
+
+/** Whether a pool event fits the year: what it says happened existed then, and enough of its choices do. */
+function fitsPeriod(ev: EventDef, s: LifeState): boolean {
+  return canon(() => fitsPeriodHere(ev, s));
+}
+
+function fitsPeriodHere(ev: EventDef, s: LifeState): boolean {
+  const year = Math.floor(s.mi / 12);
+  if (anachronism(`${ev.title}\n${labelOf(ev.intro ?? "", s)}`, year)) return false;
+  // A passive moment needs one way of telling it that fits (its text, or one of its alt lines).
+  if (ev.effect && !ev.choices && [effectText(ev.effect, s), ...(ev.effect.alt ?? [])].every((w) => w && anachronism(w, year))) return false;
+  return !ev.choices || inPeriodOptions(ev, s).length >= Math.min(2, (ev.choices ?? []).filter((c) => !c.when || c.when(s)).length);
 }
 
 /** A life change the player wrote in their own words, with what they named. */
@@ -881,7 +924,8 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
     if (choice) {
       effect = presetEffect(choice, s);
       // A kind of workplace ("대기업") only sets the league; a named one is where the choice leads.
-      if (choice.place?.trim() && !GENERIC_PLACE.test(choice.place.trim())) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
+      // A place that didn't exist that year is left to the engine, which picks one that did.
+      if (choice.place?.trim() && !GENERIC_PLACE.test(choice.place.trim()) && existedIn(choice.place, Math.floor(s.mi / 12))) plan = { place: choice.place.trim(), tier: tierOf(choice.place) };
     }
   } else if (pending.custom?.[optionId]) {
     effect = customEffect(pending.custom[optionId]);
@@ -890,7 +934,7 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
   }
   // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
   // even if the closest option was about staying at the company.
-  const wish = freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null;
+  const wish = inPeriodIntent(freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null, Math.floor(s.mi / 12));
   if (wish && allowedChanges(s).includes(wish.change) && !changesOf(effect, s).has(wish.change)) {
     const text = wish.change === "startBusiness" && employee(s.flags) ? L("사표를 냈다.") : (INTENT_TEXT[wish.change] ?? "");
     effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
@@ -929,7 +973,7 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
 function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: string): OptionPlan | undefined {
   const e = effect.hire || effect.switchJob || effect.enroll ? effect : effect.risk?.success;
   const risky = e !== effect;
-  const named = said?.trim().slice(0, 30);
+  const named = existedIn(said, Math.floor(s.mi / 12)) ? said?.trim().slice(0, 30) : undefined;
   if (e?.enroll) {
     const level = e.enroll.level;
     const korean = schoolIn(text);
@@ -945,6 +989,15 @@ function ownPlan(text: string, effect: Effect, s: LifeState, rng: Rng, said?: st
   if (reachable(s, tier) !== tier) return undefined;
   const kind = e.switchJob && employee(s.flags) ? "switch" : "hire";
   return { kind, risky, place: named, tier, salary: salaryFor(rng, tier, yearsWorked(s)), ...(kind === "switch" ? { from: s.income * 12 } : {}) };
+}
+
+/** An intent without a job title or place that belongs to another year (a 유튜버 in 1985): the engine names one from the time. */
+function inPeriodIntent(i: Intent | null, year: number): Intent | null {
+  if (!i) return i;
+  const out = { ...i };
+  if (out.title && anachronism(out.title, year)) delete out.title;
+  if (out.place && !existedIn(out.place, year)) delete out.place;
+  return out;
 }
 
 /** Drops an outcome line that names the option's own school or company, once the player picked another. */
@@ -1068,6 +1121,8 @@ function fillMomentHere(state: LifeState, key: string, res: MomentResult): LifeS
       failure: (o.failure || "").trim().slice(0, 160),
     };
     const place = o.place?.trim().slice(0, 30);
+    // A company, school or trade from another year (삼성전자 in 1967, a 유튜버 in 1990) contradicts the times.
+    if (!existedIn(place, Math.floor(s.mi / 12)) || anachronism(o.jobTitle ?? "", Math.floor(s.mi / 12))) continue;
     if (change === "startBusiness") {
       c.title = (o.jobTitle?.trim() || businessTitle(`${o.label} ${o.outcome}`)).slice(0, 20);
       if (place) c.place = place;
@@ -1163,14 +1218,18 @@ function withPlace(plan: OptionPlan, place: string, salary?: number): OptionPlan
 function fillSceneHere(state: LifeState, key: string, res: SceneResult): LifeState {
   if (!state.pending || pendingKeyOf(state) !== key) return state;
   const byId = new Map(res.labels.map((l) => [l.id, l]));
+  // Whatever the narrator set in another time (a laptop in 1976, a company not yet founded) keeps the pool's words.
+  const year = Math.floor(state.mi / 12);
   const options = state.pending.options.map((o) => {
     const r = byId.get(o.id);
     if (!r) return o;
     const place = r.place?.trim().slice(0, 30);
-    const plan = o.plan && place && o.plan.kind !== "cost" && o.plan.kind !== "home" ? withPlace(o.plan, place) : o.plan;
-    return { ...o, label: r.label?.trim() || o.label, plan, detail: planDetail(plan) };
+    const plan = o.plan && place && existedIn(place, year) && o.plan.kind !== "cost" && o.plan.kind !== "home" ? withPlace(o.plan, place) : o.plan;
+    const label = r.label?.trim() && !anachronism(r.label, year) ? r.label.trim() : o.label;
+    return { ...o, label, plan, detail: planDetail(plan) };
   });
-  const s: LifeState = { ...state, pending: { ...state.pending, scene: res.scene || state.pending.scene, options } };
+  const scene = res.scene && !anachronism(res.scene, year) ? res.scene : state.pending.scene;
+  const s: LifeState = { ...state, pending: { ...state.pending, scene, options } };
   if (res.episodes?.length) stockEpisodes(s, res.episodes);
   return s;
 }
@@ -1277,14 +1336,34 @@ function statusLine(s: LifeState, rng: Rng): Pick<LogEntry, "text" | "facts"> {
   return { text: statusSentence(s, rng) };
 }
 
+/**
+ * Only lines that fit the year (no professor's email in 1976). Which ones fit is read in the life's own language
+ * on a dry run with the same random numbers, so the line picked is the same in either display language.
+ */
 function statusSentence(s: LifeState, rng: Rng): string {
+  const year = Math.floor(s.mi / 12);
+  const masks: boolean[][] = [];
+  canon(() => statusLines(s, new Rng(rng.state), (lines) => {
+    const m = lines.map((l) => !anachronism(l, year));
+    masks.push(m);
+    return m;
+  }));
+  let k = 0;
+  return statusLines(s, rng, (lines) => masks[k++] ?? lines.map(() => true));
+}
+
+function statusLines(s: LifeState, rng: Rng, fits: (lines: string[]) => boolean[]): string {
   const f = s.flags;
   const age = ageOf(s);
-  const pick = (...lines: string[]) => rng.pick(lines);
+  const pick = (...lines: string[]) => {
+    const m = fits(lines);
+    const ok = lines.filter((_, i) => m[i]);
+    return rng.pick(ok.length ? ok : lines);
+  };
   if (inService(s)) return pick(L("군 복무를 하며 시간을 보냈다."), L("점호와 근무 사이로 계절이 지나갔다."), L("전역 날짜가 조금씩 가까워졌다."));
   if (s.mi < f.busyUntil) return pick(L("목표를 위해 하루하루를 버텼다."), L("책상 앞에서 계절이 바뀌었다."));
   const season = SEASON[(s.mi % 12) + 1];
-  if (season && rng.chance(0.35)) return rng.pick(season);
+  if (season && rng.chance(0.35)) return pick(...season);
   if (f.education === "school")
     return age < 8 ? pick(L("동네 골목에서 해가 질 때까지 뛰어놀았다."), L("그림책을 읽으며 자랐다.")) : pick(L("학교와 집을 오가며 자랐다."), L("쉬는 시간마다 운동장으로 뛰어나갔다."), L("방학 숙제를 개학 전날 몰아서 했다."));
   if (f.education === "highschool") return pick(L("야간 자율학습과 모의고사에 쫓기는 나날이었다."), L("매점 빵 하나로 버티는 날이 많았다."), L("독서실 책상 앞에서 졸다 깨기를 반복했다."));
@@ -1448,7 +1527,7 @@ function advanceTurnHere(state: LifeState): { state: LifeState; stop: StopReason
     let passive = false;
     for (const ev of rng.shuffle(eventsHere())) {
       if (ev.effect && !ev.choices && passive) continue;
-      if (!eligible(ev, s, age) || !rng.chance(eventChance(ev, s, months))) continue;
+      if (!eligible(ev, s, age) || !rng.chance(eventChance(ev, s, months)) || !fitsPeriod(ev, s)) continue;
       if (ev.once) s.done.push(ev.id);
       if (ev.cooldown) s.cooldowns[ev.id] = s.mi + ev.cooldown;
       if (ev.small) s.cooldowns[SMALL_CLOCK] = s.mi + SMALL_GAP;
@@ -1461,14 +1540,14 @@ function advanceTurnHere(state: LifeState): { state: LifeState; stop: StopReason
         // The pool's options stay as the fallback; the moment is noted as recent once it is known which one plays.
         if (slot) s.pending.slot = true;
         else if (ev.id !== "personal") noteRecent(s, eventCategory(ev), ev.keywords ?? [ev.title]);
-        entries.push({ mi: s.mi, kind: "event", text: ev.title });
+        entries.push({ mi: s.mi, kind: "event", text: s.pending.title });
         stop = "choice";
         break;
       }
       if (ev.effect && slot && ev.rare) {
         // A rare moment the engine rolled (still 1% a year at most) is written for this life and asked as a choice.
-        s.pending = { eventId: ev.id, title: ev.title, scene: labelOf(ev.intro, s), options: [], freeText: false, rare: true, slot: true };
-        entries.push({ mi: s.mi, kind: "event", text: ev.title });
+        s.pending = { eventId: ev.id, title: periodize(ev.title, year), scene: periodize(labelOf(ev.intro, s), year), options: [], freeText: false, rare: true, slot: true };
+        entries.push({ mi: s.mi, kind: "event", text: s.pending.title });
         stop = "choice";
         break;
       }
@@ -1609,7 +1688,8 @@ function lifeFactsHere(s: LifeState): string {
   const partner = { none: L("미혼, 연인 없음"), dating: L("연애 중 (미혼)"), married: L("기혼"), divorced: L("이혼 후 혼자"), widowed: L("배우자와 사별") }[f.partner];
   const kids = f.children ? L`${f.children}명 (${kidAges.length === f.children ? kidAges.map((a, i) => L`${ORDINAL()[i + 1] ?? L`${i + 1}째`} ${a}세`).join(", ") : L("나이 미상")})` : f.noKids ? L("없음, 갖지 않기로 함") : L("없음");
   const home = f.homeOwner ? L`자가 (${f.homeArea || L("지역 미상")}${f.homeValue ? L`, 시세 ${won(f.homeValue)}` : ""}${f.mortgage ? L`, 대출 잔액 ${won(f.mortgage)}` : ""})` : L("무주택 (전세나 월세)");
-  return [
+  const year = Math.floor(s.mi / 12);
+  const facts = [
     L`시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
     L`성향: ${s.profile.mbti || L("MBTI 미입력")}. ${s.profile.personality || ""}`.trim(),
     L`학업: ${study}`,
@@ -1626,6 +1706,10 @@ function lifeFactsHere(s: LifeState): string {
   ]
     .filter(Boolean)
     .join("\n");
+  // Names as they were then: 학력고사 for 수능 before 1993, 국민학교 before 1996. The era line comes after, as written.
+  const lines = periodize(facts, year).split("\n");
+  lines.splice(1, 0, `${isEn() ? "Era" : "시대"}: ${periodFacts(year)}`);
+  return lines.join("\n");
 }
 
 
@@ -1655,14 +1739,51 @@ const inLife =
   (s: LifeState, ...rest: A): R =>
     inRegion(s.region, () => fn(s, ...rest), s.lang);
 
-export const resolveChoice = inLife(resolveChoiceHere);
-export const dropPending = inLife(dropPendingHere);
+/**
+ * Names as they were in the life's year, on whatever a step added or changed: new feed lines, the choice on screen,
+ * and the employer and school (금성사 becomes LG전자 in 1995; 수능 reads 학력고사 in 1985). Pool texts and the
+ * narrator's words both pass through here, so neither has to know every old name.
+ */
+function inTime(before: LifeState, after: LifeState): LifeState {
+  if (after === before) return after;
+  const year = Math.floor(after.mi / 12);
+  const out: LifeState = { ...after };
+  const f = after.flags;
+  const named = { company: f.company && periodize(f.company, year), job: f.job && periodize(f.job, year), school: f.school && periodize(f.school, year) };
+  if (named.company !== f.company || named.job !== f.job || named.school !== f.school) out.flags = { ...f, ...named };
+  const from = after.log === before.log ? after.log.length : Math.min(before.log.length, after.log.length);
+  if (from < after.log.length) out.log = [...after.log.slice(0, from), ...after.log.slice(from).map((e) => ({ ...e, text: periodize(e.text, Math.floor(e.mi / 12)) }))];
+  const p = after.pending;
+  if (p && p !== before.pending)
+    out.pending = { ...p, title: periodize(p.title, year), scene: periodize(p.scene, year), options: p.options.map((o) => ({ ...o, label: periodize(o.label, year), ...(o.detail ? { detail: periodize(o.detail, year) } : {}) })) };
+  return out;
+}
+
+const timed =
+  <A extends unknown[]>(fn: (s: LifeState, ...rest: A) => LifeState) =>
+  (s: LifeState, ...rest: A): LifeState =>
+    inTime(s, fn(s, ...rest));
+const timedOrNull =
+  <A extends unknown[]>(fn: (s: LifeState, ...rest: A) => LifeState | null) =>
+  (s: LifeState, ...rest: A): LifeState | null => {
+    const r = fn(s, ...rest);
+    return r && inTime(s, r);
+  };
+const timedStep =
+  <A extends unknown[]>(fn: (s: LifeState, ...rest: A) => { state: LifeState; stop: StopReason }) =>
+  (s: LifeState, ...rest: A) => {
+    const r = fn(s, ...rest);
+    return { ...r, state: inTime(s, r.state) };
+  };
+
+export const resolveChoice = inLife(timed(resolveChoiceHere));
+export const dropPending = inLife(timed(dropPendingHere));
 export const allowedChanges = inLife(allowedChangesHere);
-export const fillMoment = inLife(fillMomentHere);
-export const slotFallback = inLife(slotFallbackHere);
-export const fillScene = inLife(fillSceneHere);
-export const advanceTurn = inLife(advanceTurnHere);
-export const advanceUntilStop = inLife(advanceUntilStopHere);
+export const fillMoment = inLife(timedOrNull(fillMomentHere));
+export const slotFallback = inLife(timed(slotFallbackHere));
+export const fillScene = inLife(timed(fillSceneHere));
+export const advanceTurn = inLife(timedStep(advanceTurnHere));
+export const advanceUntilStop = inLife(timedStep(advanceUntilStopHere));
 export const autoPick = inLife(autoPickHere);
 export const statusLabel = inLife(statusLabelHere);
 export const payLabel = inLife(payLabelHere);

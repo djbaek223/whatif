@@ -18,7 +18,8 @@
     "check:same": "tsx scripts/check-same.ts",
     "check:i18n": "tsx scripts/check-i18n.ts",
     "simulate:us": "tsx scripts/simulate-us.ts",
-    "check:langs": "tsx scripts/check-langs.ts"
+    "check:langs": "tsx scripts/check-langs.ts",
+    "check:period": "tsx scripts/check-period.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

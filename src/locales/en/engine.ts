@@ -207,7 +207,7 @@ export const ENGINE: Record<string, string> = {
   "{0} 일하며 가족을 꾸렸다.": "Supported a family working as {0}.",
   "아이 학원비 고지서를 보며 한숨을 쉬었다.": "Sighed at the bill for the kids' activities.",
   "다 큰 아이와 어색한 저녁을 먹었다.": "Had an awkward dinner with a nearly grown kid.",
-  "주말이면 배우자와 장을 보러 갔다.": "Went to Costco together on weekends.",
+  "주말이면 배우자와 장을 보러 갔다.": "Went grocery shopping together on weekends.",
   "{0} 출퇴근을 반복했다.": "Commuted to work as {0}, day after day.",
   "퇴근하면 반려동물이 현관에서 기다렸다.": "The pet waited at the door every evening.",
   "월요병과 불금 사이를 오갔다.": "Lived between Monday blues and Friday nights.",

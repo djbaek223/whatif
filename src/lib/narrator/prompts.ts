@@ -2,6 +2,7 @@ import { z } from "zod";
 import { lifeStage } from "../engine";
 import { isEn, isUS } from "../region";
 import { englishSchema, koreanSchema, US_SYSTEM, usPromptFor } from "../../regions/us/prompts";
+import { turningPeriod } from "../period";
 import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, SlotMomentSchema, withEpisodes, type NarrateRequest } from "./schema";
 
 export const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이터의 내레이터입니다.
@@ -21,6 +22,8 @@ export const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이�
 - life_so_far의 "인생 이력"은 이 사람에게 이미 일어난 일입니다. 창업, 입사, 결혼, 출산, 이사 같은 이력을 잊거나 뒤집지 말고, 이력과 어긋나는 과거를 지어내지 않습니다.
 - 이야기는 이 사람의 성향(MBTI, 자기소개)과 지난 선택에서 이어지게 씁니다. 지난 선택의 결과가 지금 장면의 이유가 되면 좋습니다.
 - 회사와 학교는 실제 이름으로 구체적으로 씁니다 (예: "중견기업" 대신 "한국타이어"). 돈은 만원 단위 숫자로 씁니다.
+- 시대를 지킵니다. facts의 "시대:" 줄은 지금이 몇 년이고, 그때 사람들이 어떻게 살았고, 무엇이 아직 없는지입니다. 그해에 없던 물건·기술·서비스·회사·학교·직업·제도는 쓰지 않습니다.
+  예: 1976년에는 노트북·휴대폰·인터넷이 없고 연락은 편지·공중전화·집 전화로 합니다. 삼성전자는 1969년, 기흥 반도체 공장은 1984년에 생겼습니다. 1994년 이전 LG전자는 금성사, 2002년 이전 포스코는 포항제철, 1993년 이전 대입 시험은 학력고사(1981년까지 예비고사), 1996년 이전 초등학교는 국민학교입니다. 확실하지 않으면 그 시대에 흔했던 일반적인 이름(공장, 다방, 은행)을 씁니다.
 - 답은 반드시 주어진 JSON 스키마를 따르는 JSON 객체 하나로만 합니다.`;
 
 const data = (label: string, value: unknown) =>
@@ -66,6 +69,7 @@ function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: stri
           "profile.universityYear가 있으면 대학 입학년도입니다. 변곡점이 그 해 3월 전이면 아직 입학 전(재수 등), 4년 안이면 재학 중으로 봅니다.",
           `situation, initial, choices는 모두 이 나이에 실제로 가능한 것이어야 합니다. 18세 미만은 대학생·직장인이 아니고, 결혼·자녀·자산이 없습니다. 예: 9세라면 초등학생으로서 학교, 가족, 친구, 학원, 놀이 같은 그 나이의 고민과 선택을 씁니다. 프로필의 대학이나 현재 직업은 아직 오지 않은 미래입니다.`,
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
+          turningPeriod(req.turningPoint) ? `시대: ${turningPeriod(req.turningPoint)}` : "",
           "능력치는 입력된 성향과 상황을 근거로 0~100 사이로 정하세요. initial은 변곡점 시점의 학업, 직업, 연애, 자녀, 자산 상태입니다.",
           "choices에는 실제로 했던 선택(original=true) 하나와, 현실적으로 가능했던 다른 길 2개, 모두 정확히 3개를 넣으세요. 네 번째 길은 사용자가 직접 씁니다.",
           [
@@ -156,6 +160,7 @@ function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: stri
           data("turning_point", req.turningPoint),
           data("life", req.summary),
           "comparison에는 프로필의 currentLife(현실의 삶)와 이 가지의 삶을 비교해 주세요.",
+          "회고록의 각 시기는 그 해에 있던 물건과 회사만으로 씁니다 (예: 1970년대 청춘에 휴대폰이나 노트북은 없습니다).",
         ].join("\n\n"),
       };
   }

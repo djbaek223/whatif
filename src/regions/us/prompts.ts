@@ -2,6 +2,7 @@
 // the reply schema's descriptions are swapped for the English ones below (keyed by the Korean, like i18n.ts).
 import { lifeStage } from "../../lib/engine";
 import type { NarrateRequest } from "../../lib/narrator/schema";
+import { turningPeriod } from "../../lib/period";
 
 export const US_SYSTEM = `You are the narrator of "What If", a life simulator for American players.
 The player entered facts about their real life and a turning point in their past, and is now living from that point on with different choices, until death.
@@ -19,6 +20,8 @@ The player entered facts about their real life and a turning point in their past
 - The "Monthly costs:" line is the money that leaves every month (rent, living costs, mortgage, health insurance, childcare, tuition). Write money worries that match these numbers.
 - The "Life history" in life_so_far already happened to this person. Never forget or reverse a business started, a job taken, a marriage, a birth or a move, and never invent a past that contradicts it.
 - Let the story grow from this person's temperament (MBTI, self-description) and past choices. It is good when an earlier choice becomes the reason for the current scene.
+- Keep to the times. The "Era:" line in facts says what year it is, how people lived then and what doesn't exist yet. Never mention a thing, technology, service, company, school, job or law that didn't exist that year.
+  For example, in 1976 there are no laptops, cell phones or internet; people call from home or a pay phone and write letters. Google started in 1998, Facebook in 2004, the iPhone in 2007. When unsure, use a plain word common at the time (the plant, the diner, the bank).
 - Name real companies and schools (e.g. "Ford" rather than "a car company"). Money is in US dollars written like $45,000. In the JSON number fields, money is in units of $10 (so $45,000 is 4500).
 - Every text field in your reply is in American English, even when instructions or examples below quote Korean.
 - Reply with exactly one JSON object that follows the given JSON schema.`;
@@ -44,6 +47,7 @@ export function usPromptFor(req: NarrateRequest): string {
         "If profile.universityYear is set, it is the year they started college. Before September of that year they have not started yet (a gap year, say); within four years after, they are enrolled.",
         "situation, initial and choices must all be possible at this age. Under 18 they are not a college student or employee, and have no spouse, children or assets. For a 9-year-old, write the worries and choices of a grade-schooler: school, family, friends, after-school activities, play. The college or job in the profile is a future that hasn't come yet.",
         `Era notes for reference: ${req.eraHints.join(" ") || "none"}`,
+        turningPeriod(req.turningPoint) ? `Era: ${turningPeriod(req.turningPoint)}` : "",
         "Set the stats from 0 to 100 based on the temperament and situation given. initial is their schooling, job, relationship, children and assets at the turning point (money in units of $10).",
         "choices holds exactly 3: the choice they actually made (original=true) and 2 other paths that were realistically open. The player writes a fourth path themselves.",
         [
@@ -123,6 +127,7 @@ export function usPromptFor(req: NarrateRequest): string {
         data("turning_point", req.turningPoint),
         data("life", req.summary),
         "In comparison, compare the profile's currentLife (their real life) with the life on this branch.",
+        "Tell each part of the life with only the things and companies of its own years (no cell phones or laptops in a 1970s youth).",
       ].join("\n\n");
   }
 }
