@@ -308,7 +308,6 @@ export const UI_EN: Record<string, string> = {
   "{0}개월 뒤": "In {0} months",
   "{0}을 건너뛰었어요.": "Skipped {0}.",
   "멈추기": "Pause",
-  "재생 속도": "Speed",
   "선택도 맡기기": "Let it choose too",
   "작은 선택은 성격대로 대신 골라요. 큰 결정은 멈춰서 물어봐요.": "Small choices are made for you, in character. Big decisions stop and ask.",
   "선택이 오면 멈추고 기다려요.": "Stops and waits when a choice comes up.",

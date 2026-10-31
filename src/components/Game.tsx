@@ -33,7 +33,7 @@ import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
-import { PlayView, type Speed } from "./Play";
+import { PlayView } from "./Play";
 import { Button } from "./ui";
 import { OpeningWait } from "./Waiting";
 import { L } from "@/lib/i18n";
@@ -89,7 +89,6 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
   const [remember, setRemember] = useState(false);
   const [auto, setAuto] = useState(false);
   const [autoDecide, setAutoDecide] = useState(false);
-  const [speed, setSpeed] = useState<Speed>(1);
   const [busy, setBusy] = useState(false);
   const [sceneDone, setSceneDone] = useState<string | null>(null);
   const [presentOpen, setPresentOpen] = useState(false);
@@ -278,9 +277,9 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
 
   useEffect(() => {
     if (!auto || screen !== "play") return;
-    const t = setInterval(tick, 800 / speed);
+    const t = setInterval(tick, 800);
     return () => clearInterval(t);
-  }, [auto, screen, speed]);
+  }, [auto, screen]);
 
   // Ask the narrator to write the scene and personalize the options for each new choice event.
   // A "personal" moment has no options until the narrator writes them from this life's state, so it always waits.
@@ -422,7 +421,6 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
           ai={ai}
           auto={auto}
           autoDecide={autoDecide}
-          speed={speed}
           busy={busy}
           sceneLoading={sceneLoading}
           presentOpen={presentOpen}
@@ -431,7 +429,6 @@ export default function Game({ initialLang }: { initialLang?: Lang } = {}) {
             onSkip: skip,
             onToggleAuto: () => setAuto((a) => !a),
             onToggleAutoDecide: () => setAutoDecide((a) => !a),
-            onSpeed: setSpeed,
             onChoose: (id) => choose(id),
             onChooseFree: chooseFree,
             onClosePresent: () => setPresentOpen(false),
