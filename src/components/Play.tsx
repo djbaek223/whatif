@@ -323,7 +323,7 @@ export function PlayView({
             {mode === "ending" ? (
               <p className="flex items-center justify-center gap-2 text-center text-stone-600 dark:text-stone-400" role="status">
                 <Spinner />
-                {L("삶이 끝났습니다. 회고록을 쓰는 중...")}
+                {L("삶이 끝났습니다")}
               </p>
             ) : mode === "progressing" ? (
               <ProgressDock when={formatMi(life.mi)} autoDecide={autoDecide} keys={keys} onStop={handlers.onStop} onToggleAutoDecide={handlers.onToggleAutoDecide} />

@@ -299,7 +299,7 @@ export const UI_EN: Record<string, string> = {
   "{0} · {1}세 · {2}": "{0} · age {1} · {2}",
   "펼치기": "Expand",
   "선택 창 내리고 이야기 읽기": "Lower the choices and read the story",
-  "삶이 끝났습니다. 회고록을 쓰는 중...": "This life has ended. Writing the memoir...",
+  "삶이 끝났습니다": "This life has ended",
   "멈추기": "Pause",
   "✦ 희귀한 순간": "✦ Rare moment",
   "작은 선택": "Small choice",
@@ -459,4 +459,12 @@ export const UI_EN: Record<string, string> = {
   "{0}–{1} · {2}세": "{0}–{1} · age {2}",
   "남긴 자산 {0}": "Left behind {0}",
   "나도 살아보기 → {0}": "Live yours → {0}",
+  // End of a life: ask before writing the memoir
+  "그동안 {0}번의 선택을 했어요.": "Along the way you made {0} choices.",
+  "이 삶의 회고록을 써 드릴까요?": "Shall we write this life's memoir?",
+  "지나온 선택들을 돌아보며 한 편의 글로 남기고, 현실의 삶과도 비교해 드려요.": "We look back over your choices, write them up as one story, and compare it with your real life.",
+  "회고록 쓰기": "Write the memoir",
+  "쓰지 않고 돌아보기": "Look back without one",
+  "요약과 인생 그래프만 볼게요": "Just the summary and life graph",
+  "회고록은 쓰지 않았어요. 마음이 바뀌면 지금 써도 돼요.": "No memoir was written. If you change your mind, you can write it now.",
 };
