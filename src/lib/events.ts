@@ -3,6 +3,7 @@ import { degreeOnLeaving } from "./education";
 import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
+import { STORY_EVENTS, STORY_FORKS } from "./storyEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
 import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
@@ -68,6 +69,7 @@ export interface EventDef {
   small?: boolean; // a two-way everyday dilemma; these share one cooldown so they come about once every year or two
   region?: Region; // only in this country's lives (e.g. 수능 and army service are Korean); missing means everywhere
   repeatable?: boolean; // life-stage events that may need to come back more than three times (job search, promotion)
+  follows?: { chapter: string; within: [number, number] }; // the next scene of a change in the life: only between these months after it began (sinceChapter)
 }
 
 const knowledgeOdds = (base: number) => (s: LifeState) =>
@@ -1029,7 +1031,7 @@ export const CORE_EVENTS: EventDef[] = [
 const KR_ONLY = new Set(["csat", "military", "d-promo-exam", "drivers-license"]);
 for (const e of [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS]) if (KR_ONLY.has(e.id) || e.id.startsWith("era-")) e.region = "kr";
 
-export const EVENTS: EventDef[] = [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
+export const EVENTS: EventDef[] = [...CORE_EVENTS, ...STORY_FORKS, ...LIFE_EVENTS, ...MORE_EVENTS, ...STORY_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
 
 const POOLS: Partial<Record<Region, EventDef[]>> = {};
 

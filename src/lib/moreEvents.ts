@@ -33,7 +33,7 @@ const US_NAMES_KO = ["마이크", "제시카", "크리스", "애슐리", "매트
 const US_FAMILY_KO = ["존슨", "밀러", "가르시아", "데이비스", "마르티네스", "윌슨", "앤더슨", "테일러"];
 
 /** A stable name for someone in this life (the classmate, the mentor), so later events and the narrator name the same person. */
-function nameFor(s: LifeState, role: string): string {
+export function nameFor(s: LifeState, role: string): string {
   let h = 0;
   for (const ch of `${s.profile.birthDate}|${s.turningPoint.date}|${s.profile.name}|${role}`) h = (Math.imul(h, 31) + ch.charCodeAt(0)) | 0;
   h = Math.abs(h);
@@ -1229,24 +1229,6 @@ const SMALL_DILEMMAS: EventDef[] = [
     choices: [
       { id: "buy", get label() { return L("나를 위한 선물로 산다"); }, effect: { get text() { return L("택배 상자를 뜯으며 한 달의 피로가 풀렸다."); }, wealth: -150, stats: { happiness: 5 } } },
       { id: "save", get label() { return L("적금을 하나 더 든다"); }, effect: { get text() { return L("장바구니를 비우고 적금을 하나 더 들었다."); }, stats: { happiness: -1, knowledge: 1 }, mark: "saver" } },
-    ],
-  },
-  {
-    id: "d-blood",
-    get title() { return L("헌혈 버스"); },
-    category: "health",
-    get keywords() { return [L("헌혈"), L("봉사")]; },
-    small: true,
-    temper: { warm: 0.4 },
-    minAge: 17,
-    maxAge: 65,
-    perYear: 0.12,
-    cooldown: 36,
-    when: (s) => s.stats.health >= 50,
-    get intro() { return L("길에서 헌혈 버스를 지나친다. 'O형 혈액이 부족합니다'라는 현수막이 걸려 있다."); },
-    choices: [
-      { id: "give", get label() { return L("팔을 걷는다"); }, effect: { get text() { return L("헌혈을 하고 초코파이와 영화표를 받았다."); }, stats: { happiness: 3, health: -1, relationships: 1 } } },
-      { id: "pass", get label() { return L("다음에 하기로 한다"); }, effect: { get text() { return L("약속 시간에 늦을까 봐 발걸음을 재촉했다."); }, stats: {} } },
     ],
   },
   {
