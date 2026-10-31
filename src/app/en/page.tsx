@@ -7,7 +7,7 @@ const description = "Go back to a moment in your past, make a different choice, 
 export const metadata: Metadata = {
   title,
   description,
-  alternates: { canonical: "/en", languages: { ko: "/", en: "/en" } },
+  alternates: { canonical: "/en", languages: { ko: "/", en: "/en", "x-default": "/" } },
   openGraph: { type: "website", locale: "en_US", siteName: "What If", title, description, url: "/en" },
   twitter: { card: "summary_large_image", title, description },
 };
