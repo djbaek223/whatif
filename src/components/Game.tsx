@@ -36,7 +36,7 @@ import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft 
 import { PlayView, type FreeResult } from "./Play";
 import { stopsProgress } from "@/lib/playUi";
 import { Button } from "./ui";
-import { OpeningWait } from "./Waiting";
+import { OpeningWait, REWIND_MS, reducedMotion } from "./Waiting";
 import { L } from "@/lib/i18n";
 import { countryFor, inRegion, langFor, setLang, setRegion, type Lang, type Region } from "@/lib/region";
 import { fromTag, LANG_COOKIE } from "@/lib/langPick";
@@ -224,9 +224,14 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     const mi = turningPointMi(t);
     // The new life's country and language, until it is on screen and sets them itself.
     const here = <T,>(fn: () => T) => inRegion(p.country ?? "kr", fn, lang);
-    const res = ai
-      ? await here(() => narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(mi), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) }))
-      : null;
+    // The rewind plays through at least once, even when the opening needs no AI call.
+    const rewound = new Promise((r) => setTimeout(r, reducedMotion() ? 0 : REWIND_MS + 400));
+    const [res] = await Promise.all([
+      ai
+        ? here(() => narrate<OpeningResult>({ kind: "opening", profile: p, turningPoint: t, eraHints: eraHints(mi), age: ageAt(p.birthDate, mi), hints: pathHints(p, t) }))
+        : null,
+      rewound,
+    ]);
     const opening = here(() => (res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t)));
     personalized.current = null;
     setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID, region: p.country ?? "kr", lang })));
