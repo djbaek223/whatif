@@ -1662,7 +1662,7 @@ function statusLabelHere(s: LifeState): string {
 function payLabelHere(s: LifeState): string {
   if (s.income <= 0) return "";
   if (s.flags.employed && !s.flags.retired && !ownsBusiness(s.flags)) return L`연봉 ${won(s.income * 12)}`;
-  return L`월 ${won(s.income)}`;
+  return L`월 수입 ${won(s.income)}`;
 }
 
 /** "월 305만원 (월세 95만원 · 생활비 220만원)", or who pays when nothing does yet. */
