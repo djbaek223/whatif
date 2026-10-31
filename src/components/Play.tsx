@@ -14,18 +14,15 @@ import { FeedbackDialog } from "./Feedback";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
 import { LifeScene } from "./LifeScene";
 import { SCENE_LATE_MS, SceneWait } from "./Waiting";
-import { Button, Card, DeltaChips, Segmented, Spinner, StatBars, Switch, Textarea } from "./ui";
+import { Button, Card, DeltaChips, Spinner, StatBars, Switch, Textarea } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
-
-export type Speed = 1 | 2 | 4;
 
 export interface PlayHandlers {
   onStep: () => void;
   onSkip: () => void;
   onToggleAuto: () => void;
   onToggleAutoDecide: () => void;
-  onSpeed: (s: Speed) => void;
   onChoose: (optionId: string) => void;
   onChooseFree: (text: string) => void;
   onClosePresent: () => void;
@@ -42,7 +39,6 @@ export function PlayView({
   ai,
   auto,
   autoDecide,
-  speed,
   busy,
   sceneLoading,
   presentOpen,
@@ -52,7 +48,6 @@ export function PlayView({
   ai: boolean;
   auto: boolean;
   autoDecide: boolean;
-  speed: Speed;
   busy: boolean;
   sceneLoading: boolean;
   presentOpen: boolean;
@@ -276,7 +271,6 @@ export function PlayView({
                 months={turnLength(life)}
                 auto={auto}
                 autoDecide={autoDecide}
-                speed={speed}
                 canAdvance={canAdvance}
                 presentOpen={presentOpen}
                 keys={keys}
@@ -335,12 +329,11 @@ function spanName(months: number): string {
   return [y && L`${y}년`, m && L`${m}개월`].filter(Boolean).join(" ");
 }
 
-/** The controls between choices, laid out like a player: step, skip, and play/pause with its speed and delegation. */
+/** The controls between choices, laid out like a player: step, skip, and play/pause with its delegation. */
 function ControlBar({
   months,
   auto,
   autoDecide,
-  speed,
   canAdvance,
   presentOpen,
   keys,
@@ -351,7 +344,6 @@ function ControlBar({
   months: number;
   auto: boolean;
   autoDecide: boolean;
-  speed: Speed;
   canAdvance: boolean;
   presentOpen: boolean;
   keys: boolean;
@@ -366,21 +358,9 @@ function ControlBar({
           <PauseIcon />
           {L("멈추기")}
         </Button>
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <Segmented
-            label={L("재생 속도")}
-            value={speed}
-            onChange={handlers.onSpeed}
-            options={[
-              { value: 1, label: "1×" },
-              { value: 2, label: "2×" },
-              { value: 4, label: "4×" },
-            ]}
-          />
-          <Switch checked={autoDecide} onChange={handlers.onToggleAutoDecide}>
-            {L("선택도 맡기기")}
-          </Switch>
-        </div>
+        <Switch checked={autoDecide} onChange={handlers.onToggleAutoDecide}>
+          {L("선택도 맡기기")}
+        </Switch>
         <p className="text-xs text-stone-500 dark:text-stone-400">
           {autoDecide ? L("작은 선택은 성격대로 대신 골라요. 큰 결정은 멈춰서 물어봐요.") : L("선택이 오면 멈추고 기다려요.")}
         </p>

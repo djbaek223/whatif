@@ -42,27 +42,6 @@ export function Switch({ checked, onChange, disabled, children }: { checked: boo
   );
 }
 
-/** A row of mutually exclusive pills, such as playback speed. */
-export function Segmented<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex rounded-full border border-stone-300 p-0.5 dark:border-stone-700">
-      {options.map((o) => (
-        <button
-          key={String(o.value)}
-          type="button"
-          aria-pressed={o.value === value}
-          onClick={() => onChange(o.value)}
-          className={`min-w-11 rounded-full px-3 py-1.5 text-sm font-semibold tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-            o.value === value ? "bg-indigo-600 text-white dark:bg-indigo-500" : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function Field({
   label,
   hint,
