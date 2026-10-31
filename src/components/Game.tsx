@@ -64,7 +64,7 @@ const LANGS: { id: Lang; name: string }[] = [
   { id: "en", name: "English" },
 ];
 
-/** The language picked last time on this device (or the country picked before languages existed), else the browser's. */
+/** The language picked last time on this device (or the country picked before languages existed), else the browser's (ko → 한국어, anything else → English). */
 function guessLang(): Lang {
   try {
     const kept = localStorage.getItem(LANG_KEY) ?? { us: "en", kr: "ko" }[localStorage.getItem("whatif.region") ?? ""];
@@ -72,7 +72,13 @@ function guessLang(): Lang {
   } catch {
     // storage blocked: fall through to the browser
   }
-  return /^en\b/i.test(navigator.language) ? "en" : "ko";
+  return browserLang();
+}
+
+/** The browser's first preferred language: Korean stays Korean, every other language gets English. */
+function browserLang(): Lang {
+  const first = navigator.languages?.[0] ?? navigator.language ?? "";
+  return /^ko\b/i.test(first) ? "ko" : "en";
 }
 
 /** initialLang comes from the address: /en opens in English. */
