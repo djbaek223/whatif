@@ -26,7 +26,8 @@ import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOn
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth, monthName } from "./format";
-import { addThread, aiWritable, closeThread, contradicts, hybridOn, stockEpisodes, takeEpisode } from "./hybrid";
+import { addThread, aiWritable, closeThread, contradicts, hybridOn, isCore, stockEpisodes, takeEpisode } from "./hybrid";
+import { sinceChapter } from "./storyEvents";
 import { futureCandidates, lastRealNewsMi, newsBetween, newsText, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
 import { inRegion, isEn, isUS, langFor, region, type Lang, type Region } from "./region";
@@ -528,6 +529,7 @@ const LADDERS = () => [
 ];
 
 function doPromote(s: LifeState, out: Applied) {
+  s.marks = { ...s.marks, "ch:promoted": s.mi };
   for (const ladder of titleLadders() ?? LADDERS()) {
     const i = ladder.indexOf(s.flags.job);
     if (i >= 0 && i < ladder.length - 1) {
@@ -679,7 +681,7 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   if (b.education !== a.education || b.school !== a.school) {
     if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school)
       out.push(b.entered !== undefined && b.entered > s.mi ? L`합격: ${b.school}${b.education === "graduate" ? L(" (대학원)") : ""}, ${formatMi(b.entered)} 입학` : L`입학: ${b.school}${b.education === "graduate" ? L(" (대학원)") : ""}`);
-    else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(L`학업 마침${a.school ? `: ${a.school}` : ""}`);
+    else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) out.push(L`학업 마침${a.school ? `: ${V(a.school)}` : ""}`);
   }
   if (degreeOf(b) !== degreeOf(a) && DEGREE_RANK[degreeOf(b)] >= DEGREE_RANK.college)
     out.push(L`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${V(a.school ?? b.school)})` : ""}`);
@@ -694,8 +696,30 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   return out;
 }
 
+/**
+ * Marks when each chapter of the life began ("ch:married", "ch:job"), so the events that follow a change
+ * (storyEvents.ts, `follows`) come in the months after it. A promotion is marked where it happens (doPromote).
+ */
+function markChapters(s: LifeState, a: LifeFlags) {
+  const b = s.flags;
+  const at: string[] = [];
+  const wasOwn = ownsBusiness(a);
+  const isOwn = ownsBusiness(b);
+  if (b.retired && !a.retired) at.push("retired");
+  else if (isOwn && (!wasOwn || a.company !== b.company)) at.push("business");
+  else if (b.employed && !isOwn && (!a.employed || wasOwn || a.company !== b.company)) at.push("job");
+  else if (!b.employed && a.employed && !b.retired) at.push("jobless");
+  if (b.partner !== a.partner) at.push(b.partner === "none" ? "breakup" : b.partner);
+  if (b.children > a.children) at.push("child");
+  if (b.homeOwner && !a.homeOwner) at.push("home");
+  if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school) at.push("school");
+  else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) at.push("graduated");
+  if (at.length) s.marks = { ...s.marks, ...Object.fromEntries(at.map((c) => [`ch:${c}`, s.mi])) };
+}
+
 /** Writes lasting changes into the life's memory, which is kept for good and given to the narrator with every scene. */
 function remember(s: LifeState, before: LifeFlags) {
+  markChapters(s, before);
   const changes = changesBetween(before, s);
   if (!changes.length) return;
   s.memory = [...(s.memory ?? []), `${stamp(s)}: ${changes.join(", ")}`].slice(-MAX_MEMORY);
@@ -1355,13 +1379,25 @@ function eventChance(ev: EventDef, s: LifeState, months: number): number {
   if (perYear < 0.85) perYear *= Math.max(0.5, 1 + relativeAffinity(s, eventTheme(ev)) * 1.5);
   // Temperament: an outgoing person meets more gatherings, a careful one fewer scams, and so on.
   perYear *= temperFactor(s, ev.temper ?? ID_TEMPER[ev.id]);
+  // Variety: an everyday moment of the same kind as the last two is less likely, so the story moves between
+  // work, people, money, health and the rest. Life forks, the next scene of a change and the times are left alone.
+  if (!ev.follows && !isCore(ev) && eventCategory(ev) !== "era" && recentKinds(s).includes(eventCategory(ev))) perYear *= SAME_KIND;
   // Rare stays rare: never more than 1% a year, whatever the leanings.
   if (ev.rare) perYear = Math.min(0.01, perYear);
   return 1 - Math.pow(1 - Math.max(0, Math.min(1, perYear)), months / 12);
 }
 
+const SAME_KIND = 0.5;
+
+/** The kinds of the last two moments (noteRecent's "category:keywords"). */
+const recentKinds = (s: LifeState) => (s.recent ?? []).slice(-2).map((r) => r.split(":")[0]);
+
 function eligible(ev: EventDef, s: LifeState, age: number): boolean {
   if (age < ev.minAge || age > ev.maxAge) return false;
+  if (ev.follows) {
+    const since = sinceChapter(s, ev.follows.chapter);
+    if (since < ev.follows.within[0] || since > ev.follows.within[1]) return false;
+  }
   if (ev.once && s.done.includes(ev.id)) return false;
   if ((s.cooldowns[ev.id] ?? -1) > s.mi) return false;
   if (ev.when && !ev.when(s, age)) return false;
@@ -1375,7 +1411,7 @@ function eligible(ev: EventDef, s: LifeState, age: number): boolean {
 
 const MAX_REPEATS = 3;
 const SMALL_CLOCK = "small-dilemma";
-const SMALL_GAP = 12; // months
+const SMALL_GAP = 16; // months
 
 export type StopReason = "choice" | "death" | "present" | null;
 
@@ -1491,7 +1527,10 @@ function advanceUntilStopHere(state: LifeState, maxTurns = 400): { state: LifeSt
 }
 
 // Life forks from the main event list: where to study, work, live, whom to marry, whether to have a child.
-const BIG_EVENTS = new Set(["college-apps", "draft-lottery", "csat", "military", "graduation", "grad-done", "job-search", "job-offer", "startup-itch", "layoff", "retirement", "marriage", "baby", "marriage-crisis", "house"]);
+const BIG_EVENTS = new Set([
+  "college-apps", "draft-lottery", "csat", "military", "graduation", "grad-done", "job-search", "job-offer", "startup-itch", "layoff", "retirement",
+  "marriage", "baby", "marriage-crisis", "house", "overseas-post", "study-again", "hometown-call", "kid-abroad",
+]);
 
 /** A choice big enough that auto-decide stops and asks, and that gets a moment of its own on screen. */
 export function isBigChoice(p: PendingChoice): boolean {

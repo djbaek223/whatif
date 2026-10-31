@@ -1,6 +1,9 @@
 // English for a Korean life, where the shared English (src/locales/en) is told the American way: "김장철이 다가왔다"
 // is Thanksgiving for an American life but kimchi-making season here. Keyed by the Korean; used only for a Korean life.
 export const EN_KR: Record<string, string> = {
+  "반려동물이 며칠째 밥을 잘 안 먹는다. 검사만 해도 수십만 원이라고 한다.": "Your pet has barely eaten for days. The vet says the tests alone will cost a few hundred thousand won.",
+  "신혼의 첫 연휴": "The first Chuseok as newlyweds",
+  "함께 사는 게 아직 어색하다. 첫 연휴를 어떻게 보낼지 둘의 생각이 다르다.": "Living together still feels new. You two don't agree on how to spend your first Chuseok holiday.",
   "9급 공무원": "Grade 9 civil servant",
   "8급 공무원": "Grade 8 civil servant",
   "7급 공무원": "Grade 7 civil servant",

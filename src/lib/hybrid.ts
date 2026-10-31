@@ -5,13 +5,17 @@
 // the narrator only decides *what*. Whenever it can't, or what it wrote contradicts the life, the pool plays as written.
 import { US_CORE_EVENTS } from "../regions/us/events";
 import { CORE_EVENTS, ageOf, type Effect, type EventDef } from "./events";
+import { STORY_FORKS } from "./storyEvents";
 import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
 import { timelineConflict } from "./timeline";
 import { ownsBusiness } from "./work";
 import { L } from "./i18n";
 
-const CORE = new Set([...CORE_EVENTS, ...US_CORE_EVENTS].map((e) => e.id));
+const CORE = new Set([...CORE_EVENTS, ...STORY_FORKS, ...US_CORE_EVENTS].map((e) => e.id));
+
+/** A life fork or life-stage event, which always plays as written. */
+export const isCore = (ev: EventDef) => CORE.has(ev.id);
 
 // Milestones the engine tracks by date (a child turning 7, a grandchild) and the later steps of pool chains,
 // which only follow a pool event that already happened. These stay as written.
@@ -32,7 +36,7 @@ function lasting(e: Effect | undefined): boolean {
 
 /** Whether the narrator writes this event for the life instead of playing the pool's version. */
 export function aiWritable(ev: EventDef): boolean {
-  if (CORE.has(ev.id) || POOL_ONLY.has(ev.id) || eventCategory(ev) === "era") return false;
+  if (isCore(ev) || POOL_ONLY.has(ev.id) || eventCategory(ev) === "era") return false;
   return !lasting(ev.effect) && !(ev.choices ?? []).some((c) => lasting(c.effect));
 }
 
