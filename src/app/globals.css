@@ -466,3 +466,9 @@ body {
     transform: none;
   }
 }
+
+@keyframes vhs-blink {
+  50% {
+    opacity: 0;
+  }
+}
