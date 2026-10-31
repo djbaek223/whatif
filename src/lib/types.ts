@@ -176,8 +176,11 @@ export interface PendingChoice {
   slot?: boolean; // a pool event the narrator rewrites for this life; options are the pool's until then (none for a rare passive moment)
 }
 
-/** What an event is about, for spreading events evenly over a life: daily life, people, work, money, health, the times, luck. */
-export type Category = "daily" | "relation" | "work" | "money" | "health" | "era" | "chance";
+/**
+ * What an event is about, for spreading events evenly over a life: daily life, people, work, money, health, the times,
+ * luck, school, home and family, learning and hobbies, and what one believes is right.
+ */
+export type Category = "daily" | "relation" | "work" | "money" | "health" | "era" | "chance" | "school" | "family" | "growth" | "values";
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   get daily() { return L("일상"); },
@@ -187,6 +190,10 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   get health() { return L("건강"); },
   get era() { return L("시대"); },
   get chance() { return L("우연"); },
+  get school() { return L("학교생활"); },
+  get family() { return L("가정"); },
+  get growth() { return L("배움·취미"); },
+  get values() { return L("가치관"); },
 };
 
 /** Temperament axes read from MBTI and self-description, each -1..1. */

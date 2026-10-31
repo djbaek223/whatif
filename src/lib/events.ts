@@ -4,6 +4,7 @@ import { formatWealth } from "./format";
 import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
 import { STORY_EVENTS, STORY_FORKS } from "./storyEvents";
+import { SCENE_EVENTS } from "./sceneEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
 import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
@@ -1031,7 +1032,7 @@ export const CORE_EVENTS: EventDef[] = [
 const KR_ONLY = new Set(["csat", "military", "d-promo-exam", "drivers-license"]);
 for (const e of [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS]) if (KR_ONLY.has(e.id) || e.id.startsWith("era-")) e.region = "kr";
 
-export const EVENTS: EventDef[] = [...CORE_EVENTS, ...STORY_FORKS, ...LIFE_EVENTS, ...MORE_EVENTS, ...STORY_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
+export const EVENTS: EventDef[] = [...CORE_EVENTS, ...STORY_FORKS, ...LIFE_EVENTS, ...MORE_EVENTS, ...STORY_EVENTS, ...SCENE_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
 
 const POOLS: Partial<Record<Region, EventDef[]>> = {};
 

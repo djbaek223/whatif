@@ -92,7 +92,7 @@ export function usPromptFor(req: NarrateRequest): string {
           "- Never create a situation that contradicts the facts. Their work is exactly the 'Work' line in facts. For someone who runs a café, the scene comes from that café, its customers and its sales. No commutes, bosses or office parties for someone without a job, no spouse for someone single, no kids for someone childless.",
           "- Job and job-change options come only from what the 'Education' line in facts allows. A high school graduate doesn't get a corporate new-grad offer, someone without a PhD doesn't get a professorship, and nobody becomes a doctor without medical school. Money worries come from the 'Monthly costs' in facts (rent, living costs, kids' activities and tuition).",
           "- Ground it in temperament and past choices. Someone who has started a business before might get a second chance at one; someone who kept choosing school might get a degree or research opportunity.",
-          slot ? "" : "- Variety: avoid the same type or keywords as the recent moments. Pick a kind that has come up less (daily life, relationships, work, money, health, the times, chance).",
+          slot ? "" : "- Variety: avoid the same type or keywords as the recent moments. Pick a kind that has come up less (daily life, relationships, work, money, health, the times, chance, school, home and family, learning and hobbies, values).",
           slot?.small
             ? "- This is a small dilemma, so exactly 2 options, with everyday-sized results (stats around ±5, money in the tens to hundreds of dollars)."
             : "- Spread the option themes. With 4 options use at least 3 themes; with 3 or fewer, make them all different.",
@@ -155,7 +155,7 @@ export const SCHEMA_EN: Record<string, string> = {
   "이 사람에게 맞춘 선택지 문장, 30자 이내. 현재 상태와 맞아야 함": "The option reworded for this person, under 60 characters. Must agree with their current state",
   "이 선택지의 회사·학교 이름을 이 사람에게 더 맞는 같은 급의 실제 이름으로 바꾸고 싶을 때만 그 이름. 아니면 빈 문자열": "Only when you want to swap the option's company or school for a real one of the same tier that fits this person better: that name. Otherwise an empty string",
   "이 순간의 제목, 15자 이내": "Title of this moment, under 30 characters",
-  "이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연": "Kind of moment: daily, relation, work, money, health, era (the times), chance",
+  "이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연, school 학교, family 가정, growth 배움·취미, values 가치관": "Kind of moment: daily, relation, work, money, health, era (the times), chance, school, family (home life), growth (learning and hobbies), values (what one believes is right)",
   "이 순간의 핵심 키워드 2~3개, 각각 한두 단어 (예: 동업, 대학 동기)": "2-3 key words for this moment, one or two words each (e.g. partnership, college friend)",
   "이 장면의 톤 하나: 유쾌함, 뭉클함, 긴장감, 담담함 중에서": "One tone for the scene: funny, touching, tense or matter-of-fact",
   "이 사람의 현재 상태, 성향, 지난 선택에서 자연스럽게 생긴 갈림길을 2인칭으로 그리는 2~4문장": "2-4 sentences in the second person depicting a fork that grows naturally from this person's state, temperament and past choices",
