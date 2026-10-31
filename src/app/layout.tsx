@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   applicationName: "What If",
   openGraph: { type: "website", locale: "ko_KR", siteName: "What If", title, description, url: "/" },
   twitter: { card: "summary_large_image", title, description },
+  verification: { google: "lQZdZvhIVht6gTeFwjJheeCwHDfX3Mj1tkHPcYQs_Fk" },
 };
 
 export const viewport: Viewport = {
