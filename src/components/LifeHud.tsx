@@ -52,7 +52,7 @@ export function LifeHud({
         <div className="flex shrink-0 items-start gap-1">
           <div className="text-right">
             <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
-            <MoneyLine life={life} pay={payLabel(life)} compact={compact} />
+            <MoneyLine life={life} pay={payLabel(life)} />
           </div>
           {menu}
         </div>
@@ -82,13 +82,39 @@ function StatMini({ life }: { life: LifeState }) {
   );
 }
 
-/** Wealth and pay in the HUD; a press opens this month's fixed costs, item by item, and what is left over. */
-function MoneyLine({ life, pay, compact }: { life: LifeState; pay: string; compact: boolean }) {
+const MONEY_HINT_KEY = "whatif.moneyHint";
+
+function hintSeen(): boolean {
+  try {
+    return localStorage.getItem(MONEY_HINT_KEY) === "seen";
+  } catch {
+    return true; // storage blocked: don't nag on every visit
+  }
+}
+
+function markHintSeen() {
+  try {
+    localStorage.setItem(MONEY_HINT_KEY, "seen");
+  } catch {
+    // Private mode or blocked storage: the hint just goes away for this visit.
+  }
+}
+
+/**
+ * Wealth and pay in the HUD, drawn as a chip with a chevron so it reads as something to press; a press opens this
+ * month's fixed costs, item by item, and what is left over. The first time, a small bubble says so.
+ */
+function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
   const [open, setOpen] = useState(false);
+  const [hint, setHint] = useState(() => !hintSeen());
   const box = useRef<HTMLDivElement>(null);
   const items = monthlyCosts(life);
   const total = costTotal(items);
   const left = life.income - total;
+  const dismissHint = () => {
+    setHint(false);
+    markHintSeen();
+  };
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
@@ -103,33 +129,47 @@ function MoneyLine({ life, pay, compact }: { life: LifeState; pay: string; compa
     };
   }, [open]);
   return (
-    <div ref={box} className="relative">
+    <div ref={box} className="relative mt-0.5">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          setOpen(!open);
+          if (hint) dismissHint();
+        }}
         aria-expanded={open}
         aria-controls="money-detail"
-        className="-mr-1 rounded px-1 text-right text-xs text-stone-600 tabular-nums hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
+        className={`-mr-0.5 inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 py-0.5 pr-1 pl-2 text-right text-xs text-stone-700 tabular-nums hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 ${open ? "border-indigo-300 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950" : ""}`}
       >
-        {/* A negative balance is spelled with a minus, so it does not rest on colour alone. */}
-        <span className={`block whitespace-nowrap ${life.wealth < 0 ? "text-amber-800 dark:text-amber-300" : ""}`}>
-          {L("자산")} {formatWealth(life.wealth)}
-          {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
-          <span aria-hidden className="ml-0.5 inline-block text-[10px]">{open ? "▴" : "▾"}</span>
+        <span className="block">
+          {/* A negative balance is spelled with a minus, so it does not rest on colour alone. */}
+          <span className={`block whitespace-nowrap ${life.wealth < 0 ? "text-amber-800 dark:text-amber-300" : ""}`}>
+            {L("자산")} {formatWealth(life.wealth)}
+            {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
+          </span>
+          {pay && <span className="block whitespace-nowrap sm:hidden lg:block">{pay}</span>}
+          {total > 0 && <span className="hidden lg:block">{L("고정지출 월")} {formatWealth(total)}</span>}
         </span>
-        {pay && <span className={`block whitespace-nowrap sm:hidden lg:block ${compact ? "max-lg:hidden" : ""}`}>{pay}</span>}
-        {total > 0 && <span className="hidden lg:block">{L("고정지출 월")} {formatWealth(total)}</span>}
+        <svg aria-hidden viewBox="0 0 16 16" className={`h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform motion-reduce:transition-none dark:text-stone-500 ${open ? "rotate-90" : ""}`}>
+          <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
         <span className="sr-only">{L(", 월 고정지출 자세히 보기")}</span>
       </button>
+      {hint && !open && (
+        <div role="note" className="absolute top-full right-0 z-30 mt-1.5 flex w-max max-w-[13rem] items-start gap-1 rounded-lg bg-indigo-600 py-1.5 pr-1 pl-2.5 text-left text-xs leading-snug text-white shadow-lg dark:bg-indigo-500">
+          <span aria-hidden className="absolute -top-1 right-3 h-2 w-2 rotate-45 bg-indigo-600 dark:bg-indigo-500" />
+          <span>{L("눌러서 이번 달 수입·지출 보기")}</span>
+          <button type="button" onClick={dismissHint} aria-label={L("안내 닫기")} className="-my-0.5 shrink-0 rounded px-1 text-white/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+            ×
+          </button>
+        </div>
+      )}
       {open && (
         <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs shadow-lg dark:border-stone-800 dark:bg-stone-900">
           <p className="font-semibold text-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
           <dl className="mt-2 space-y-1 tabular-nums">
             <div className="flex justify-between gap-2">
-              <dt className="text-stone-600 dark:text-stone-400">{L("수입")}</dt>
-              <dd>
-                {L("월")} {formatWealth(Math.max(0, life.income))}
-              </dd>
+              <dt className="text-stone-600 dark:text-stone-400">{L("월 수입")}</dt>
+              <dd>{formatWealth(Math.max(0, life.income))}</dd>
             </div>
             {items.map((e) => (
               <div key={e.label} className="flex justify-between gap-2">
