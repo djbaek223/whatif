@@ -40,18 +40,18 @@ const MEDIA = /미디어|신문|방송|광고|디자인|콘텐츠|문화|게임|
 const BIO = /생명|바이오|약학|화학|의학|간호|보건/;
 
 const COMPANIES: Company[] = [
-  { name: "삼성전자", tier: "large", fields: /전자|반도체|컴퓨터|공학|소프트/ },
-  { name: "현대자동차", tier: "large", fields: /기계|자동차|공학|산업/ },
+  { name: "삼성전자", tier: "large", since: 1969, fields: /전자|반도체|컴퓨터|공학|소프트/ },
+  { name: "현대자동차", tier: "large", since: 1967, fields: /기계|자동차|공학|산업/ },
   { name: "SK하이닉스", tier: "large", since: 2012, fields: /반도체|전자|재료|화학/ },
   { name: "LG전자", tier: "large", since: 1995, fields: /전자|공학|디자인/ },
   { name: "LG화학", tier: "large", since: 1995, fields: /화학|재료|에너지/ },
   { name: "포스코", tier: "large", since: 2002, fields: /재료|기계|공학/ },
   { name: "삼성물산", tier: "large", fields: /건축|토목|무역|경영/ },
   { name: "CJ제일제당", tier: "large", since: 1996, fields: /식품|생명|경영|마케팅/ },
-  { name: "롯데쇼핑", tier: "large", fields: /경영|마케팅|무역/ },
-  { name: "신한은행", tier: "large", fields: BIZ },
+  { name: "롯데쇼핑", tier: "large", since: 1979, fields: /경영|마케팅|무역/ },
+  { name: "신한은행", tier: "large", since: 1982, fields: BIZ },
   { name: "KB국민은행", tier: "large", since: 2001, fields: BIZ },
-  { name: "삼성생명", tier: "large", fields: BIZ },
+  { name: "삼성생명", tier: "large", since: 1989, fields: BIZ },
   { name: "한화에어로스페이스", tier: "large", since: 2015, fields: /기계|항공|전자/ },
   { name: "삼성바이오로직스", tier: "large", since: 2011, fields: BIO },
   { name: "네이버", tier: "it", since: 1999, fields: TECH },
@@ -63,47 +63,75 @@ const COMPANIES: Company[] = [
   { name: "배달의민족(우아한형제들)", tier: "it", since: 2011, fields: /컴퓨터|마케팅|디자인/ },
   { name: "구글코리아", tier: "foreign", since: 2004, fields: TECH },
   { name: "한국마이크로소프트", tier: "foreign", since: 1988, fields: TECH },
-  { name: "한국IBM", tier: "foreign", fields: TECH },
+  { name: "한국IBM", tier: "foreign", since: 1967, fields: TECH },
   { name: "한국P&G", tier: "foreign", since: 1989, fields: /경영|마케팅/ },
-  { name: "한국전력공사", tier: "public", fields: /전기|공학|경영/ },
+  { name: "한국전력공사", tier: "public", since: 1982, fields: /전기|공학|경영/ },
   { name: "한국토지주택공사(LH)", tier: "public", since: 2009, fields: /건축|토목|도시/ },
-  { name: "한국수자원공사", tier: "public", fields: /토목|환경/ },
+  { name: "한국수자원공사", tier: "public", since: 1988, fields: /토목|환경/ },
   { name: "국민건강보험공단", tier: "public", since: 2000, fields: /보건|간호|행정/ },
-  { name: "한국도로공사", tier: "public", fields: /토목|교통/ },
+  { name: "한국도로공사", tier: "public", since: 1969, fields: /토목|교통/ },
   { name: "인천국제공항공사", tier: "public", since: 1999 },
-  { name: "한국은행", tier: "public", fields: /경제|금융|통계/ },
+  { name: "한국은행", tier: "public", since: 1950, fields: /경제|금융|통계/ },
+  // Older names, so a life in the 1960s-90s works where people worked then (금성사 before LG전자, 포항제철 before 포스코).
+  { name: "금성사", tier: "large", since: 1958, until: 1994, fields: /전자|공학|디자인/ },
+  { name: "럭키화학", tier: "large", since: 1947, until: 1994, fields: /화학|재료|에너지/ },
+  { name: "포항종합제철", tier: "large", since: 1968, until: 2001, fields: /재료|기계|공학/ },
+  { name: "대우그룹", tier: "large", since: 1967, until: 1999, fields: /무역|경영|기계|공학/ },
+  { name: "현대건설", tier: "large", fields: /건축|토목|공학/ },
+  { name: "제일제당", tier: "large", since: 1953, until: 1995, fields: /식품|생명|경영|마케팅/ },
+  { name: "동방생명", tier: "large", since: 1957, until: 1988, fields: BIZ },
+  { name: "국민은행", tier: "large", since: 1963, fields: BIZ },
+  { name: "제일은행", tier: "large", since: 1958, until: 2004, fields: BIZ },
+  { name: "대한항공", tier: "large", since: 1969, fields: /항공|기계|경영|관광/ },
+  { name: "삼보컴퓨터", tier: "it", since: 1981, fields: TECH },
+  { name: "삼성데이타시스템", tier: "it", since: 1985, until: 1996, fields: TECH },
+  { name: "데이콤", tier: "it", since: 1982, until: 2009, fields: TECH },
+  { name: "한국전력주식회사", tier: "public", since: 1961, until: 1981, fields: /전기|공학|경영/ },
+  { name: "철도청", tier: "public", since: 1963, until: 2004, fields: /기계|전기|교통/ },
+  { name: "전매청", tier: "public", until: 1986 },
+  { name: "동아제약", tier: "mid", fields: BIO },
+  { name: "유한양행", tier: "mid", fields: BIO },
+  { name: "해태제과", tier: "mid", fields: /식품|마케팅/ },
+  { name: "삼양식품", tier: "mid", since: 1961, fields: /식품|마케팅/ },
+  { name: "전주제지", tier: "mid", since: 1965, until: 1990, fields: ENG },
+  { name: "신세계백화점 판매직", tier: "contract", since: 1963 },
+  { name: "미도파백화점 판매직", tier: "contract", since: 1969, until: 2002 },
+  { name: "구로공단 봉제공장", tier: "field", since: 1967, until: 2000 },
+  { name: "마산수출자유지역 전자공장", tier: "field", since: 1971 },
+  { name: "울산 현대조선소", tier: "field", since: 1973 },
+  { name: "포항제철 협력업체", tier: "field", since: 1970, until: 2001 },
   { name: "구청", tier: "civil" },
   { name: "시청", tier: "civil" },
   { name: "주민센터", tier: "civil" },
   { name: "세무서", tier: "civil", fields: /세무|회계/ },
   { name: "한국전자통신연구원(ETRI)", tier: "research", since: 1997, fields: TECH },
-  { name: "한국과학기술연구원(KIST)", tier: "research", fields: /공학|화학|생명|재료/ },
+  { name: "한국과학기술연구원(KIST)", tier: "research", since: 1966, fields: /공학|화학|생명|재료/ },
   { name: "한국생명공학연구원", tier: "research", since: 1995, fields: BIO },
-  { name: "한국개발연구원(KDI)", tier: "research", fields: /경제|통계/ },
+  { name: "한국개발연구원(KDI)", tier: "research", since: 1971, fields: /경제|통계/ },
   { name: "한국항공우주연구원", tier: "research", since: 1989, fields: /항공|기계|전자/ },
-  { name: "한국타이어", tier: "mid", fields: ENG },
-  { name: "오뚜기", tier: "mid", fields: /식품|마케팅/ },
-  { name: "한샘", tier: "mid", fields: /디자인|건축|마케팅/ },
+  { name: "한국타이어", tier: "mid", since: 1968, fields: ENG },
+  { name: "오뚜기", tier: "mid", since: 1971, fields: /식품|마케팅/ },
+  { name: "한샘", tier: "mid", since: 1970, fields: /디자인|건축|마케팅/ },
   { name: "코웨이", tier: "mid", since: 2006, fields: /마케팅|경영/ },
-  { name: "대웅제약", tier: "mid", fields: BIO },
-  { name: "한미약품", tier: "mid", fields: BIO },
+  { name: "대웅제약", tier: "mid", since: 1978, fields: BIO },
+  { name: "한미약품", tier: "mid", since: 1973, fields: BIO },
   { name: "안랩", tier: "mid", since: 1995, fields: TECH },
   { name: "더존비즈온", tier: "mid", since: 2003, fields: /회계|컴퓨터/ },
-  { name: "제일기획", tier: "mid", fields: MEDIA },
+  { name: "제일기획", tier: "mid", since: 1973, fields: MEDIA },
   { name: "CJ ENM", tier: "mid", since: 2011, fields: MEDIA },
   { name: "대한통운", tier: "mid", fields: /물류|경영/ },
-  { name: "한솔제지", tier: "mid", fields: ENG },
+  { name: "한솔제지", tier: "mid", since: 1991, fields: ENG },
   // Small firms are made-up but specific, so the story names a place instead of "a small company".
   { name: "온누리세무회계", tier: "small", fields: /세무|회계/ },
   { name: "새봄무역", tier: "small", fields: /무역|경영|어학/ },
   { name: "푸른종합건설", tier: "small", fields: /건축|토목/ },
-  { name: "다온소프트", tier: "small", fields: /컴퓨터|디자인|소프트/ },
+  { name: "다온소프트", tier: "small", since: 1988, fields: /컴퓨터|디자인|소프트/ },
   { name: "한결정밀", tier: "small", fields: ENG },
   { name: "해솔기획", tier: "small", fields: MEDIA },
-  { name: "누리인테리어", tier: "small", fields: /디자인|건축/ },
-  { name: "별빛물류", tier: "small" },
+  { name: "누리인테리어", tier: "small", since: 1988, fields: /디자인|건축/ },
+  { name: "별빛물류", tier: "small", since: 1990 },
   { name: "미래식품", tier: "small", fields: /식품|생명/ },
-  { name: "하나로유통", tier: "small" },
+  { name: "하나로유통", tier: "small", since: 1985 },
   { name: "야놀자", tier: "startup", since: 2007, fields: /관광|마케팅|컴퓨터/ },
   { name: "직방", tier: "startup", since: 2012, fields: /부동산|컴퓨터/ },
   { name: "당근마켓", tier: "startup", since: 2015, fields: TECH },
@@ -115,11 +143,11 @@ const COMPANIES: Company[] = [
   { name: "이마트", tier: "contract", since: 1993 },
   { name: "홈플러스", tier: "contract", since: 1997 },
   { name: "KT 고객센터", tier: "contract", since: 2002 },
-  { name: "국민연금공단(계약직)", tier: "contract" },
-  { name: "한결오토텍(현대차 협력사)", tier: "field", fields: /기계|자동차/ },
+  { name: "국민연금공단(계약직)", tier: "contract", since: 1987 },
+  { name: "한결오토텍(현대차 협력사)", tier: "field", since: 1968, fields: /기계|자동차/ },
   { name: "대우조선 협력업체", tier: "field", since: 1994 },
   { name: "SK하이닉스 이천공장 생산라인", tier: "field", since: 2012 },
-  { name: "삼성전자 기흥공장 생산라인", tier: "field" },
+  { name: "삼성전자 기흥공장 생산라인", tier: "field", since: 1984 },
   { name: "서울대학교병원", tier: "doctor" },
   { name: "서울아산병원", tier: "doctor", since: 1989 },
   { name: "삼성서울병원", tier: "doctor", since: 1994 },
@@ -236,9 +264,17 @@ export function tierOf(company: string | undefined): CompanyTier | undefined {
   return (all.find((c) => c.name === company) ?? all.find((c) => company.includes(c.name)))?.tier;
 }
 
+const ERA_STAND_IN: Partial<Record<CompanyTier, CompanyTier>> = { it: "large", foreign: "large", startup: "small", contract: "small", research: "public" };
+
+/** Employers named with the years they hired under that name, for the narrator's anachronism check (period.ts). */
+export const datedCompanies = (): { name: string; since?: number; until?: number }[] => companies().filter((c) => c.since || c.until);
+
 /** Picks an employer of the tier that existed that year, preferring ones that fit the major. */
 export function pickCompany(rng: Rng, tier: CompanyTier, year: number, major: string, exclude?: string): string {
-  const pool = companies().filter((c) => c.tier === tier && (c.since ?? 0) <= year && (c.until ?? Infinity) >= year && c.name !== exclude);
+  const open = (t: CompanyTier) => companies().filter((c) => c.tier === t && (c.since ?? 0) <= year && (c.until ?? Infinity) >= year && c.name !== exclude);
+  let pool = open(tier);
+  // Before a kind of employer existed (IT firms in 1975, startups in 1985), the nearest one that did.
+  if (!pool.length && ERA_STAND_IN[tier]) pool = open(ERA_STAND_IN[tier]!);
   if (!pool.length) return TIER_LABEL[tier];
   const fit = pool.filter((c) => c.fields?.test(major));
   return rng.pick(fit.length && rng.chance(0.75) ? fit : pool).name;
@@ -307,6 +343,27 @@ const KR_UNIVERSITIES: Record<SchoolTier, string[]> = {
 
 const UNIVERSITIES: Record<SchoolTier, string[]> = byRegion(KR_UNIVERSITIES, US_UNIVERSITIES);
 
+/** First year a school took freshmen under this name. Others are older than any life in the game. */
+export const SCHOOL_SINCE: Record<string, number> = {
+  KAIST: 1986, // a graduate school from 1971; undergraduates from 1986
+  포항공과대학교: 1987,
+  경상국립대학교: 2021,
+  한남대학교: 1982,
+  서울시립대학교: 1981,
+  대림대학교: 1998,
+  영진전문대학교: 1998,
+  명지전문대학: 1974,
+  아주대학교: 1973,
+  영남대학교: 1967,
+};
+
+/** The schools of a tier that existed in that year (all of them when the year is unknown). */
+const schoolsIn = (tier: SchoolTier, year?: number) => {
+  const all = UNIVERSITIES[tier];
+  const open = year === undefined ? all : all.filter((u) => (SCHOOL_SINCE[u] ?? 0) <= year);
+  return open.length ? open : all;
+};
+
 /** Promotion ladders for the current region (engine.ts doPromote). */
 export const titleLadders = () => (isUS() ? US_LADDERS : null);
 
@@ -322,21 +379,21 @@ export function tuitionFor(school: string, level: "university" | "graduate" | "a
 }
 
 /** Picks a university by how well the exam went (knowledge stat), or keeps the one in the profile. */
-export function pickUniversity(rng: Rng, knowledge: number, fromProfile?: string): string {
+export function pickUniversity(rng: Rng, knowledge: number, fromProfile?: string, year?: number): string {
   if (fromProfile?.trim()) return fromProfile.trim();
   const tier: SchoolTier = knowledge >= 82 ? "top" : knowledge >= 68 ? "seoul" : knowledge >= 55 ? rng.pick(["national", "regional"] as const) : knowledge >= 42 ? "regional" : "college";
-  return rng.pick(UNIVERSITIES[tier]);
+  return rng.pick(schoolsIn(tier, year));
 }
 
-export function pickGradSchool(rng: Rng, knowledge: number, undergrad?: string): string {
+export function pickGradSchool(rng: Rng, knowledge: number, undergrad?: string, year?: number): string {
   const grad = (u: string) => (isUS() ? `graduate school at ${u}` : `${u} 대학원`);
   if (undergrad && rng.chance(0.5)) return grad(undergrad);
-  return grad(rng.pick(UNIVERSITIES[knowledge >= 70 ? "top" : "seoul"]));
+  return grad(rng.pick(schoolsIn(knowledge >= 70 ? "top" : "seoul", year)));
 }
 
 /** A university to teach at: one a step or two below where one studied is the usual first post. */
-export function pickFaculty(rng: Rng, knowledge: number): string {
-  return rng.pick(UNIVERSITIES[knowledge >= 80 ? rng.pick(["top", "seoul"] as const) : knowledge >= 65 ? rng.pick(["seoul", "national"] as const) : "regional"]);
+export function pickFaculty(rng: Rng, knowledge: number, year?: number): string {
+  return rng.pick(schoolsIn(knowledge >= 80 ? rng.pick(["top", "seoul"] as const) : knowledge >= 65 ? rng.pick(["seoul", "national"] as const) : "regional", year));
 }
 
 const ABROAD_SCHOOLS = ["미국 UC버클리", "미국 미시간대", "미국 일리노이대", "영국 임페리얼칼리지", "독일 뮌헨공대", "일본 도쿄대", "미국 퍼듀대", "싱가포르국립대"];
@@ -378,27 +435,28 @@ export function schoolIn(text: string): string | undefined {
 export interface HomeArea {
   name: string;
   price: number; // 만원, a typical 84㎡ (32평) apartment in 2026 won
+  since?: number; // first year of homes there (new towns, new districts)
 }
 
 const AREAS: HomeArea[] = [
-  { name: "서울 강남구", price: 280000 },
+  { name: "서울 강남구", price: 280000, since: 1975 },
   { name: "서울 마포구", price: 160000 },
-  { name: "서울 노원구", price: 75000 },
-  { name: "경기 성남시 분당구", price: 150000 },
+  { name: "서울 노원구", price: 75000, since: 1988 },
+  { name: "경기 성남시 분당구", price: 150000, since: 1991 },
   { name: "경기 수원시", price: 65000 },
-  { name: "경기 고양시 일산", price: 60000 },
-  { name: "인천 송도", price: 70000 },
-  { name: "부산 해운대구", price: 70000 },
-  { name: "대전 유성구", price: 55000 },
-  { name: "대구 수성구", price: 75000 },
-  { name: "광주 남구", price: 40000 },
+  { name: "경기 고양시 일산", price: 60000, since: 1992 },
+  { name: "인천 송도", price: 70000, since: 2005 },
+  { name: "부산 해운대구", price: 70000, since: 1980 },
+  { name: "대전 유성구", price: 55000, since: 1989 },
+  { name: "대구 수성구", price: 75000, since: 1980 },
+  { name: "광주 남구", price: 40000, since: 1995 },
   { name: "청주시", price: 35000 },
   { name: "경기 평택시", price: 40000 },
   { name: "천안시", price: 33000 },
 ];
 
 /** The best area this person can buy in with at most 60% borrowed, nudged toward their hometown. */
-export function pickHome(rng: Rng, wealth: number, hometown: string, cheap = false): HomeArea {
+export function pickHome(rng: Rng, wealth: number, hometown: string, cheap = false, year = Infinity): HomeArea {
   const budget = Math.max(0, wealth) / 0.4;
   if (isUS()) {
     // Up to 80% borrowed, nudged toward the home state.
@@ -407,7 +465,7 @@ export function pickHome(rng: Rng, wealth: number, hometown: string, cheap = fal
     if (!affordable.length) return { name: "a starter condo", price: Math.max(12000, Math.round(can / 1000) * 1000) };
     return rng.pick(cheap ? affordable.slice(-3) : affordable.slice(0, 3));
   }
-  const affordable = AREAS.filter((a) => a.price <= budget).sort((a, b) => b.price - a.price);
+  const affordable = AREAS.filter((a) => a.price <= budget && (a.since ?? 0) <= year).sort((a, b) => b.price - a.price);
   if (!affordable.length) return { name: "외곽의 빌라", price: Math.max(15000, Math.round(budget / 1000) * 1000) };
   const home = affordable.find((a) => hometown && a.name.includes(hometown.slice(0, 2)));
   if (home && !cheap) return home;

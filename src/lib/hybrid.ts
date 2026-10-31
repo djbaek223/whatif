@@ -9,6 +9,7 @@ import { STORY_FORKS } from "./storyEvents";
 import { eventCategory } from "./personal";
 import type { Category, Episode, LifeState, StatKey, Stats } from "./types";
 import { timelineConflict } from "./timeline";
+import { anachronism } from "./period";
 import { ownsBusiness } from "./work";
 import { L } from "./i18n";
 
@@ -67,7 +68,7 @@ export function conflictIn(text: string, s: LifeState): string | null {
   if (f.children === 0 && KIDS.test(text)) return L("자녀");
   if (!f.homeOwner && OWN_HOME.test(text)) return L("자가");
   if (ageOf(s) < 19 && ADULT.test(text)) return L("나이");
-  return timelineConflict(text, s);
+  return timelineConflict(text, s) ?? anachronism(text, Math.floor(s.mi / 12));
 }
 
 /** conflictIn over several pieces of text at once. */
