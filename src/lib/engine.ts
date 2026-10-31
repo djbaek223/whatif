@@ -679,6 +679,7 @@ function applyTop(s: LifeState, effect: Effect, rng: Rng, plan?: OptionPlan): { 
 const clone = (s: LifeState): LifeState => structuredClone(s);
 
 const MAX_MEMORY = 60;
+const MAX_CHAPTERS = 200;
 
 /** "34세(2019년 3월)": when something happened, as the narrator reads it. */
 const stamp = (s: LifeState) => L`${ageOf(s)}세(${formatMi(s.mi)})`;
@@ -718,7 +719,7 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
  * Marks when each chapter of the life began ("ch:married", "ch:job"), so the events that follow a change
  * (storyEvents.ts, `follows`) come in the months after it. A promotion is marked where it happens (doPromote).
  */
-function markChapters(s: LifeState, a: LifeFlags) {
+function markChapters(s: LifeState, a: LifeFlags): string[] {
   const b = s.flags;
   const at: string[] = [];
   const wasOwn = ownsBusiness(a);
@@ -733,14 +734,17 @@ function markChapters(s: LifeState, a: LifeFlags) {
   if ((b.education === "university" || b.education === "graduate") && b.school && b.school !== a.school) at.push("school");
   else if (b.education === "done" && (a.education === "university" || a.education === "graduate")) at.push("graduated");
   if (at.length) s.marks = { ...s.marks, ...Object.fromEntries(at.map((c) => [`ch:${c}`, s.mi])) };
+  return at;
 }
 
 /** Writes lasting changes into the life's memory, which is kept for good and given to the narrator with every scene. */
 function remember(s: LifeState, before: LifeFlags) {
-  markChapters(s, before);
+  const tags = markChapters(s, before);
   const changes = changesBetween(before, s);
   if (!changes.length) return;
   s.memory = [...(s.memory ?? []), `${stamp(s)}: ${changes.join(", ")}`].slice(-MAX_MEMORY);
+  // The same changes, kept for the screen: when (month and place in the log) and what, for the life's milestones.
+  s.chapters = [...(s.chapters ?? []), { mi: s.mi, at: s.log.length, items: changes, ...(tags.length ? { tags } : {}) }].slice(-MAX_CHAPTERS);
 }
 
 const MAX_SEEDS = 8;

@@ -42,7 +42,7 @@ export const publishedId = (sig: string) => Object.entries(loadMine()).find(([, 
 
 const MASK = "○○";
 /** The real name and school names are masked before the writer even sees the draft; they can edit the rest. */
-function masked(text: string, life: LifeState) {
+export function masked(text: string, life: LifeState) {
   const p = life.profile;
   const words = [p.name, p.elementary, p.middle, p.high, p.university].map((w) => w?.trim()).filter((w): w is string => !!w && w.length >= 2);
   return words.sort((a, b) => b.length - a.length).reduce((t, w) => t.split(w).join(MASK), text);

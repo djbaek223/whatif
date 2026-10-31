@@ -408,7 +408,33 @@ body {
   }
 }
 
+/* A bar for waits that report no progress: a short piece slides across instead of claiming a percentage. */
+.indeterminate > span {
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+/* The play screen's design tokens: the HUD and the sheets share these heights so nothing jumps between modes. */
+:root {
+  --hud-scene: 104px;
+  --hud-scene-slim: 52px;
+  --sheet-max: 85dvh;
+  --dock-pad-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  --hud-pad-top: max(0.75rem, env(safe-area-inset-top));
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .indeterminate > span {
+    animation: none !important;
+    transform: translateX(100%);
+  }
   .scene-layer,
   .pen-stroke,
   .pen-nib,

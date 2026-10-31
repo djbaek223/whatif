@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatWealth, statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
 import { BoardDialog, PublishDialog, endingSig, publishedId } from "./Board";
 import { BadgeCollection } from "./GameFx";
 import { LifeChart } from "./LifeChart";
-import { Button, Card, StatBars } from "./ui";
+import { LifeSummaryCard, ShareDialog } from "./LifeSummary";
+import { Button, Card } from "./ui";
 import { EndingWait } from "./Waiting";
 import { L } from "@/lib/i18n";
 import { isEn } from "@/lib/region";
@@ -29,6 +29,7 @@ export function EndingView({
   const [writing, setWriting] = useState(false);
   const [board, setBoard] = useState(false);
   const [posted, setPosted] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   // An ending posted earlier from this browser shows "게시판에서 보기" instead of posting it twice.
   const sig = ending ? endingSig(life, ending) : "";
   useEffect(() => {
@@ -48,14 +49,7 @@ export function EndingView({
         <p className="mt-3 italic text-stone-600 dark:text-stone-400">&ldquo;{ending.epitaph}&rdquo;</p>
       </div>
 
-      <Card>
-        <h2 className="text-xs font-semibold text-stone-500 dark:text-stone-400">{L("마지막 모습")}</h2>
-        <p className="mt-1 font-semibold">{statusLabel(life)}</p>
-        <p className="text-sm text-stone-500 dark:text-stone-400">{L("남긴 자산")} {formatWealth(life.wealth)}</p>
-        <div className="mt-4">
-          <StatBars stats={life.stats} />
-        </div>
-      </Card>
+      <LifeSummaryCard life={life} />
 
       <Card>
         <BadgeCollection life={life} />
@@ -117,7 +111,11 @@ export function EndingView({
 
       <div className="space-y-2">
         <Button className="w-full" onClick={onReplay}>
-          {L("같은 변곡점에서 다시 살아보기")}
+          {L("다른 삶 살아보기")}
+          <span className="block text-xs font-normal opacity-80">{L("같은 변곡점에서 다시 시작해요")}</span>
+        </Button>
+        <Button variant="ghost" className="w-full" aria-haspopup="dialog" onClick={() => setSharing(true)}>
+          {L("내 인생 공유하기")}
         </Button>
         <div className="flex gap-2">
           <Button variant="ghost" className="flex-1" onClick={onNewTurningPoint}>
@@ -132,6 +130,7 @@ export function EndingView({
         </button>
       </div>
 
+      <ShareDialog open={sharing} life={life} line={ending.epitaph} onClose={() => setSharing(false)} />
       <PublishDialog
         open={writing}
         life={life}
