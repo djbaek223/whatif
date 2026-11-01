@@ -1,7 +1,7 @@
 import { revalidateTag } from "next/cache";
 import { z } from "zod";
-import { BOARD_TAG, cachedList } from "@/lib/boardCache";
-import { boardConfigured, deleteMemoir, publishMemoir } from "@/lib/memoirs";
+import { BOARD_TAG, cachedHome, cachedList } from "@/lib/boardCache";
+import { allowHit, boardConfigured, deleteMemoir, publishMemoir } from "@/lib/memoirs";
 import { plausibleRecords } from "@/lib/records";
 
 const RegionField = z.enum(["kr", "us"]).catch("kr");
@@ -30,19 +30,6 @@ const Post = z.object({
 
 const Delete = z.object({ id: z.string().regex(/^[\w-]{6,24}$/), key: z.string().min(8).max(200) });
 
-// Best effort, per server instance: enough to stop one tab from flooding the board.
-const WINDOW_MS = 10 * 60_000;
-const PER_WINDOW = 3;
-const recent = new Map<string, number[]>();
-function allow(ip: string) {
-  const now = Date.now();
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  if (hits.length >= PER_WINDOW) return false;
-  recent.set(ip, [...hits, now]);
-  if (recent.size > 5000) recent.clear();
-  return true;
-}
-
 async function body(request: Request) {
   const raw = await request.text();
   if (raw.length > 20_000) return null;
@@ -60,6 +47,8 @@ export async function GET(request: Request) {
   const before = Math.max(0, Math.min(10_000, Number(q.get("before")) || 0));
   const size = Math.max(1, Math.min(10, Number(q.get("size")) || 10));
   try {
+    // The start screen: the most liked three once likes have built up, the newest three before that.
+    if (q.get("home")) return Response.json({ ok: true, ...(await cachedHome(region)), more: true });
     return Response.json({ ok: true, ...(await cachedList(region, before, size)) });
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
@@ -72,7 +61,8 @@ export async function POST(request: Request) {
   const parsed = Post.safeParse(await body(request));
   if (!parsed.success) return Response.json({ ok: false, reason: "invalid" }, { status: 400 });
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0].trim() || "local";
-  if (!allow(ip)) return Response.json({ ok: false, reason: "rate-limited" }, { status: 429 });
+  // Three posts per ten minutes from one address, counted across every server instance.
+  if (!(await allowHit("post", ip, 3, 600))) return Response.json({ ok: false, reason: "rate-limited" }, { status: 429 });
   const { region, penName, title, epitaph, memoir, deathAge, status, records } = parsed.data;
   // Numbers that can't come out of the game are left off; the memoir itself still goes up.
   const kept = records && plausibleRecords(records, deathAge) ? { records: { ...records, badges: [...new Set(records.badges)] } } : {};

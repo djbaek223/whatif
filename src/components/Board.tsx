@@ -21,6 +21,7 @@ export interface PublishedMemoir {
   status: string;
   records?: LifeRecords;
   createdAt: string;
+  likes?: number;
 }
 
 // The secret for each post written from this browser, so its writer (and only they) can take it down.
@@ -275,6 +276,7 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
               ))}
               {post.records && <RecordGrid records={post.records} deathAge={post.deathAge} lang={lang()} />}
               {post.status && <p className="text-sm text-stone-500 dark:text-stone-400">{L("마지막 모습")} · {post.status}</p>}
+              <LikeButton id={post.id} initial={post.likes ?? 0} />
               {mine[post.id] ? (
                 <Button type="button" variant="ghost" className="w-full text-rose-700 dark:text-rose-400" onClick={() => remove(post.id)}>
                   {L("내 글 지우기")}
@@ -314,6 +316,7 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
                       <RecordLine records={m.records} lang={lang()} />
                       <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">
                         {m.penName || L("익명")} · {L`${m.deathAge}세`} · {dateText(m.createdAt)}
+                        {!!m.likes && <> · ❤ {m.likes}</>}
                       </span>
                     </button>
                   </li>
@@ -368,5 +371,78 @@ export function ReportButton({ id, lang: shown }: { id: string; lang?: Lang }) {
         </button>
       )}
     </p>
+  );
+}
+
+const LIKED_KEY = "whatif.liked";
+const LIKER_KEY = "whatif.liker";
+
+/** This browser's random id for likes: one like per browser per post, without an account. */
+function likerId(): string {
+  try {
+    let id = localStorage.getItem(LIKER_KEY);
+    if (!id) {
+      id = Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(36).padStart(2, "0")).join("").slice(0, 32);
+      localStorage.setItem(LIKER_KEY, id);
+    }
+    return id;
+  } catch {
+    return "";
+  }
+}
+function likedSet(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LIKED_KEY) || "[]") as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
+/** 공감: a heart with the count. Pressing it again takes the like back. */
+export function LikeButton({ id, initial, lang: shown }: { id: string; initial: number; lang?: Lang }) {
+  const view = shown ?? lang();
+  const [liked, setLiked] = useState(false);
+  const [count, setCount] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setLiked(likedSet().has(id)); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [id]);
+  const toggle = async () => {
+    const liker = likerId();
+    if (!liker || busy) return;
+    const on = !liked;
+    setBusy(true);
+    setLiked(on);
+    setCount((c) => Math.max(0, c + (on ? 1 : -1)));
+    try {
+      const res = await fetch("/api/memoirs/like", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, liker, on }) });
+      const data = (await res.json()) as { ok?: boolean; likes?: number };
+      if (!data.ok || typeof data.likes !== "number") throw new Error();
+      setCount(data.likes);
+      const set = likedSet();
+      if (on) set.add(id);
+      else set.delete(id);
+      try {
+        localStorage.setItem(LIKED_KEY, JSON.stringify([...set].slice(-500)));
+      } catch {}
+    } catch {
+      setLiked(!on);
+      setCount((c) => Math.max(0, c + (on ? -1 : 1)));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={liked}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+        liked ? "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300" : "border-stone-300 text-stone-700 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-800"
+      }`}
+    >
+      <span aria-hidden>{liked ? "❤️" : "🤍"}</span>
+      {tr(view, "공감")} <span className="tabular-nums">{count}</span>
+    </button>
   );
 }
