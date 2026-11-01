@@ -82,4 +82,13 @@ export const EN_KR: Record<string, string> = {
   "모의고사": "Mock exam",
   "모의고사 성적표를 받아 들고 한숨을 쉬었다.": "Sighed at the mock exam scores.",
   "성인이 되었다. 이제 매달 나가는 돈은 스스로 감당한다.": "Now an adult. From now on, the monthly bills are yours.",
+  // School, work and home scenes (sceneEvents.ts)
+  "소풍날 김밥 도시락을 열자 친구들이 몰려들었다.": "On the school picnic, friends crowded around the moment you opened your gimbap lunch box.",
+  "부서 워크숍에서 족구를 하다 팀장님과 한편이 되었다. 그 뒤로 말이 조금 편해졌다.": "At the department retreat, you ended up on the boss's team in a game of jokgu, foot volleyball. Talking got a little easier after that.",
+  "주말 아침, 가족이 다 같이 목욕탕에 다녀와 바나나우유를 마셨다.": "On a weekend morning, the whole family went to the public bathhouse and drank banana milk afterward.",
+  "아이가 성적표를 내밀며 눈치를 봤다. 혼내려다 말고 같이 떡볶이를 먹으러 갔다.": "The kid handed over the report card and watched your face. You were going to scold them, but went out for tteokbokki together instead.",
+  "주말에 배우자와 같이 김치찌개를 끓였다. 간 보는 걸로 한참 실랑이를 했다.": "On the weekend you made kimchi stew with your spouse and argued for ages over the seasoning.",
+  "아이가 학원에 갔다고 했는데, 사실은 친구 집에서 놀다 왔다는 걸 알게 되었다.": "The kid said they went to hagwon, but you found out they were at a friend's house.",
+  "왜 그랬는지 물었다. 아이는 울면서 학원이 너무 힘들다고 털어놓았다.": "You asked why. In tears, the kid admitted hagwon was too much for them.",
+  "부모님이 반찬을 잔뜩 싸 들고 올라오셨다. 냉장고가 꽉 찼고 마음도 꽉 찼다.": "Your parents came up with containers full of banchan. The fridge was full, and so were you.",
 };

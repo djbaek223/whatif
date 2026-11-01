@@ -120,6 +120,13 @@ console.log(
 );
 console.log(`choices per life  mean ${avg(lives.map(({ life }) => life.choices.length)).toFixed(1)}  (small dilemmas ${smallPerLife.toFixed(1)}, about one every ${(adultYears / Math.max(0.1, smallPerLife)).toFixed(1)} years; median gap ${smallGaps.sort((a, b) => a - b)[Math.floor(smallGaps.length / 2)]?.toFixed(1) ?? "-"} years)`);
 console.log(`rare moments  ${rareLives} lives (${((rareLives / n) * 100).toFixed(0)}%) had at least one`);
+// The feed as the player reads it: routine lines (a quiet month) against moments (a passive event or a choice).
+const feed = lives.map(({ life }) => {
+  const routine = life.log.filter((e) => e.kind === "turn" && !e.tag);
+  return { routine: routine.length, moments: life.log.filter((e) => e.kind === "event").length, lines: new Set(routine.map((e) => e.text)).size };
+});
+const routineShare = avg(feed.map((f) => f.routine / Math.max(1, f.routine + f.moments)));
+console.log(`feed  routine lines ${(routineShare * 100).toFixed(0)}% of story entries; distinct routine lines per life mean ${avg(feed.map((f) => f.lines)).toFixed(1)}`);
 console.log(`events seen at least once across all lives: ${happened.size} / ${EVENTS.length}`);
 console.log(`occurrences by category: ${cats.map((c) => `${CATEGORY_LABELS[c]} ${catTotals[c]}`).join(", ")}`);
 const neverSeen = EVENTS.filter((e) => !happened.has(e.id) && e.id !== "personal").map((e) => e.id);

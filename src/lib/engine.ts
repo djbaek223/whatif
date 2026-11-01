@@ -55,6 +55,7 @@ import type {
 } from "./types";
 import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema";
 import { schoolYears } from "./onboarding";
+import { ROUTINE, seasonMore, workLines } from "./routine";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
 import { L, T, V } from "./i18n";
@@ -1081,7 +1082,7 @@ function customEffect(c: CustomOption): Effect {
 }
 
 const THEME_SET = new Set<Theme>(["career", "study", "family", "love", "risk", "money", "health", "leisure"]);
-const CATEGORY_SET = new Set<Category>(["daily", "relation", "work", "money", "health", "era", "chance"]);
+const CATEGORY_SET = new Set<Category>(["daily", "relation", "work", "money", "health", "era", "chance", "school", "family", "growth", "values"]);
 
 /** The big changes a narrator-written moment may make: none for a pool moment it rewrites, since those stay small. */
 export const momentChanges = (s: LifeState): CustomChange[] => (s.pending?.slot ? ["none"] : allowedChanges(s));
@@ -1364,35 +1365,45 @@ function statusLines(s: LifeState, rng: Rng, fits: (lines: string[]) => boolean[
     const ok = lines.filter((_, i) => m[i]);
     return rng.pick(ok.length ? ok : lines);
   };
-  if (inService(s)) return pick(L("군 복무를 하며 시간을 보냈다."), L("점호와 근무 사이로 계절이 지나갔다."), L("전역 날짜가 조금씩 가까워졌다."));
-  if (s.mi < f.busyUntil) return pick(L("목표를 위해 하루하루를 버텼다."), L("책상 앞에서 계절이 바뀌었다."));
-  const season = SEASON[(s.mi % 12) + 1];
-  if (season && rng.chance(0.35)) return pick(...season);
+  if (inService(s)) return pick(L("군 복무를 하며 시간을 보냈다."), L("점호와 근무 사이로 계절이 지나갔다."), L("전역 날짜가 조금씩 가까워졌다."), ...ROUTINE.army);
+  if (s.mi < f.busyUntil) return pick(L("목표를 위해 하루하루를 버텼다."), L("책상 앞에서 계절이 바뀌었다."), ...ROUTINE.busy);
+  const m = (s.mi % 12) + 1;
+  const season = [...(SEASON[m] ?? []), ...seasonMore(m)];
+  if (season.length && rng.chance(0.3)) return pick(...season);
   if (f.education === "school")
-    return age < 8 ? pick(L("동네 골목에서 해가 질 때까지 뛰어놀았다."), L("그림책을 읽으며 자랐다.")) : pick(L("학교와 집을 오가며 자랐다."), L("쉬는 시간마다 운동장으로 뛰어나갔다."), L("방학 숙제를 개학 전날 몰아서 했다."));
-  if (f.education === "highschool") return pick(L("야간 자율학습과 모의고사에 쫓기는 나날이었다."), L("매점 빵 하나로 버티는 날이 많았다."), L("독서실 책상 앞에서 졸다 깨기를 반복했다."));
-  if (f.education === "university") return pick(L("강의와 아르바이트 사이를 오갔다."), L("학교 앞 밥집에서 동기들과 끼니를 때웠다."), L("과제 마감에 쫓겨 밤을 새웠다."), L("도서관 자리 맡기 경쟁이 치열했다."));
-  if (f.education === "graduate") return pick(L("연구실에서 밤을 새우는 날이 많았다."), L("논문 마감이 다가왔다."), L("교수님의 메일 한 통에 하루가 좌우되었다."));
+    return age < 8
+      ? pick(L("동네 골목에서 해가 질 때까지 뛰어놀았다."), L("그림책을 읽으며 자랐다."), ...ROUTINE.preschool)
+      : pick(L("학교와 집을 오가며 자랐다."), L("쉬는 시간마다 운동장으로 뛰어나갔다."), L("방학 숙제를 개학 전날 몰아서 했다."), ...ROUTINE.school);
+  if (f.education === "highschool") return pick(L("야간 자율학습과 모의고사에 쫓기는 나날이었다."), L("매점 빵 하나로 버티는 날이 많았다."), L("독서실 책상 앞에서 졸다 깨기를 반복했다."), ...ROUTINE.highschool);
+  if (f.education === "university") return pick(L("강의와 아르바이트 사이를 오갔다."), L("학교 앞 밥집에서 동기들과 끼니를 때웠다."), L("과제 마감에 쫓겨 밤을 새웠다."), L("도서관 자리 맡기 경쟁이 치열했다."), ...ROUTINE.university);
+  if (f.education === "graduate") return pick(L("연구실에서 밤을 새우는 날이 많았다."), L("논문 마감이 다가왔다."), L("교수님의 메일 한 통에 하루가 좌우되었다."), ...ROUTINE.graduate);
+  // A grown-up's day at home now and then: chores, a call to the parents, the bills.
+  if (rng.chance(0.15)) return pick(...ROUTINE.home(!s.done.includes("parent-death")));
   if (f.retired) {
-    if (f.children > 0) return pick(L("느긋한 하루가 이어졌다."), L("자식들의 안부 전화를 기다렸다."), L("공원 벤치에서 햇볕을 쬐었다."), L("텃밭에 상추를 심었다."));
-    return pick(L("느긋한 하루가 이어졌다."), L("공원 벤치에서 햇볕을 쬐었다."), L("아침 산책이 하루의 시작이 되었다."));
+    const with_ = f.partner === "married" ? ROUTINE.retiredCouple : f.children > 0 ? [] : ROUTINE.retiredAlone;
+    if (f.children > 0) return pick(L("느긋한 하루가 이어졌다."), L("자식들의 안부 전화를 기다렸다."), L("공원 벤치에서 햇볕을 쬐었다."), L("텃밭에 상추를 심었다."), ...ROUTINE.retired, ...ROUTINE.retiredParent, ...with_);
+    return pick(L("느긋한 하루가 이어졌다."), L("공원 벤치에서 햇볕을 쬐었다."), L("아침 산책이 하루의 시작이 되었다."), ...ROUTINE.retired, ...with_);
   }
   if (ownsBusiness(f)) {
     const since = s.marks?.venture;
     if (f.company && since !== undefined && rng.chance(0.15)) return L`${eulReul(f.company)} 연 지 ${Math.max(1, Math.round((s.mi - since) / 12))}년이 되어 갔다.`;
-    if (kidsUnder(s, 13)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("문 닫고 돌아오면 아이는 벌써 잠들어 있었다."));
-    if (f.partner === "married") return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("쉬는 날이면 배우자와 장을 보러 갔다."));
-    return pick(L`${withRo(f.job)} 하루하루를 꾸렸다.`, L("손님이 많은 날도, 파리만 날리는 날도 있었다."), L("밤마다 장부를 펴고 이번 달 매출을 계산했다."), L("쉬는 날 없이 일하는 주가 이어졌다."));
+    if (kidsUnder(s, 13) && rng.chance(0.6)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("문 닫고 돌아오면 아이는 벌써 잠들어 있었다."), ...ROUTINE.youngKids);
+    if (f.partner === "married" && rng.chance(0.4)) return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("쉬는 날이면 배우자와 장을 보러 갔다."), ...ROUTINE.couple);
+    return pick(L`${withRo(f.job)} 하루하루를 꾸렸다.`, L("손님이 많은 날도, 파리만 날리는 날도 있었다."), L("밤마다 장부를 펴고 이번 달 매출을 계산했다."), L("쉬는 날 없이 일하는 주가 이어졌다."), ...ROUTINE.business);
   }
   if (f.employed) {
     if (f.company && rng.chance(0.15)) return L`${f.company}에서의 ${Math.max(1, yearsWorked(s))}년 차가 흘러갔다.`;
-    if (kidsUnder(s, 13)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("퇴근하면 육아로 두 번째 출근을 했다."), L("주말이면 아이 손을 잡고 놀이공원에 갔다."));
-    if (f.children > 0) return pick(L`${withRo(f.job)} 일하며 가족을 꾸렸다.`, L("아이 학원비 고지서를 보며 한숨을 쉬었다."), L("다 큰 아이와 어색한 저녁을 먹었다."));
-    if (f.partner === "married") return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("주말이면 배우자와 장을 보러 갔다."));
-    if (f.pet) return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("퇴근하면 반려동물이 현관에서 기다렸다."));
-    return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("월요병과 불금 사이를 오갔다."), L("점심 메뉴 고르는 게 하루의 고민이었다."), L("월급날을 손꼽아 기다렸다."));
+    // About half the quiet months show the life at home (kids, partner, pet), the rest the work itself.
+    if (rng.chance(0.55)) {
+      if (kidsUnder(s, 13)) return pick(L`${withRo(f.job)} 일하며 ${f.children > 1 ? L`아이 ${f.children}명을` : L("아이를")} 키웠다.`, L("퇴근하면 육아로 두 번째 출근을 했다."), L("주말이면 아이 손을 잡고 놀이공원에 갔다."), ...ROUTINE.youngKids);
+      if (f.children > 0) return pick(L`${withRo(f.job)} 일하며 가족을 꾸렸다.`, L("아이 학원비 고지서를 보며 한숨을 쉬었다."), L("다 큰 아이와 어색한 저녁을 먹었다."), ...ROUTINE.olderKids);
+      if (f.partner === "married") return pick(L`${withRo(f.job)} 일하며 배우자와 하루를 나눴다.`, L("주말이면 배우자와 장을 보러 갔다."), ...ROUTINE.couple);
+      if (f.partner === "dating") return pick(...ROUTINE.dating);
+      if (f.pet) return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("퇴근하면 반려동물이 현관에서 기다렸다."), ...ROUTINE.pet);
+    }
+    return pick(L`${withRo(f.job)} 출퇴근을 반복했다.`, L("월요병과 불금 사이를 오갔다."), L("점심 메뉴 고르는 게 하루의 고민이었다."), L("월급날을 손꼽아 기다렸다."), ...workLines(tierOf(f.company) ?? guessTier(`${f.company ?? ""} ${f.job}`)));
   }
-  return pick(L("다음 일을 고민하며 시간을 보냈다."), L("채용 공고를 뒤적이며 하루를 보냈다."));
+  return pick(L("다음 일을 고민하며 시간을 보냈다."), L("채용 공고를 뒤적이며 하루를 보냈다."), ...ROUTINE.jobless);
 }
 
 /** Appends 로 or 으로 to a Korean noun, by its final consonant. An English text takes the word as it is. */

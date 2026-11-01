@@ -58,11 +58,11 @@ export type SceneResult = z.infer<typeof SceneSchema> & { episodes?: EpisodeResu
 const CHANGES = ["none", "hire", "switchJob", "quitJob", "startBusiness", "closeBusiness", "enrollUniversity", "enrollGraduate", "buyHome", "addChild", "startDating", "marry", "retire"] as const;
 const THEMES = ["career", "study", "family", "love", "risk", "money", "health", "leisure"] as const;
 
-const CATEGORIES = ["daily", "relation", "work", "money", "health", "era", "chance"] as const;
+const CATEGORIES = ["daily", "relation", "work", "money", "health", "era", "chance", "school", "family", "growth", "values"] as const;
 
 export const MomentSchema = z.object({
   title: z.string().describe("이 순간의 제목, 15자 이내"),
-  type: z.enum(CATEGORIES).describe("이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연"),
+  type: z.enum(CATEGORIES).describe("이 순간의 종류: daily 일상, relation 관계, work 일, money 돈, health 건강, era 시대, chance 우연, school 학교, family 가정, growth 배움·취미, values 가치관"),
   keywords: z.array(z.string()).describe("이 순간의 핵심 키워드 2~3개, 각각 한두 단어 (예: 동업, 대학 동기)"),
   tone: z.string().describe("이 장면의 톤 하나: 유쾌함, 뭉클함, 긴장감, 담담함 중에서"),
   scene: z.string().describe("이 사람의 현재 상태, 성향, 지난 선택에서 자연스럽게 생긴 갈림길을 2인칭으로 그리는 2~4문장"),
@@ -104,7 +104,7 @@ export type MomentResult = Omit<z.infer<typeof MomentSchema>, "options"> & {
 
 const EpisodeSchema = z.object({
   title: z.string().describe("10자 이내 제목"),
-  type: z.enum(["daily", "relation", "work", "money", "health", "chance"]),
+  type: z.enum(["daily", "relation", "work", "money", "health", "chance", "school", "family", "growth", "values"]),
   text: z.string().describe("선택 없이 지나가는 일, 과거형 1~2문장"),
   stats: z.object({ health: z.number().int(), happiness: z.number().int(), knowledge: z.number().int(), relationships: z.number().int() }).describe("각각 -4~4, 대부분 0. knowledge는 교육"),
   money: z.number().int().describe("만원. 대부분 0"),
