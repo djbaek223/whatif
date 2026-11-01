@@ -867,14 +867,14 @@ function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint
     ["regret", L("아쉬움"), tp.regret],
   ];
   return (
-    <dl className="divide-y divide-stone-100 dark:divide-stone-800">
+    <dl className="grid grid-cols-[max-content_minmax(0,1fr)_auto] gap-x-3 divide-y divide-stone-100 dark:divide-stone-800">
       {rows.map(([id, rawLabel, value]) => {
         const label = cap(rawLabel);
         const required = STEPS[indexOf(id)].required;
         return (
-          <div key={id} className="flex items-center gap-3 py-1.5">
-            <dt className="w-16 shrink-0 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
-            <dd className={`min-w-0 flex-1 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
+          <div key={id} className="col-span-3 grid grid-cols-subgrid items-center py-1.5">
+            <dt className="max-w-28 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
+            <dd className={`min-w-0 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
               {value || (required ? L("꼭 필요해요") : L("건너뜀"))}
             </dd>
             <button
