@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "simulate": "tsx scripts/simulate.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "validate:events": "tsx scripts/validate-events.ts",
     "check:memory": "tsx scripts/check-memory.ts",
     "check:hybrid": "tsx scripts/check-hybrid.ts",
