@@ -16,7 +16,7 @@ async function Page({ searchParams }: { searchParams: Promise<{ page?: string }>
 export default function Board(props: PageProps<"/en/board">) {
   return (
     <BoardShell lang="en">
-      <BoardIntro lang="en" />
+      <BoardIntro lang="en" tab="latest" />
       <Suspense fallback={<p className="py-10 text-center text-sm text-stone-500">Loading</p>}>
         <Page searchParams={props.searchParams as Promise<{ page?: string }>} />
       </Suspense>

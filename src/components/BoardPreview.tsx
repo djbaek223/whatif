@@ -8,16 +8,22 @@ import type { PublishedMemoir } from "./Board";
 import { BadgeRow, RecordLine } from "./BoardRecords";
 
 /**
- * The start screen's look at the memoir board: the three newest posts on the board of the shown language, and a way
- * into the whole board. Hidden while the board isn't set up; once posts collect likes it can switch to the most liked.
+ * The start screen's look at the memoir board: the three newest posts on the board of the shown language (the three
+ * most liked once three posts have three likes or more), and ways into the board and its hall of fame. Hidden while
+ * the board isn't set up.
  */
 export function BoardPreview({ lang }: { lang: Lang }) {
   const [items, setItems] = useState<PublishedMemoir[] | null>(null);
+  const [popular, setPopular] = useState(false);
   useEffect(() => {
     let live = true;
-    fetch(`/api/memoirs?region=${countryFor(lang)}&size=3`)
+    fetch(`/api/memoirs?region=${countryFor(lang)}&home=1`)
       .then((r) => r.json())
-      .then((d: { ok?: boolean; items?: PublishedMemoir[] }) => live && setItems(d.ok ? (d.items ?? []) : null))
+      .then((d: { ok?: boolean; items?: PublishedMemoir[]; popular?: boolean }) => {
+        if (!live) return;
+        setItems(d.ok ? (d.items ?? []) : null);
+        setPopular(!!d.popular);
+      })
       .catch(() => live && setItems(null));
     return () => {
       live = false;
@@ -29,11 +35,16 @@ export function BoardPreview({ lang }: { lang: Lang }) {
     <section aria-labelledby="board-preview" className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
         <h2 id="board-preview" className="text-base font-bold">
-          {L("다른 사람들의 인생")}
+          {popular ? L("공감을 많이 받은 인생") : L("다른 사람들의 인생")}
         </h2>
-        <Link href={base} className="text-sm font-medium text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
-          {L("회고록 게시판 보기")} →
-        </Link>
+        <span className="flex gap-3 text-sm font-medium">
+          <Link href={`${base}/hall`} className="text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
+            {L("명예의 전당")}
+          </Link>
+          <Link href={base} className="text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
+            {L("게시판")} →
+          </Link>
+        </span>
       </div>
       {items.length ? (
         <ul className="space-y-2">
@@ -46,6 +57,7 @@ export function BoardPreview({ lang }: { lang: Lang }) {
                 <span className="mt-1 flex items-center justify-between gap-2 text-xs text-stone-500 dark:text-stone-400">
                   <span>
                     {m.penName || L("익명")} · {L`${m.deathAge}세`}
+                    {!!m.likes && <> · ❤ {m.likes}</>}
                   </span>
                   {m.records && <BadgeRow ids={m.records.badges} lang={lang} max={5} />}
                 </span>

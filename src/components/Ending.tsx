@@ -5,6 +5,7 @@ import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
 import { BoardDialog, PublishDialog, endingSig, publishedId } from "./Board";
 import { BadgeCollection } from "./GameFx";
+import { BoardStanding } from "./BoardStanding";
 import { LifeChart } from "./LifeChart";
 import { LifeSummaryCard, ShareDialog } from "./LifeSummary";
 import { Button, Card } from "./ui";
@@ -65,6 +66,8 @@ export function EndingView({
       </div>
 
       <LifeSummaryCard life={life} />
+
+      <BoardStanding life={life} posted={!!posted} onPublish={ending ? () => setWriting(true) : undefined} />
 
       <Card>
         <BadgeCollection life={life} />
