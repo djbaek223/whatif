@@ -9,7 +9,7 @@
 // `npm run check:i18n` lists texts missing from either dictionary.
 import { EN, EN_KR, EN_NAMES } from "../locales/en";
 import { KO, KO_NAMES, KO_US } from "../locales/ko";
-import { lang, region } from "./region";
+import { lang, love, region, type Love } from "./region";
 
 const keyOf = (strings: readonly string[]) => strings.reduce((k, s, i) => (i ? `${k}{${i - 1}}${s}` : s), "");
 
@@ -46,6 +46,26 @@ function byWords(value: string, dict: Record<string, string>): string {
   return out.every((w) => w !== undefined) ? out.join(" ") : value;
 }
 
+// English texts about the love interest or partner write {they}, {them}, {their}, {theirs} (or {They}...), filled in
+// for the life (region.ts love()): "Marry {them}" reads "Marry her" for a man. Keep the verb the same for every
+// pronoun: "{They} read it twice", not "{They} seem".
+const PRONOUNS: Record<string, Record<Love, string>> = {
+  they: { she: "she", he: "he", they: "they" },
+  them: { she: "her", he: "him", they: "them" },
+  their: { she: "her", he: "his", they: "their" },
+  theirs: { she: "hers", he: "his", they: "theirs" },
+};
+const PRONOUN = /\{([Tt]hey|[Tt]hem|[Tt]heir|[Tt]heirs)\}/g;
+
+/** Fills in the love interest's pronouns in an English text. */
+export function withLove(text: string): string {
+  if (!text.includes("{")) return text;
+  return text.replace(PRONOUN, (_, w: string) => {
+    const out = PRONOUNS[w.toLowerCase()][love()];
+    return w[0] === "T" ? out[0].toUpperCase() + out.slice(1) : out;
+  });
+}
+
 function translate(source: "ko" | "en", dict: Record<string, string>, text: string | TemplateStringsArray, values: unknown[]): string {
   const key = keyOf(typeof text === "string" ? [text] : text);
   if (lang() === source) {
@@ -63,11 +83,13 @@ function translate(source: "ko" | "en", dict: Record<string, string>, text: stri
   return fill(out, shown);
 }
 
+const shown = (text: string) => (lang() === "en" ? withLove(text) : text);
+
 /** A text written in Korean, in the display language. */
-export const L = (text: string | TemplateStringsArray, ...values: unknown[]): string => translate("ko", EN, text, values);
+export const L = (text: string | TemplateStringsArray, ...values: unknown[]): string => shown(translate("ko", EN, text, values));
 
 /** A text written in English, in the display language. */
-export const T = (text: string | TemplateStringsArray, ...values: unknown[]): string => translate("en", KO, text, values);
+export const T = (text: string | TemplateStringsArray, ...values: unknown[]): string => shown(translate("en", KO, text, values));
 
 /** Keys asked for with no entry yet (development only), for scripts and tests. */
 export const missing = new Set<string>();

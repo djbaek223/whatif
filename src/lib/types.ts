@@ -1,6 +1,6 @@
 // "knowledge" is shown as 지식; the degree (학력) is a separate profile line. The key stays so saved lives and the narrator schema keep working.
 import { L } from "./i18n";
-import type { Lang, Region } from "./region";
+import type { Lang, Love, Region } from "./region";
 export type StatKey = "health" | "happiness" | "knowledge" | "relationships";
 export type Stats = Record<StatKey, number>;
 
@@ -88,6 +88,7 @@ export interface LifeFlags {
   // Degrees (education.ts); missing in lives saved before them, then read from education and school.
   degree?: Degree; // highest degree finished
   program?: Degree; // the degree the current course leads to, credited once its last month has passed
+  love?: Love; // the love interest's pronoun when the player named one in their own words (else region.ts loveFor)
 }
 
 /** What a choice is about. Temperament and past choices make some themes come up more often. */

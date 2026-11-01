@@ -13,6 +13,8 @@ import {
   fillMoment,
   fillScene,
   isBigChoice,
+  loveFromText,
+  loveOf,
   lifeSummary,
   pendingKeyOf,
   resolveChoice,
@@ -39,7 +41,7 @@ import { stopsProgress } from "@/lib/playUi";
 import { Button } from "./ui";
 import { OpeningWait, REWIND_MS, reducedMotion } from "./Waiting";
 import { L } from "@/lib/i18n";
-import { countryFor, inRegion, langFor, setLang, setRegion, type Lang, type Region } from "@/lib/region";
+import { countryFor, inRegion, langFor, loveFor, setLang, setLove, setRegion, type Lang, type Region } from "@/lib/region";
 import { fromTag, LANG_COOKIE } from "@/lib/langPick";
 
 // Everyday moments, small dilemmas, follow-ups and rare moments written for each life (hybrid.ts).
@@ -123,6 +125,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const shownLang: Lang = lifeShown ? (life.lang ?? langFor(life.region)) : lang;
   setRegion(shownRegion);
   setLang(shownLang);
+  // Who the player falls for is "her" or "him" in English (i18n.ts withLove): as the life says, else from the gender.
+  setLove(lifeShown ? loveOf(life) : loveFromText([tp.situation, tp.actualChoice, tp.regret].join(" ")) ?? loveFor(profile.gender));
 
   useEffect(() => {
     document.documentElement.lang = shownLang;

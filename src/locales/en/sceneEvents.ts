@@ -451,7 +451,7 @@ export const SCENE_EN: Record<string, string> = {
   "같이 그려 보자고 한다": "Say let's picture it together",
   "둘이 앉아 몇 년 뒤의 모습을 이야기했다. 서로 생각보다 많이 닮아 있었다.": "You sat and talked about the years ahead. You wanted more of the same things than you'd thought.",
   "조금 더 시간을 갖자고 한다": "Ask for a little more time",
-  "아직은 모르겠다고 솔직히 말했다. 연인은 서운해했지만 기다려 주겠다고 했다.": "You honestly said you didn't know yet. Your partner was hurt, but said they'd wait.",
+  "아직은 모르겠다고 솔직히 말했다. 연인은 서운해했지만 기다려 주겠다고 했다.": "You honestly said you didn't know yet. Your partner was hurt, but said {they}'d wait.",
   "내가 원하는 삶을 먼저 말한다": "Say first what life I want",
   "내가 하고 싶은 일과 살고 싶은 곳을 이야기했다. 연인은 한참 생각하더니 같이 가 보자고 했다.": "You talked about the work you want and where you want to live. Your partner thought a long time, then said, let's go together.",
   "지시와 양심": "Orders and conscience",

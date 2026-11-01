@@ -153,7 +153,7 @@ export const ROUTINE_EN: Record<string, string> = {
   "퇴근 후 연인과 영화를 보러 갔다.": "Went to a movie with your partner after work.",
   "주말 데이트 코스를 고르느라 한참 고민했다.": "Spent a long time planning the weekend date.",
   "연인과 통화하다 잠드는 날이 많았다.": "Often fell asleep on the phone with your partner.",
-  "연인의 회사 근처에서 점심을 같이 먹었다.": "Met your partner for lunch near their office.",
+  "연인의 회사 근처에서 점심을 같이 먹었다.": "Met your partner for lunch near {their} office.",
   "달력에 둘만의 기념일 동그라미가 늘었다.": "More of your little anniversaries got circled on the calendar.",
   // Pet
   "퇴근하면 반려동물 산책부터 시켰다.": "First thing after work: walking the pet.",
