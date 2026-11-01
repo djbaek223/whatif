@@ -4,8 +4,10 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
-import { region } from "@/lib/region";
+import { lang, region, type Lang } from "@/lib/region";
+import { lifeRecords, type LifeRecords } from "@/lib/records";
 import { L } from "@/lib/i18n";
+import { RecordGrid, RecordLine, tr } from "./BoardRecords";
 import { Button, Input, Spinner, Textarea } from "./ui";
 
 /** A post as the board shows it (src/lib/memoirs.ts). */
@@ -17,6 +19,7 @@ export interface PublishedMemoir {
   memoir: string;
   deathAge: number;
   status: string;
+  records?: LifeRecords;
   createdAt: string;
 }
 
@@ -84,6 +87,7 @@ export function PublishDialog({
   const [memoir, setMemoir] = useState(() => masked(ending.memoir, life));
   const [agreed, setAgreed] = useState(false);
   const [status, setStatus] = useState<PublishStatus>("idle");
+  const records = lifeRecords(life);
   const ready = agreed && title.trim().length > 0 && memoir.trim().length >= 20 && status !== "sending";
 
   const send = async (e: FormEvent) => {
@@ -103,6 +107,7 @@ export function PublishDialog({
           memoir,
           deathAge: life.deathAge ?? 0,
           status: statusLabel(life),
+          records,
           website: website?.value ?? "",
         }),
       });
@@ -144,11 +149,15 @@ export function PublishDialog({
           <span className="text-sm font-semibold">{L("회고록")}</span>
           <Textarea value={memoir} onChange={(e) => setMemoir(e.target.value)} rows={9} maxLength={8000} className="leading-relaxed" />
         </label>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold">{L("함께 올라가는 인생 기록")}</p>
+          <RecordGrid records={records} deathAge={life.deathAge ?? 0} lang={lang()} />
+        </div>
         {/* Hidden from people and screen readers; a bot that fills it gets turned away. */}
         <input name="website" tabIndex={-1} autoComplete="off" aria-hidden className="hidden" />
         <label className="flex items-start gap-2.5 text-sm">
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-indigo-600" />
-          <span>{L("다른 사람이 읽어도 괜찮은 내용인지 확인했어요. 프로필(생일, 학교, MBTI 등)은 올라가지 않아요.")}</span>
+          <span>{L("다른 사람이 읽어도 괜찮은 내용인지 확인했어요. 인생 기록은 다른 사람들과 비교할 수 있게 공개돼요. 프로필(생일, 학교, MBTI 등)은 올라가지 않아요.")}</span>
         </label>
         {problem && (
           <p role="alert" className="text-[13px] font-medium text-rose-700 dark:text-rose-400">
@@ -264,11 +273,14 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
                   {para}
                 </p>
               ))}
+              {post.records && <RecordGrid records={post.records} deathAge={post.deathAge} lang={lang()} />}
               {post.status && <p className="text-sm text-stone-500 dark:text-stone-400">{L("마지막 모습")} · {post.status}</p>}
-              {mine[post.id] && (
+              {mine[post.id] ? (
                 <Button type="button" variant="ghost" className="w-full text-rose-700 dark:text-rose-400" onClick={() => remove(post.id)}>
                   {L("내 글 지우기")}
                 </Button>
+              ) : (
+                <ReportButton id={post.id} />
               )}
             </article>
           ) : status === "loading" ? (
@@ -299,6 +311,7 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
                         {mine[m.id] && <span className="ml-1.5 rounded bg-indigo-50 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{L("내 글")}</span>}
                       </span>
                       {m.epitaph && <span className="mt-0.5 block truncate text-sm italic text-stone-600 dark:text-stone-400">&ldquo;{m.epitaph}&rdquo;</span>}
+                      <RecordLine records={m.records} lang={lang()} />
                       <span className="mt-1 block text-xs text-stone-500 dark:text-stone-400">
                         {m.penName || L("익명")} · {L`${m.deathAge}세`} · {dateText(m.createdAt)}
                       </span>
@@ -316,5 +329,44 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
         </div>
       </div>
     </dialog>
+  );
+}
+
+const REPORTED_KEY = "whatif.reported";
+
+/** Flags a post for the owner to look at. Three reports from different people hide it (src/lib/memoirs.ts). */
+export function ReportButton({ id, lang: shown }: { id: string; lang?: Lang }) {
+  const view = shown ?? lang();
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  useEffect(() => {
+    try {
+      if ((JSON.parse(localStorage.getItem(REPORTED_KEY) || "[]") as string[]).includes(id)) setState("done"); // eslint-disable-line react-hooks/set-state-in-effect
+    } catch {}
+  }, [id]);
+  const report = async () => {
+    if (!window.confirm(tr(view, "이 글을 신고할까요? 욕설, 개인정보, 광고 같은 글은 확인 뒤 내려요."))) return;
+    setState("sending");
+    try {
+      const res = await fetch("/api/memoirs/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!res.ok) throw new Error();
+      try {
+        const list = JSON.parse(localStorage.getItem(REPORTED_KEY) || "[]") as string[];
+        localStorage.setItem(REPORTED_KEY, JSON.stringify([...list, id].slice(-200)));
+      } catch {}
+      setState("done");
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <p className="text-right text-xs text-stone-500 dark:text-stone-400" role="status">
+      {state === "done" ? (
+        tr(view, "신고했어요. 확인해 볼게요.")
+      ) : (
+        <button type="button" onClick={report} disabled={state === "sending"} className="-my-2 px-1 py-2 underline-offset-2 hover:underline disabled:opacity-50">
+          {state === "error" ? tr(view, "신고하지 못했어요. 다시 시도") : tr(view, "신고하기")}
+        </button>
+      )}
+    </p>
   );
 }

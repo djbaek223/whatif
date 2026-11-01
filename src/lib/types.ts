@@ -287,6 +287,8 @@ export interface LifeState {
   threads?: { text: string; due: number }[]; // follow-ups the narrator left, told in a later moment once due
   expense?: Record<string, number>; // 만원 / 월 by item (budget.ts), as of the last turn, to tell the player when fixed costs change
   chapters?: LifeChapter[]; // the same lasting changes for the screen (milestones, a choice's 삶의 변화); missing in older saves
+  donated?: number; // 만원 given away over the life (Effect.donate, and narrator moments that read as a gift)
+  peakWealth?: number; // 만원, the most this life ever had, checked every turn
   memory?: string[]; // every lasting change to this life ("34세(2019년 3월): 카페 창업"), kept for good and given to the narrator
 }
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import type { Region } from "./region";
+import type { LifeRecords } from "./records";
 
 // Published memoirs live in Redis through Upstash's REST API (https://upstash.com/docs/redis/features/restapi),
 // which Vercel's Upstash for Redis integration sets up as KV_REST_API_URL / KV_REST_API_TOKEN.
@@ -21,10 +22,14 @@ export interface Memoir {
   memoir: string;
   deathAge: number;
   status: string; // how the life ended, e.g. "은퇴 · 기혼"
+  records?: LifeRecords; // the life's numbers (records.ts); missing on posts from before records, or when they didn't add up
   createdAt: string;
 }
 
-type Stored = Memoir & { keyHash: string };
+type Stored = Memoir & { keyHash: string; hidden?: boolean };
+
+/** Reports from different people that take a post off the board until the owner looks at it. */
+export const HIDE_AFTER = 3;
 
 export const PAGE = 10;
 const listKey = (r: Region) => `memoirs:${r}`;
@@ -33,6 +38,7 @@ const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 function strip(stored: Stored): Memoir {
   const m: Partial<Stored> = { ...stored };
   delete m.keyHash;
+  delete m.hidden;
   return m as Memoir;
 }
 
@@ -52,19 +58,37 @@ async function redis<T>(commands: (string | number)[][]): Promise<T[]> {
 }
 
 // Development only: one process, gone on restart.
-type Mem = { lists: Record<Region, string[]>; items: Map<string, Stored> };
+type Mem = { lists: Record<Region, string[]>; items: Map<string, Stored>; reports: Map<string, Set<string>> };
 const holder = globalThis as { __memoirs?: Mem };
-const mem: Mem = (holder.__memoirs ??= { lists: { kr: [], us: [] }, items: new Map() });
+const mem: Mem = (holder.__memoirs ??= { lists: { kr: [], us: [] }, items: new Map(), reports: new Map() });
+mem.reports ??= new Map(); // a dev process started before reports existed
+
+async function getStored(id: string): Promise<Stored | undefined> {
+  if (inMemory()) return mem.items.get(id);
+  const [s] = await redis<string | null>([["GET", itemKey(id)]]);
+  if (!s) return undefined;
+  try {
+    return JSON.parse(s) as Stored;
+  } catch {
+    return undefined;
+  }
+}
+
+/** One post, for its own page. Null when it was taken down or hidden after reports. */
+export async function getMemoir(id: string): Promise<Memoir | null> {
+  const stored = await getStored(id);
+  return stored && !stored.hidden ? strip(stored) : null;
+}
 
 /** Newest first. `before` is how many posts the reader has already seen. */
-export async function listMemoirs(region: Region, before = 0): Promise<{ items: Memoir[]; more: boolean }> {
+export async function listMemoirs(region: Region, before = 0, size = PAGE): Promise<{ items: Memoir[]; more: boolean }> {
   if (inMemory()) {
-    const ids = mem.lists[region].slice(before, before + PAGE + 1);
-    const items = ids.slice(0, PAGE).flatMap((id) => (mem.items.has(id) ? [strip(mem.items.get(id)!)] : []));
-    return { items, more: ids.length > PAGE };
+    const ids = mem.lists[region].slice(before, before + size + 1);
+    const items = ids.slice(0, size).flatMap((id) => (mem.items.has(id) ? [strip(mem.items.get(id)!)] : []));
+    return { items, more: ids.length > size };
   }
-  const [ids] = await redis<string[]>([["LRANGE", listKey(region), before, before + PAGE]]);
-  const page = ids.slice(0, PAGE);
+  const [ids] = await redis<string[]>([["LRANGE", listKey(region), before, before + size]]);
+  const page = ids.slice(0, size);
   const raw = page.length ? (await redis<string[]>([["MGET", ...page.map(itemKey)]]))[0] : [];
   const items = raw.flatMap((s) => {
     if (!s) return [];
@@ -74,7 +98,44 @@ export async function listMemoirs(region: Region, before = 0): Promise<{ items: 
       return [];
     }
   });
-  return { items, more: ids.length > PAGE };
+  return { items, more: ids.length > size };
+}
+
+/**
+ * Counts a report against a post, once per reporter (an IP hash). At HIDE_AFTER reports the post leaves the list and
+ * its page; it stays stored, so the owner (BOARD_ADMIN_KEY) can still look at it and delete it.
+ */
+export async function reportMemoir(id: string, reporter: string): Promise<"counted" | "hidden" | "missing"> {
+  const who = hash(`report|${reporter}`).slice(0, 16);
+  const stored = await getStored(id);
+  if (!stored || stored.hidden) return "missing";
+  let count: number;
+  if (inMemory()) {
+    const set = mem.reports.get(id) ?? new Set<string>();
+    set.add(who);
+    mem.reports.set(id, set);
+    count = set.size;
+  } else {
+    const [, n] = await redis<number>([
+      ["SADD", `memoir:reports:${id}`, who],
+      ["SCARD", `memoir:reports:${id}`],
+    ]);
+    count = n;
+  }
+  if (count < HIDE_AFTER) return "counted";
+  const hidden: Stored = { ...stored, hidden: true };
+  if (inMemory()) {
+    mem.items.set(id, hidden);
+    mem.lists[stored.region] = mem.lists[stored.region].filter((x) => x !== id);
+  } else {
+    await redis([
+      ["SET", itemKey(id), JSON.stringify(hidden)],
+      ["LREM", listKey(stored.region), 0, id],
+      ["SADD", "memoirs:hidden", id],
+    ]);
+  }
+  console.warn(`[memoirs] ${id} hidden after ${count} reports`);
+  return "hidden";
 }
 
 /** Saves a post and returns it with the secret that lets this browser take it down later. */
@@ -96,22 +157,20 @@ export async function publishMemoir(m: Omit<Memoir, "id" | "createdAt">): Promis
 
 /** Takes a post down with the writer's secret, or with BOARD_ADMIN_KEY for the site owner. False if neither matches. */
 export async function deleteMemoir(id: string, key: string): Promise<boolean> {
-  let stored: Stored | undefined;
-  if (inMemory()) stored = mem.items.get(id);
-  else {
-    const [s] = await redis<string | null>([["GET", itemKey(id)]]);
-    stored = s ? (JSON.parse(s) as Stored) : undefined;
-  }
+  const stored = await getStored(id);
   if (!stored) return true; // already gone
   const admin = process.env.BOARD_ADMIN_KEY;
   if (hash(key) !== stored.keyHash && !(admin && key === admin)) return false;
   if (inMemory()) {
     mem.items.delete(id);
+    mem.reports.delete(id);
     mem.lists[stored.region] = mem.lists[stored.region].filter((x) => x !== id);
   } else {
     await redis([
       ["DEL", itemKey(id)],
       ["LREM", listKey(stored.region), 0, id],
+      ["DEL", `memoir:reports:${id}`],
+      ["SREM", "memoirs:hidden", id],
     ]);
   }
   return true;

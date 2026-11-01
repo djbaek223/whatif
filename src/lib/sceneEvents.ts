@@ -1092,7 +1092,7 @@ const LIFE_CHOICES: EventDef[] = [
     when: (s) => adult(s) && s.wealth > 300,
     get intro() { return L("뉴스에서 큰 재난 소식을 봤다. 어디서든 작게라도 보태고 싶어진다."); },
     choices: [
-      { id: "give", get label() { return L("한 달 용돈만큼 보낸다"); }, effect: { get text() { return L("한 달 치 여윳돈을 보냈다. 통장은 가벼워졌고 마음은 조금 덜 무거워졌다."); }, stats: { happiness: 3, relationships: 1 }, wealth: -30, get note() { return L("기부"); } } },
+      { id: "give", get label() { return L("한 달 용돈만큼 보낸다"); }, effect: { get text() { return L("한 달 치 여윳돈을 보냈다. 통장은 가벼워졌고 마음은 조금 덜 무거워졌다."); }, stats: { happiness: 3, relationships: 1 }, wealth: -30, donate: true, get note() { return L("기부"); } } },
       { id: "hands", get label() { return L("주말에 몸으로 돕는다"); }, effect: { get text() { return L("주말에 봉사를 다녀왔다. 처음 보는 사람들과 땀을 흘리며 밥을 먹었다."); }, stats: { relationships: 3, health: -1, happiness: 2 } } },
     ],
   },

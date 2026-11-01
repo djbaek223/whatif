@@ -5,6 +5,7 @@ import { LIFE_EVENTS } from "./lifeEvents";
 import { MORE_EVENTS } from "./moreEvents";
 import { STORY_EVENTS, STORY_FORKS } from "./storyEvents";
 import { SCENE_EVENTS } from "./sceneEvents";
+import { GIVING_EVENTS } from "./givingEvents";
 import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
 import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
@@ -39,6 +40,7 @@ export interface Effect {
   startBusiness?: { title?: string; name?: string; income?: number }; // opens a shop or business of one's own; how it goes plays out later
   homeValuePct?: number; // change in the home's price; the gain or loss lands in wealth
   note?: string; // what a cost was for, shown with the amount
+  donate?: boolean; // the money this effect spends is a gift (기부): it adds up in LifeState.donated for the memoir board
   mark?: string; // remembers when this happened, so a later event in a chain can follow it
   seed?: Dyn<string>; // a person or thread the narrator can bring back later
 }
@@ -1032,7 +1034,7 @@ export const CORE_EVENTS: EventDef[] = [
 const KR_ONLY = new Set(["csat", "military", "d-promo-exam", "drivers-license"]);
 for (const e of [...CORE_EVENTS, ...LIFE_EVENTS, ...MORE_EVENTS]) if (KR_ONLY.has(e.id) || e.id.startsWith("era-")) e.region = "kr";
 
-export const EVENTS: EventDef[] = [...CORE_EVENTS, ...STORY_FORKS, ...LIFE_EVENTS, ...MORE_EVENTS, ...STORY_EVENTS, ...SCENE_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
+export const EVENTS: EventDef[] = [...CORE_EVENTS, ...STORY_FORKS, ...LIFE_EVENTS, ...MORE_EVENTS, ...STORY_EVENTS, ...SCENE_EVENTS, ...GIVING_EVENTS, ...US_CORE_EVENTS, ...US_MORE_EVENTS];
 
 const POOLS: Partial<Record<Region, EventDef[]>> = {};
 

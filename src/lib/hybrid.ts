@@ -25,6 +25,8 @@ const POOL_ONLY = new Set([
   "grandkid-care", "grandkid-school", "army-life", "parents-70", "sibling-wedding", "spouse-surgery", "will",
   "inheritance", "biz-offer", "biz-result", "venture-result", "lend-return", "channel-grow", "channel-sponsor",
   "mentor-call", "crew-love", "crew-friends",
+  // Big gifts: their donate flag feeds the memoir board's 기부 record, which a rewritten option would lose.
+  "give-scholarship", "give-sponsor", "give-disaster", "give-bequest",
 ]);
 
 /** An effect that changes the life for good (job, school, partner, home, pay). Those belong to the engine. */

@@ -1237,7 +1237,7 @@ export const LIFE_EVENTS: EventDef[] = [
     choices: [
       { id: "memoir", get label() { return L("자서전을 쓴다"); }, effect: { get text() { return L("한 글자씩 내 인생을 적었다. 작은 책 한 권이 되었다."); }, stats: { happiness: 5, knowledge: 2 } } },
       { id: "letters", get label() { return L("가족에게 편지를 쓴다"); }, effect: { get text() { return L("가족 한 명 한 명에게 편지를 남겼다."); }, stats: { relationships: 6, happiness: 3 } } },
-      { id: "donate", get label() { return L("모은 것 일부를 기부한다"); }, effect: { get text() { return L("모교 장학금으로 작은 기부를 했다."); }, stats: { happiness: 6 }, wealthPct: -0.05 } },
+      { id: "donate", get label() { return L("모은 것 일부를 기부한다"); }, effect: { get text() { return L("모교 장학금으로 작은 기부를 했다."); }, stats: { happiness: 6 }, wealthPct: -0.05, donate: true } },
       { id: "nothing", get label() { return L("그냥 오늘을 산다"); }, effect: { get text() { return L("남기는 것보다 오늘을 사는 게 중요했다."); }, stats: { happiness: 2 } } },
     ],
   },
