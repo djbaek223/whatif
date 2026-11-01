@@ -607,6 +607,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.wealth) s.wealth += effect.wealth;
   if (effect.wealthPct && s.wealth > 0) s.wealth += Math.round(s.wealth * effect.wealthPct);
   const spent = s.wealth - wealthBefore;
+  if (effect.donate && spent < 0) s.donated = (s.donated ?? 0) - spent;
   if (effect.note && spent) out.texts.push(spent < 0 ? L`${effect.note}에 ${won(-spent)}이 들었다.` : L`${effect.note}로 ${won(spent)}이 들어왔다.`);
   // A retirement income in an American life is Social Security plus a 401(k), about 1.45 times a Korean pension.
   if (effect.income !== undefined) s.income = Math.round(effect.income * (isUS() && s.flags.retired ? 1.45 : 1));
@@ -1075,8 +1076,12 @@ function changeEffect(c: CustomChange, o?: Pick<CustomOption, "title" | "place">
   }
 }
 
+// A narrator-written option that spends money on a gift counts toward the life's donations.
+const GIFT = /기부|후원|성금|장학금|나눔|donat|charit|fundrais|scholarship fund/i;
+
 function customEffect(c: CustomOption): Effect {
-  const base: Effect = { text: c.outcome, stats: c.stats, ...(c.money ? { wealth: c.money } : {}), ...changeEffect(c.change, c) };
+  const gift = c.money < 0 && GIFT.test(c.outcome);
+  const base: Effect = { text: c.outcome, stats: c.stats, ...(c.money ? { wealth: c.money } : {}), ...(gift ? { donate: true } : {}), ...changeEffect(c.change, c) };
   if (c.chance >= 0.99) return base;
   return { text: "", risk: { chance: () => c.chance, success: base, failure: { text: c.failure || L("생각대로 되지는 않았다."), stats: { happiness: -4 } } } };
 }
@@ -1520,6 +1525,7 @@ function advanceTurnHere(state: LifeState): { state: LifeState; stop: StopReason
   const before = structuredClone(s.flags);
   drift(s, months);
   remember(s, before);
+  s.peakWealth = Math.max(s.peakWealth ?? s.wealth, s.wealth);
   const age = ageOf(s);
   const year = Math.floor(s.mi / 12);
   const entries: LogEntry[] = [];

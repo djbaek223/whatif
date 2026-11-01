@@ -31,6 +31,8 @@ export function keysInCode(tag: "L" | "T" = "L"): Map<string, string> {
     };
     const visit = (node: ts.Node) => {
       if (ts.isCallExpression(node) && node.expression.getText(src) === tag && node.arguments[0] && ts.isStringLiteralLike(node.arguments[0])) add(node.arguments[0].text, node);
+      // tr(lang, "…") in BoardRecords.tsx: the same Korean keys, for screens drawn in a language given as an argument.
+      if (tag === "L" && ts.isCallExpression(node) && node.expression.getText(src) === "tr" && node.arguments[1] && ts.isStringLiteralLike(node.arguments[1])) add(node.arguments[1].text, node);
       if (ts.isTaggedTemplateExpression(node) && node.tag.getText(src) === tag) {
         const t = node.template;
         add(ts.isNoSubstitutionTemplateLiteral(t) ? t.text : t.head.text + t.templateSpans.map((s, i) => `{${i}}${s.literal.text}`).join(""), node);

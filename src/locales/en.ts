@@ -8,10 +8,11 @@ import { MORE2_EN } from "./en/moreEvents2";
 import { STORY_EN } from "./en/storyEvents";
 import { ROUTINE_EN } from "./en/routine";
 import { SCENE_EN } from "./en/sceneEvents";
+import { GIVING_EN } from "./en/givingEvents";
 import { UI_EN } from "./en/ui";
 import { EN_KR } from "./en/korea";
 import { KR_NEWS_EN } from "./en/news";
 import { EN_NAMES } from "./en/names";
 
-export const EN: Record<string, string> = { ...EN_NAMES, ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN, ...STORY_EN, ...ROUTINE_EN, ...SCENE_EN, ...UI_EN, ...KR_NEWS_EN };
+export const EN: Record<string, string> = { ...EN_NAMES, ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN, ...STORY_EN, ...ROUTINE_EN, ...SCENE_EN, ...GIVING_EN, ...UI_EN, ...KR_NEWS_EN };
 export { EN_KR, EN_NAMES };

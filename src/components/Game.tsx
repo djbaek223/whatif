@@ -33,6 +33,7 @@ import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
+import { BoardPreview } from "./BoardPreview";
 import { PlayView, type FreeResult } from "./Play";
 import { stopsProgress } from "@/lib/playUi";
 import { Button } from "./ui";
@@ -437,6 +438,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
               )}
             </p>
           </div>
+          <BoardPreview lang={lang} />
         </div>
       )}
 
