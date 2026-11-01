@@ -34,7 +34,7 @@ import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { beforeMemoir } from "@/lib/ads";
-import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, TURNING_STEP, type WizardDraft } from "./Forms";
+import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
 import { PlayView, type FreeResult } from "./Play";
 import { stopsProgress } from "@/lib/playUi";
@@ -215,7 +215,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     const freeText = !!tp.situation; // turning points written before the fill-in-the-blanks sentence stay as plain text
     return {
       ...EMPTY_DRAFT,
-      step: screen === "turning" || profile.birthDate ? TURNING_STEP : 0, // a saved profile goes straight to the turning point
+      step: 0,
+      at: screen === "turning" || profile.birthDate ? "kind" : "birth", // a saved profile goes straight to the turning point
       profile,
       tp,
       mode: freeText ? "free" : "template",

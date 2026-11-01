@@ -70,6 +70,7 @@ function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: stri
           data("turning_point", req.turningPoint),
           `변곡점 당시 나이: 만 ${req.age}세${lifeStage(req.age) ? ` (${lifeStage(req.age)})` : ""}`,
           "profile.universityYear가 있으면 대학 입학년도입니다. 변곡점이 그 해 3월 전이면 아직 입학 전(재수 등), 4년 안이면 재학 중으로 봅니다.",
+          "프로필의 학교·대학·MBTI가 비어 있으면 묻지 않은 것입니다. 나이, 변곡점, 지금의 나 설명으로 그럴듯하게 정하고, 학교가 필요하면 그 시절 실제 학교 이름을 정하세요.",
           `situation, initial, choices는 모두 이 나이에 실제로 가능한 것이어야 합니다. 18세 미만은 대학생·직장인이 아니고, 결혼·자녀·자산이 없습니다. 예: 9세라면 초등학생으로서 학교, 가족, 친구, 학원, 놀이 같은 그 나이의 고민과 선택을 씁니다. 프로필의 대학이나 현재 직업은 아직 오지 않은 미래입니다.`,
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
           turningPeriod(req.turningPoint) ? `시대: ${turningPeriod(req.turningPoint)}` : "",

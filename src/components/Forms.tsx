@@ -9,10 +9,7 @@ import {
   fillTemplate,
   josa,
   kindDef,
-  MBTI_QUIZ,
-  MBTI_TYPES,
   personalityChips,
-  schoolYears,
   suggestions,
   tpKinds,
   type TpBlanks,
@@ -20,10 +17,10 @@ import {
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
-import { Button, Card, FieldError, Input, Select, Textarea } from "./ui";
+import { Button, Card, FieldError, Input, Textarea } from "./ui";
 import { L, T } from "@/lib/i18n";
 import { ageText, ymText, ymdText, cap } from "@/lib/format";
-import { countryFor, isEn, isUS, lang, setRegion, type Region } from "@/lib/region";
+import { countryFor, isEn, lang, setRegion, type Region } from "@/lib/region";
 
 export const EMPTY_PROFILE: Profile = {
   name: "",
@@ -42,15 +39,12 @@ export const EMPTY_PROFILE: Profile = {
   currentLife: "",
 };
 
-type StepId =
+export type StepId =
   | "birth"
   | "name"
   | "gender"
   | "hometown"
-  | "schools"
-  | "university"
   | "family"
-  | "mbti"
   | "personality"
   | "current"
   | "kind"
@@ -61,26 +55,32 @@ type StepId =
   | "review";
 
 // One question per screen. secs is a rough time to answer, for the "about 2 minutes left" estimate.
-const STEPS: { id: StepId; section: string; secs: number; required?: boolean }[] = [
-  { id: "birth", get section() { return L("나에 대해"); }, secs: 15, required: true },
-  { id: "name", get section() { return L("나에 대해"); }, secs: 8 },
-  { id: "gender", get section() { return L("나에 대해"); }, secs: 4 },
-  { id: "hometown", get section() { return L("나에 대해"); }, secs: 6 },
-  { id: "schools", get section() { return L("나에 대해"); }, secs: 18 },
-  { id: "university", get section() { return L("나에 대해"); }, secs: 10 },
-  { id: "family", get section() { return L("나에 대해"); }, secs: 18 },
-  { id: "mbti", get section() { return L("나에 대해"); }, secs: 8 },
-  { id: "personality", get section() { return L("나에 대해"); }, secs: 20 },
-  { id: "current", get section() { return L("나에 대해"); }, secs: 18 },
-  { id: "kind", get section() { return L("변곡점"); }, secs: 5 },
-  { id: "date", get section() { return L("변곡점"); }, secs: 10, required: true },
-  { id: "situation", get section() { return L("변곡점"); }, secs: 30, required: true },
-  { id: "actual", get section() { return L("변곡점"); }, secs: 8 },
-  { id: "regret", get section() { return L("변곡점"); }, secs: 12 },
-  { id: "review", get section() { return L("확인"); }, secs: 8 },
+// short names the step on the bar at the top, where any step can be opened directly.
+const STEPS: { id: StepId; section: string; short: string; secs: number; required?: boolean }[] = [
+  { id: "birth", get section() { return L("나에 대해"); }, get short() { return L("생일"); }, secs: 15, required: true },
+  { id: "name", get section() { return L("나에 대해"); }, get short() { return L("별명"); }, secs: 8 },
+  { id: "gender", get section() { return L("나에 대해"); }, get short() { return L("성별"); }, secs: 4 },
+  { id: "hometown", get section() { return L("나에 대해"); }, get short() { return L("자란 곳"); }, secs: 6 },
+  { id: "family", get section() { return L("나에 대해"); }, get short() { return L("가족"); }, secs: 18 },
+  { id: "personality", get section() { return L("나에 대해"); }, get short() { return L("성격"); }, secs: 20 },
+  { id: "current", get section() { return L("나에 대해"); }, get short() { return L("지금"); }, secs: 18 },
+  { id: "kind", get section() { return L("변곡점"); }, get short() { return L("갈림길"); }, secs: 5 },
+  { id: "date", get section() { return L("변곡점"); }, get short() { return L("그때"); }, secs: 10, required: true },
+  { id: "situation", get section() { return L("변곡점"); }, get short() { return L("상황"); }, secs: 30, required: true },
+  { id: "actual", get section() { return L("변곡점"); }, get short() { return L("실제 선택"); }, secs: 8 },
+  { id: "regret", get section() { return L("변곡점"); }, get short() { return L("아쉬움"); }, secs: 12 },
+  { id: "review", get section() { return L("확인"); }, get short() { return L("확인"); }, secs: 8 },
 ];
 const indexOf = (id: StepId) => STEPS.findIndex((s) => s.id === id);
-export const TURNING_STEP = indexOf("kind");
+
+// The questions before the schools and MBTI were dropped (2026-11), to read a draft saved then by its step number.
+const OLD_STEPS = ["birth", "name", "gender", "hometown", "schools", "university", "family", "mbti", "personality", "current", "kind", "date", "situation", "actual", "regret", "review"];
+/** Where a restored draft opens: its saved question, or for an older draft the next question that still exists. */
+function startStep(d: { step?: number; at?: StepId }): number {
+  if (d.at && indexOf(d.at) >= 0) return indexOf(d.at);
+  const i = OLD_STEPS.slice(d.step ?? 0).map((id) => indexOf(id as StepId)).find((n) => n >= 0);
+  return i ?? 0;
+}
 
 const MIN_SITUATION = 5;
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -95,6 +95,7 @@ const looksLikeRealName = (name: string) => /^[가-힣]{2,4}$/.test(name.trim())
 /** What is kept in the browser while the questions are answered, so a refresh picks up where it left off. */
 export interface WizardDraft {
   step: number;
+  at?: StepId; // the question by name; drafts saved before it count steps in OLD_STEPS
   profile: Profile;
   tp: TurningPoint;
   blanks: TpBlanks;
@@ -116,17 +117,15 @@ function remaining(step: number) {
 
 export function Onboarding({
   initial,
-  initialStep = 0,
   onDone,
   onExit,
 }: {
   initial: Omit<WizardDraft, "step"> & { step?: number };
-  initialStep?: number;
   onDone: (p: Profile, tp: TurningPoint, remember: boolean) => void;
   onExit: () => void;
 }) {
   const [now] = useState(() => new Date());
-  const [step, setStep] = useState(initial.step ?? initialStep);
+  const [step, setStep] = useState(() => startStep(initial));
   const [p, setP] = useState<Profile>(initial.profile);
   const [tp, setTp] = useState<TurningPoint>(initial.tp);
   const [blanks, setBlanks] = useState<TpBlanks>(initial.blanks);
@@ -138,7 +137,6 @@ export function Onboarding({
   const [typedError, setTypedError] = useState<string | null>(null);
   const [tried, setTried] = useState(false); // the user pressed 다음 on this step at least once
   const [toReview, setToReview] = useState(initial.toReview ?? false);
-  const [quiz, setQuiz] = useState<string[] | null>(null);
   const root = useRef<HTMLDivElement>(null);
 
   // Where they grew up decides the school system, the examples and later the whole life, so the questions follow it.
@@ -149,13 +147,10 @@ export function Onboarding({
   const age = ageIn(p.birthDate, tp.date);
   const kind = kindDef(tp.kind) ?? kindDef("other")!;
   const birthYear = Number(p.birthDate.slice(0, 4)) || 0;
-  // University entrance year: the usual year straight from high school, or any year from 17 up to this year (재수, 늦깎이 입학).
-  const usualUniYear = schoolYears(p.birthDate)?.stages[3].from ?? 0;
-  const uniYears = birthYear ? Array.from({ length: Math.max(0, now.getFullYear() - (birthYear + 17) + 1) }, (_, i) => birthYear + 17 + i) : [];
 
   // Keep answers in the browser (encrypted, see localData.ts) a moment after each change.
   useEffect(() => {
-    const t = setTimeout(() => writeDraft({ step, profile: p, tp, blanks, mode, free, remember, toReview } satisfies WizardDraft, remember), 400);
+    const t = setTimeout(() => writeDraft({ step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview } satisfies WizardDraft, remember), 400);
     return () => clearTimeout(t);
   }, [step, p, tp, blanks, mode, free, remember, toReview]);
 
@@ -218,11 +213,27 @@ export function Onboarding({
   const invalid = (id: StepId) =>
     id === "birth" ? !p.birthDate || !!typedError : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false;
   const err = errors[cur.id] ?? null;
+  // Answered questions get a check on the step bar.
+  const answered = (id: StepId) =>
+    ({
+      birth: !!p.birthDate,
+      name: !!p.name.trim(),
+      gender: !!p.gender,
+      hometown: !!p.hometown.trim(),
+      family: !!p.family.trim(),
+      personality: !!p.personality.trim(),
+      current: !!p.currentLife.trim(),
+      kind: !!tp.kind,
+      date: !!tp.date,
+      situation: !invalid("situation"),
+      actual: !!tp.actualChoice.trim(),
+      regret: !!tp.regret.trim(),
+      review: false,
+    })[id];
 
   const go = (to: number, review = false) => {
     setTried(false);
     setTypedError(null);
-    setQuiz(null);
     setToReview(review);
     setStep(to);
   };
@@ -262,7 +273,7 @@ export function Onboarding({
       case "birth":
         return (
           <>
-            {question(L("언제 태어났나요?"), L("학교 연도와 그 시절 이야기를 맞추는 데 써요."))}
+            {question(L("언제 태어났나요?"), L("나이와 그 시절 이야기를 맞추는 데 써요."))}
             <DatePicker
               id="birth"
               value={birth}
@@ -322,42 +333,6 @@ export function Onboarding({
             <Input data-autofocus aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
           </>
         );
-      case "schools":
-        return (
-          <>
-            {question(L("어느 학교를 다녔나요?"), L("학교 이름을 적으면 아래 연표가 바로 채워져요."))}
-            <div className="space-y-2">
-              <LabeledInput label={L("초등학교")} autoFocus value={p.elementary} onChange={setField("elementary")} placeholder={isUS() ? T("e.g. Lincoln Elementary") : L`예: ${p.hometown || L("대전")} 문화초`} />
-              <LabeledInput label={L("중학교")} value={p.middle} onChange={setField("middle")} placeholder={L("예: 문화중")} />
-              <LabeledInput label={L("고등학교")} value={p.high} onChange={setField("high")} placeholder={L("예: 대전고")} />
-            </div>
-            <SchoolTimeline profile={p} upTo="high" />
-          </>
-        );
-      case "university":
-        return (
-          <>
-            {question(L("대학은 어디서 무엇을 공부했나요?"), L("재수했거나 늦게 들어갔다면 입학년도를 골라 주세요. 안 다녔다면 건너뛰어도 괜찮아요."))}
-            <div className="space-y-2">
-              <LabeledInput label={L("대학교")} autoFocus value={p.university} onChange={setField("university")} placeholder={L("예: 충남대")} />
-              <LabeledInput label={L("전공")} value={p.major} onChange={setField("major")} placeholder={L("예: 경영학")} />
-              <label className="flex items-center gap-3">
-                <span className="w-16 shrink-0 text-sm font-medium text-stone-600 dark:text-stone-400">{L("입학년도")}</span>
-                <Select className="flex-1" value={p.universityYear ?? ""} onChange={setField("universityYear")}>
-                  <option value="">{usualUniYear ? L`고교 졸업 후 바로 (${usualUniYear}년)` : L("선택")}</option>
-                  {uniYears
-                    .filter((y) => y !== usualUniYear)
-                    .map((y) => (
-                      <option key={y} value={y}>
-                        {y}{L("년")}{!usualUniYear ? "" : y < usualUniYear ? L(" (조기 입학)") : L` (${y - usualUniYear}년 늦게)`}
-                      </option>
-                    ))}
-                </Select>
-              </label>
-            </div>
-            <SchoolTimeline profile={p} upTo="university" />
-          </>
-        );
       case "family":
         return (
           <>
@@ -370,41 +345,6 @@ export function Onboarding({
               placeholder={L("예: 공무원 아버지와 미용실을 하던 어머니, 누나 한 명. 넉넉하진 않았지만 화목했다.")}
               maxLength={800}
             />
-          </>
-        );
-      case "mbti":
-        return (
-          <>
-            {question(L("MBTI가 뭔가요?"), L("몰라도 괜찮아요. 네 문항이면 대략 알 수 있어요."))}
-            {quiz ? (
-              <MbtiQuiz
-                answers={quiz}
-                onAnswer={(letter) => {
-                  const a = [...quiz, letter];
-                  if (a.length < MBTI_QUIZ.length) return setQuiz(a);
-                  setQuiz(null);
-                  setP({ ...p, mbti: a.join("") });
-                }}
-                onCancel={() => setQuiz(null)}
-              />
-            ) : (
-              <>
-                <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="MBTI">
-                  {MBTI_TYPES.map((m) => (
-                    <Choice key={m} selected={p.mbti === m} onClick={() => pick("mbti", m)} small>
-                      {m}
-                    </Choice>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setQuiz([])}
-                  className="min-h-11 w-full rounded-xl border border-dashed border-indigo-300 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950"
-                >
-                  {L("모르겠어요 → 4문항 간단 테스트")}
-                </button>
-              </>
-            )}
           </>
         );
       case "personality":
@@ -632,7 +572,7 @@ export function Onboarding({
   return (
     <div ref={root} className="lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-8">
       <div className="space-y-4">
-        <Progress step={step} />
+        <Stepper step={step} done={answered} onPick={(i) => i !== step && go(i)} />
         <div className="lg:hidden">
           <CharacterCard profile={p} tp={tp} now={now} compact />
         </div>
@@ -672,28 +612,59 @@ export function Onboarding({
   );
 }
 
-function Progress({ step }: { step: number }) {
+/** The steps as a bar of buttons: where you are, what is answered, what is still needed, and a tap opens any of them. */
+function Stepper({ step, done, onPick }: { step: number; done: (id: StepId) => boolean; onPick: (i: number) => void }) {
   const cur = STEPS[step];
-  const pct = Math.round((step / (STEPS.length - 1)) * 100);
+  const list = useRef<HTMLOListElement>(null);
+  // Keeps the current step in view on a narrow screen, scrolling the bar only (never the page).
+  useEffect(() => {
+    const ol = list.current;
+    const li = ol?.children[step] as HTMLElement | undefined;
+    if (!ol || !li) return;
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    ol.scrollTo({ left: li.offsetLeft - (ol.clientWidth - li.offsetWidth) / 2, behavior: smooth ? "smooth" : "auto" });
+  }, [step]);
   return (
-    <div>
+    <nav aria-label={L("입력 단계")}>
       <div className="flex items-baseline justify-between text-sm">
         <span className="font-semibold text-indigo-700 dark:text-indigo-300">{cur.section}</span>
         <span className="text-stone-500 tabular-nums dark:text-stone-400">
           {step + 1} / {STEPS.length} · {cur.id === "review" ? L("마지막 확인") : L`${remaining(step)} 남음`}
         </span>
       </div>
-      <div
-        className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800"
-        role="progressbar"
-        aria-label={L("입력 진행률")}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={pct}
+      <ol
+        ref={list}
+        className="relative -mx-1 mt-2 flex snap-x gap-1 overflow-x-auto pr-7 pl-1 pb-1 lg:pr-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] lg:flex-wrap lg:[mask-image:none] [&::-webkit-scrollbar]:hidden"
       >
-        <div className="h-full rounded-full bg-indigo-500 transition-all duration-500" style={{ width: `${Math.max(4, pct)}%` }} />
-      </div>
-    </div>
+        {STEPS.map((s, i) => {
+          const here = i === step;
+          const ok = done(s.id);
+          const need = s.required && !ok;
+          const newSection = i > 0 && STEPS[i - 1].section !== s.section;
+          return (
+            <li key={s.id} className={`flex shrink-0 snap-start items-center ${newSection ? "ml-1.5 border-l border-stone-200 pl-2.5 dark:border-stone-700" : ""}`}>
+              <button
+                type="button"
+                onClick={() => onPick(i)}
+                aria-current={here ? "step" : undefined}
+                className={`inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                  here
+                    ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-500"
+                    : ok
+                      ? "border-indigo-200 bg-indigo-50 text-indigo-800 hover:border-indigo-400 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200"
+                      : "border-stone-200 text-stone-600 hover:border-indigo-400 dark:border-stone-700 dark:text-stone-300"
+                }`}
+              >
+                {ok && !here && <span aria-hidden>✓</span>}
+                {cap(s.short)}
+                {need && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${here ? "bg-white" : "bg-rose-500"}`} />}
+                <span className="sr-only">{ok ? L(" (입력함)") : need ? L(" (필수)") : ""}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 
@@ -725,15 +696,6 @@ function SmallButton({ onClick, children }: { onClick: () => void; children: Rea
     >
       {children}
     </button>
-  );
-}
-
-function LabeledInput({ label, autoFocus, ...props }: { label: string; autoFocus?: boolean; value: string; onChange: (e: { target: { value: string } }) => void; placeholder?: string }) {
-  return (
-    <label className="flex items-center gap-3">
-      <span className="w-16 shrink-0 text-sm font-medium text-stone-600 sm:w-20 dark:text-stone-400">{cap(label)}</span>
-      <Input {...props} data-autofocus={autoFocus || undefined} maxLength={60} />
-    </label>
   );
 }
 
@@ -779,85 +741,13 @@ function Suggestions({ title, items, current, onPick }: { title: string; items: 
   );
 }
 
-function SchoolTimeline({ profile: p, upTo }: { profile: Profile; upTo: "high" | "university" }) {
-  const sy = schoolYears(p.birthDate, p.universityYear);
-  if (!sy) return null;
-  const names: Record<string, string> = { elementary: p.elementary, middle: p.middle, high: p.high, university: [p.university, p.major].filter(Boolean).join(" ") };
-  // Three stages fit a phone's width, so the university step shows high school → university.
-  const stages = upTo === "high" ? sy.stages.slice(0, 3) : sy.stages.slice(2);
-  return (
-    <div className="rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50" aria-label={L("학교 연표")}>
-      <ol className="flex items-stretch gap-1.5">
-        {stages.map((s, i) => (
-          <li key={s.key} className="flex min-w-0 flex-1 items-center gap-1.5">
-            <div
-              className={`min-w-0 flex-1 rounded-xl border px-2 py-2 text-center ${
-                names[s.key] ? "border-indigo-300 bg-white dark:border-indigo-800 dark:bg-stone-900" : "border-dashed border-stone-300 dark:border-stone-700"
-              }`}
-            >
-              <p key={names[s.key] ? "named" : "empty"} className={`truncate text-sm font-semibold ${names[s.key] ? "" : "text-stone-500 dark:text-stone-400"}`} style={{ animation: "fadein .3s ease-out" }}>
-                {names[s.key] || s.label}
-              </p>
-              <p className="text-[11px] text-stone-500 tabular-nums dark:text-stone-400">
-                {s.from}~{s.to}
-              </p>
-            </div>
-            {i < stages.length - 1 && (
-              <span aria-hidden className="shrink-0 text-stone-400">
-                →
-              </span>
-            )}
-          </li>
-        ))}
-      </ol>
-      <p className="mt-2 text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
-        {p.birthDate.slice(0, 4)}{L("년생 기준으로 계산했어요")}{sy.early ? L(" (1~2월생이라 한 해 일찍 입학한 빠른년생 기준)") : ""}.{upTo === "university" ? L` 대학은 ${p.universityYear ? L`${p.universityYear}년 입학, ` : ""}4년제, 휴학·군대 없이 계산했어요.` : ""}
-      </p>
-    </div>
-  );
-}
-
-function MbtiQuiz({ answers, onAnswer, onCancel }: { answers: string[]; onAnswer: (letter: string) => void; onCancel: () => void }) {
-  const q = MBTI_QUIZ[answers.length];
-  return (
-    <div className="space-y-3 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50" style={{ animation: "fadein .2s ease-out" }}>
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-semibold text-indigo-700 dark:text-indigo-300">
-          {L("간단 테스트")} {answers.length + 1} / {MBTI_QUIZ.length}
-        </span>
-        <button type="button" onClick={onCancel} className="min-h-11 px-1 text-stone-500 underline-offset-2 hover:underline dark:text-stone-400">
-          {L("그만두기")}
-        </button>
-      </div>
-      <p key={q.q} className="font-semibold" role="status">
-        {q.q}
-      </p>
-      <div className="grid gap-2">
-        {q.options.map((o, i) => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => onAnswer(q.letters[i])}
-            className="min-h-12 rounded-xl border border-field bg-white px-4 py-2.5 text-left text-[15px] hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
-          >
-            {o}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint; onEdit: (id: StepId) => void }) {
   const rows: [StepId, string, string][] = [
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : ""],
     ["name", L("별명"), p.name],
     ["gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender)],
     ["hometown", L("자란 곳"), [countryName(p.country ?? countryFor(lang())), p.hometown].filter(Boolean).join(" · ")],
-    ["schools", L("학교"), [p.elementary, p.middle, p.high].filter(Boolean).join(" → ")],
-    ["university", L("대학"), [p.university, p.major, p.university && p.universityYear ? L`${p.universityYear}년 입학` : ""].filter(Boolean).join(" · ")],
     ["family", L("가족"), p.family],
-    ["mbti", "MBTI", p.mbti],
     ["personality", L("성격"), p.personality],
     ["current", L("지금의 나"), p.currentLife],
     ["kind", L("변곡점"), tp.kind ?? ""],

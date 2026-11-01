@@ -23,7 +23,7 @@ import {
   type CompanyTier,
 } from "./catalog";
 import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
-import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor } from "./education";
+import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor, saidNoCollege } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
 import { formatWealth, monthName } from "./format";
 import { anachronism, canon, existedIn, periodFacts, periodize } from "./period";
@@ -54,7 +54,7 @@ import type {
   TurningPoint,
 } from "./types";
 import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema";
-import { schoolYears } from "./onboarding";
+import { kindDef, schoolYears } from "./onboarding";
 import { ROUTINE, seasonMore, workLines } from "./routine";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
@@ -144,13 +144,17 @@ export function heuristicInitial(profile: Profile, tp: TurningPoint): OpeningRes
   const mi = turningPointMi(tp);
   const hasUni = profile.university.trim().length > 0;
   const uni = universitySpan(profile);
+  // Schools aren't asked any more: someone of college age is taken to be in college, unless their words say otherwise
+  // or the turning point is the entrance exam itself.
+  const exam = kindDef(tp.kind)?.id === "exam";
+  const likelyStudent = hasUni ? !uni : !exam && !saidNoCollege(profile.currentLife, profile.personality, profile.family, tp.situation);
   const none = { company: "", school: "" };
   if (age < 16) return { ...none, education: "school", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
   if (uni && mi >= uni.from && mi <= uni.to)
     return { ...none, school: profile.university, education: "university", employed: false, jobTitle: "", monthlyIncome: 50, partner: "none", children: 0, wealth: 200 };
   // Before a late entrance year the player was still preparing for the exam (재수).
-  if (age < 19 || (uni && mi < uni.from && age < 23)) return { ...none, education: "highschool", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
-  if (age < 23 && hasUni && !uni)
+  if (age < 19 || (uni && mi < uni.from && age < 23) || (exam && !hasUni && age < 23)) return { ...none, education: "highschool", employed: false, jobTitle: "", monthlyIncome: 0, partner: "none", children: 0, wealth: 0 };
+  if (age < 23 && likelyStudent)
     return { ...none, school: profile.university, education: "university", employed: false, jobTitle: "", monthlyIncome: 50, partner: "none", children: 0, wealth: 200 };
   if (age < 26) return { ...none, education: "done", employed: true, jobTitle: L("사원"), monthlyIncome: 230, partner: "none", children: 0, wealth: 800 };
   return {
@@ -200,7 +204,9 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
   const company = employed
     ? named || (GENERIC_JOB.test(jobTitle) || !jobTitle || init.company?.trim() ? pickCompany(rng, tier, Math.floor(mi / 12), `${profile.major} ${jobTitle}`) : "")
     : "";
-  const school = init.school?.trim() || (init.education === "university" || init.education === "graduate" ? profile.university.trim() : "");
+  const inCollege = init.education === "university" || init.education === "graduate";
+  // A student whose school nobody named (the profile no longer asks) gets a real one of the time, fitting what they know.
+  const school = init.school?.trim() || (inCollege ? profile.university.trim() || pickUniversity(rng, opening.stats.knowledge ?? 55, undefined, Math.floor(mi / 12)) : "");
   const uni = init.education === "university" ? uniDates(profile, mi, age) : null;
   const flags: LifeFlags = {
     education: init.education,
@@ -229,7 +235,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     flags.love = told;
     setLove(told);
   }
-  flags.degree = startDegree(flags, profile, age);
+  flags.degree = startDegree(flags, profile, tp, age);
   if (flags.education === "university" || flags.education === "graduate")
     flags.program = programFor(flags.education, school, flags.degree);
   const stats: Stats = {
@@ -302,11 +308,14 @@ function inPeriodChoices(choices: OpeningChoice[], year: number): OpeningChoice[
 }
 
 /** The degree held at the turning point: a working adult who names a university in the profile finished it. */
-function startDegree(f: LifeFlags, profile: Profile, age: number): Degree {
+function startDegree(f: LifeFlags, profile: Profile, tp: TurningPoint, age: number): Degree {
   if (f.education !== "done") return degreeOf(f);
   if (f.school) return degreeOf(f);
   const uni = profile.university.trim();
   if (uni && age >= 22) return programFor("university", uni, "high");
+  // With no school named (the profile no longer asks), an adult is taken as a college graduate, as most are,
+  // unless their own words say they didn't go.
+  if (!uni && age >= 23 && !saidNoCollege(profile.currentLife, profile.personality, profile.family, tp.situation, tp.actualChoice)) return "bachelor";
   return age >= 18 ? "high" : "none";
 }
 
@@ -1750,7 +1759,7 @@ function lifeFactsHere(s: LifeState): string {
   const year = Math.floor(s.mi / 12);
   const facts = [
     L`시점: ${formatMi(s.mi)}, ${age}세 (${s.profile.gender || "성별 미입력"})`,
-    L`성향: ${s.profile.mbti || L("MBTI 미입력")}. ${s.profile.personality || ""}`.trim(),
+    s.profile.mbti ? L`성향: ${s.profile.mbti}. ${s.profile.personality || ""}`.trim() : L`성향: ${s.profile.personality || L("알려지지 않음")}`,
     L`학업: ${study}`,
     L`학력: ${degreeFacts(s)}`,
     ...timelineFacts(s).map((t) => L`날짜: ${t}`),
