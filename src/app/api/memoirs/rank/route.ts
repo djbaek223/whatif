@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { z } from "zod";
 import { RANK_CATS, boardConfigured, standings } from "@/lib/memoirs";
 
@@ -8,6 +9,7 @@ const RegionField = z.enum(["kr", "us"]).catch("kr");
  * query value, how many posts are higher and how many are ranked. Nothing is stored.
  */
 export async function GET(request: Request) {
+  await connection(); // answers each query; without this the build would keep one fixed answer
   if (!boardConfigured()) return Response.json({ ok: false, reason: "no-store" });
   const q = new URL(request.url).searchParams;
   const values = Object.fromEntries(
