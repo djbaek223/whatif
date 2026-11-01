@@ -17,7 +17,7 @@ import {
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
-import { Button, Card, FieldError, Input, Textarea } from "./ui";
+import { Badge, Button, Card, FieldError, Input, Textarea } from "./ui";
 import { L, T } from "@/lib/i18n";
 import { ageText, ymText, ymdText, cap } from "@/lib/format";
 import { countryFor, isEn, lang, setRegion, type Region } from "@/lib/region";
@@ -39,46 +39,36 @@ export const EMPTY_PROFILE: Profile = {
   currentLife: "",
 };
 
-export type StepId =
-  | "birth"
-  | "name"
-  | "gender"
-  | "hometown"
-  | "family"
-  | "personality"
-  | "current"
-  | "kind"
-  | "date"
-  | "situation"
-  | "actual"
-  | "regret"
-  | "review";
+export type StepId = "birth" | "kind" | "date" | "situation" | "review" | "name" | "gender" | "hometown" | "family" | "personality" | "current" | "regret";
 
-// One question per screen. secs is a rough time to answer, for the "about 2 minutes left" estimate.
-// short names the step on the bar at the top, where any step can be opened directly.
-const STEPS: { id: StepId; section: string; short: string; secs: number; required?: boolean }[] = [
-  { id: "birth", get section() { return L("나에 대해"); }, get short() { return L("생일"); }, secs: 15, required: true },
-  { id: "name", get section() { return L("나에 대해"); }, get short() { return L("별명"); }, secs: 8 },
-  { id: "gender", get section() { return L("나에 대해"); }, get short() { return L("성별"); }, secs: 4 },
-  { id: "hometown", get section() { return L("나에 대해"); }, get short() { return L("자란 곳"); }, secs: 6 },
-  { id: "family", get section() { return L("나에 대해"); }, get short() { return L("가족"); }, secs: 18 },
-  { id: "personality", get section() { return L("나에 대해"); }, get short() { return L("성격"); }, secs: 20 },
-  { id: "current", get section() { return L("나에 대해"); }, get short() { return L("지금"); }, secs: 18 },
-  { id: "kind", get section() { return L("변곡점"); }, get short() { return L("갈림길"); }, secs: 5 },
-  { id: "date", get section() { return L("변곡점"); }, get short() { return L("그때"); }, secs: 10, required: true },
-  { id: "situation", get section() { return L("변곡점"); }, get short() { return L("상황"); }, secs: 30, required: true },
-  { id: "actual", get section() { return L("변곡점"); }, get short() { return L("실제 선택"); }, secs: 8 },
-  { id: "regret", get section() { return L("변곡점"); }, get short() { return L("아쉬움"); }, secs: 12 },
-  { id: "review", get section() { return L("확인"); }, get short() { return L("확인"); }, secs: 8 },
+// Quick start: four questions (main) and the summary, then the life begins. The rest are asked only if the player
+// opens them from the summary ("더 알려주기"); each such question goes back to the summary when answered.
+// secs is a rough time to answer, for the "about a minute left" line; short names the step on the bar and the summary.
+const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main?: boolean }[] = [
+  { id: "birth", get short() { return L("생일"); }, secs: 15, required: true, main: true },
+  { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
+  { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
+  { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
+  { id: "review", get short() { return L("시작"); }, secs: 5, main: true },
+  { id: "name", get short() { return L("별명"); }, secs: 8 },
+  { id: "gender", get short() { return L("성별"); }, secs: 4 },
+  { id: "hometown", get short() { return L("자란 곳"); }, secs: 6 },
+  { id: "family", get short() { return L("가족"); }, secs: 18 },
+  { id: "personality", get short() { return L("성격"); }, secs: 20 },
+  { id: "current", get short() { return L("지금의 나"); }, secs: 18 },
+  { id: "regret", get short() { return L("아쉬움"); }, secs: 12 },
 ];
+const MAIN = STEPS.filter((s) => s.main);
+const REVIEW = STEPS.findIndex((s) => s.id === "review");
+const EXTRA = STEPS.filter((s) => !s.main);
 const indexOf = (id: StepId) => STEPS.findIndex((s) => s.id === id);
 
 // The questions before the schools and MBTI were dropped (2026-11), to read a draft saved then by its step number.
 const OLD_STEPS = ["birth", "name", "gender", "hometown", "schools", "university", "family", "mbti", "personality", "current", "kind", "date", "situation", "actual", "regret", "review"];
-/** Where a restored draft opens: its saved question, or for an older draft the next question that still exists. */
+/** Where a restored draft opens: its saved question, or for an older draft the next question still on the quick path. */
 function startStep(d: { step?: number; at?: StepId }): number {
   if (d.at && indexOf(d.at) >= 0) return indexOf(d.at);
-  const i = OLD_STEPS.slice(d.step ?? 0).map((id) => indexOf(id as StepId)).find((n) => n >= 0);
+  const i = OLD_STEPS.slice(d.step ?? 0).map((id) => indexOf(id as StepId)).find((n) => n >= 0 && STEPS[n].main);
   return i ?? 0;
 }
 
@@ -111,8 +101,9 @@ const toYmd = (date: string): Ymd => {
 };
 
 function remaining(step: number) {
-  const secs = STEPS.slice(step).reduce((sum, s) => sum + s.secs, 0);
-  return secs < 50 ? L("1분 이내") : L`약 ${Math.round(secs / 60)}분`;
+  const at = MAIN.findIndex((s) => s.id === STEPS[step].id);
+  const secs = MAIN.slice(Math.max(0, at)).reduce((sum, s) => sum + s.secs, 0);
+  return secs < 70 ? L("1분 이내") : L`약 ${Math.round(secs / 60)}분`;
 }
 
 export function Onboarding({
@@ -226,7 +217,6 @@ export function Onboarding({
       kind: !!tp.kind,
       date: !!tp.date,
       situation: !invalid("situation"),
-      actual: !!tp.actualChoice.trim(),
       regret: !!tp.regret.trim(),
       review: false,
     })[id];
@@ -252,9 +242,10 @@ export function Onboarding({
       document.getElementById(id)?.focus();
       return;
     }
-    go(toReview ? indexOf("review") : step + 1);
+    go(toReview || !cur.main ? REVIEW : step + 1);
   };
-  const back = () => (step === 0 ? onExit() : go(step - 1));
+  // An extra question opened from the summary goes back there either way.
+  const back = () => (!cur.main ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
 
   const pick = (k: keyof Profile, v: string) => setP({ ...p, [k]: p[k] === v ? "" : v });
 
@@ -262,7 +253,7 @@ export function Onboarding({
     <div className="space-y-1.5">
       <h1 tabIndex={-1} className="text-[22px] leading-snug font-bold outline-none sm:text-2xl">
         {title}
-        {cur.required && <span className="ml-2 align-middle rounded bg-indigo-50 px-1.5 py-px text-[11px] font-semibold text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{L("필수")}</span>}
+        {cur.id !== "review" && (cur.required || !cur.main) && <Badge required={!!cur.required} className="ml-2 align-middle" />}
       </h1>
       {hint && <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{hint}</p>}
     </div>
@@ -465,7 +456,8 @@ export function Onboarding({
           </>
         );
       }
-      case "situation":
+      case "situation": {
+        const options = mode === "template" ? [blanks.a, blanks.b].map((x) => x.trim()).filter(Boolean) : [];
         return (
           <>
             {question(L("어떤 상황이었나요?"), mode === "template" ? L("빈칸만 채우면 문장이 완성돼요.") : L("고민, 주변 상황, 마음을 자유롭게 적어 주세요."))}
@@ -522,23 +514,23 @@ export function Onboarding({
               </SmallButton>
               <SmallButton onClick={() => switchMode(mode === "template" ? "free" : "template")}>{mode === "template" ? L("직접 자유롭게 쓰기") : L("빈칸 채우기로 쓰기")}</SmallButton>
             </div>
-          </>
-        );
-      case "actual": {
-        const options = [blanks.a, blanks.b].map((s) => s.trim()).filter(Boolean);
-        return (
-          <>
-            {question(L("실제로는 어떤 선택을 했나요?"), L("이번 인생에서는 다른 길을 가볼 수 있어요."))}
-            {options.length > 0 && (
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label={L("고민했던 갈래")}>
-                {options.map((o) => (
-                  <Choice key={o} selected={tp.actualChoice === o} onClick={() => setTp({ ...tp, actualChoice: tp.actualChoice === o ? "" : o })}>
-                    {o}
-                  </Choice>
-                ))}
-              </div>
-            )}
-            <Input data-autofocus={options.length ? undefined : true} aria-label={L("실제로 한 선택")} value={tp.actualChoice} onChange={(e) => setTp({ ...tp, actualChoice: e.target.value })} placeholder={L("예: 재수하지 않고 지방대에 갔다")} maxLength={100} />
+            {/* The choice actually made, asked on the same screen: one tap on a path just written. */}
+            <div className="space-y-2 border-t border-stone-200 pt-4 dark:border-stone-800">
+              <p id="actual-label" className="flex items-center gap-1.5 text-sm font-semibold">
+                {L("그때 실제로는 어느 쪽을 골랐나요?")}
+                <Badge required={false} />
+              </p>
+              {options.length > 0 && (
+                <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby="actual-label">
+                  {options.map((o) => (
+                    <Choice key={o} selected={tp.actualChoice === o} onClick={() => setTp({ ...tp, actualChoice: tp.actualChoice === o ? "" : o })}>
+                      {o}
+                    </Choice>
+                  ))}
+                </div>
+              )}
+              <Input aria-labelledby="actual-label" value={tp.actualChoice} onChange={(e) => setTp({ ...tp, actualChoice: e.target.value })} placeholder={options.length ? L("다른 선택이었다면 적어 주세요") : L("예: 재수하지 않고 지방대에 갔다")} maxLength={100} />
+            </div>
           </>
         );
       }
@@ -552,8 +544,8 @@ export function Onboarding({
       case "review":
         return (
           <>
-            {question(L("이 정보로 시작할까요?"), L("고치고 싶은 항목은 바로 수정할 수 있어요."))}
-            <Review profile={p} tp={tp} onEdit={(id) => go(indexOf(id), true)} />
+            {question(L("이대로 그날로 돌아갈까요?"), L("나머지는 모두 선택이에요. 더 알려줄수록 이야기가 나다워져요."))}
+            <Review profile={p} tp={tp} country={country} onEdit={(id) => go(indexOf(id), true)} />
             <label className="flex cursor-pointer gap-3 rounded-xl border border-stone-200 p-4 dark:border-stone-800">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-indigo-600" />
               <span className="space-y-1">
@@ -589,17 +581,18 @@ export function Onboarding({
               {body}
             </div>
           </Card>
-          <div className="flex gap-2">
+          {/* Stays at the bottom of a phone screen, so 다음 is never a scroll away. */}
+          <div className="sticky bottom-0 z-10 flex gap-2 bg-[var(--background)]/95 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
             <Button type="button" variant="ghost" onClick={back} className="min-h-11">
-              {L("이전")}
+              {cur.main ? L("이전") : L("돌아가기")}
             </Button>
-            {!cur.required && !isLast && (
-              <Button type="button" variant="ghost" onClick={() => go(toReview ? indexOf("review") : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
+            {cur.main && !cur.required && !isLast && (
+              <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
                 {L("건너뛰기")}
               </Button>
             )}
             <Button type="submit" className="min-h-11 flex-1">
-              {isLast ? L("그날로 돌아가기") : toReview ? L("확인") : L("다음")}
+              {isLast ? L("그날로 돌아가기") : !cur.main ? L("완료") : toReview ? L("확인") : L("다음")}
             </Button>
           </div>
           {!isLast && <p className="hidden text-center text-xs text-stone-500 sm:block dark:text-stone-400">{L("Enter 키를 눌러도 다음으로 넘어가요.")}</p>}
@@ -612,52 +605,46 @@ export function Onboarding({
   );
 }
 
-/** The steps as a bar of buttons: where you are, what is answered, what is still needed, and a tap opens any of them. */
+/**
+ * The quick-start steps as the Figma "Progress > Steps" bar: one segment per step, its bar filled once answered,
+ * the current one in bold accent. Each segment is a button, so any step opens with a tap besides 이전/다음.
+ */
 function Stepper({ step, done, onPick }: { step: number; done: (id: StepId) => boolean; onPick: (i: number) => void }) {
   const cur = STEPS[step];
-  const list = useRef<HTMLOListElement>(null);
-  // Keeps the current step in view on a narrow screen, scrolling the bar only (never the page).
-  useEffect(() => {
-    const ol = list.current;
-    const li = ol?.children[step] as HTMLElement | undefined;
-    if (!ol || !li) return;
-    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    ol.scrollTo({ left: li.offsetLeft - (ol.clientWidth - li.offsetWidth) / 2, behavior: smooth ? "smooth" : "auto" });
-  }, [step]);
+  const at = cur.main ? cur.id : "review"; // an extra question is opened from the summary
+  const n = MAIN.findIndex((s) => s.id === at) + 1;
   return (
     <nav aria-label={L("입력 단계")}>
       <div className="flex items-baseline justify-between text-sm">
-        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{cur.section}</span>
+        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{cur.main ? L("빠르게 시작") : L`더 알려주기 · ${cap(cur.short)}`}</span>
         <span className="text-stone-500 tabular-nums dark:text-stone-400">
-          {step + 1} / {STEPS.length} · {cur.id === "review" ? L("마지막 확인") : L`${remaining(step)} 남음`}
+          {n} / {MAIN.length}
+          {cur.main && cur.id !== "review" ? ` · ${L`${remaining(step)} 남음`}` : ""}
         </span>
       </div>
-      <ol
-        ref={list}
-        className="relative -mx-1 mt-2 flex snap-x gap-1 overflow-x-auto pr-7 pl-1 pb-1 lg:pr-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] lg:flex-wrap lg:[mask-image:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {STEPS.map((s, i) => {
-          const here = i === step;
+      <ol className="mt-1.5 flex gap-1">
+        {MAIN.map((s) => {
+          const here = s.id === at;
           const ok = done(s.id);
           const need = s.required && !ok;
-          const newSection = i > 0 && STEPS[i - 1].section !== s.section;
           return (
-            <li key={s.id} className={`flex shrink-0 snap-start items-center ${newSection ? "ml-1.5 border-l border-stone-200 pl-2.5 dark:border-stone-700" : ""}`}>
+            <li key={s.id} className="min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => onPick(i)}
+                onClick={() => onPick(indexOf(s.id))}
                 aria-current={here ? "step" : undefined}
-                className={`inline-flex min-h-11 items-center gap-1 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                  here
-                    ? "border-indigo-600 bg-indigo-600 text-white dark:border-indigo-400 dark:bg-indigo-500"
-                    : ok
-                      ? "border-indigo-200 bg-indigo-50 text-indigo-800 hover:border-indigo-400 dark:border-indigo-900 dark:bg-indigo-950 dark:text-indigo-200"
-                      : "border-stone-200 text-stone-600 hover:border-indigo-400 dark:border-stone-700 dark:text-stone-300"
-                }`}
+                className="group flex min-h-11 w-full flex-col gap-1.5 rounded-md pt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
-                {ok && !here && <span aria-hidden>✓</span>}
-                {cap(s.short)}
-                {need && <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${here ? "bg-white" : "bg-rose-500"}`} />}
+                <span
+                  aria-hidden
+                  className={`h-1 w-full rounded-sm transition-colors ${here || ok ? "bg-indigo-600 dark:bg-indigo-400" : "bg-stone-200 group-hover:bg-indigo-200 dark:bg-stone-800 dark:group-hover:bg-indigo-900"}`}
+                />
+                <span
+                  className={`flex w-full items-center justify-center gap-1 truncate text-xs ${here ? "font-bold text-indigo-700 dark:text-indigo-300" : "text-stone-600 group-hover:text-indigo-700 dark:text-stone-400 dark:group-hover:text-indigo-300"}`}
+                >
+                  {cap(s.short)}
+                  {need && !here && <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />}
+                </span>
                 <span className="sr-only">{ok ? L(" (입력함)") : need ? L(" (필수)") : ""}</span>
               </button>
             </li>
@@ -741,44 +728,83 @@ function Suggestions({ title, items, current, onPick }: { title: string; items: 
   );
 }
 
-function Review({ profile: p, tp, onEdit }: { profile: Profile; tp: TurningPoint; onEdit: (id: StepId) => void }) {
-  const rows: [StepId, string, string][] = [
+function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: TurningPoint; country: Region; onEdit: (id: StepId) => void }) {
+  const gender = p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender);
+  // The quick-start answers, then the optional ones.
+  const main: [StepId, string, string][] = [
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : ""],
-    ["name", L("별명"), p.name],
-    ["gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender)],
-    ["hometown", L("자란 곳"), [countryName(p.country ?? countryFor(lang())), p.hometown].filter(Boolean).join(" · ")],
-    ["family", L("가족"), p.family],
-    ["personality", L("성격"), p.personality],
-    ["current", L("지금의 나"), p.currentLife],
-    ["kind", L("변곡점"), tp.kind ?? ""],
+    ["kind", L("갈림길"), tp.kind ?? ""],
     ["date", L("그때"), tp.date ? ymText(tp.date) : ""],
     ["situation", L("상황"), tp.situation],
-    ["actual", L("실제 선택"), tp.actualChoice],
-    ["regret", L("아쉬움"), tp.regret],
+    ["situation", L("실제 선택"), tp.actualChoice],
   ];
+  const extra: Record<string, string> = {
+    name: p.name,
+    gender,
+    hometown: [p.country || p.hometown ? countryName(country) : "", p.hometown].filter(Boolean).join(" · "),
+    family: p.family,
+    personality: p.personality,
+    current: p.currentLife,
+    regret: tp.regret,
+  };
+  const filled = EXTRA.filter((s) => extra[s.id]).length;
   return (
-    <dl className="grid grid-cols-[max-content_minmax(0,1fr)_auto] gap-x-3 divide-y divide-stone-100 dark:divide-stone-800">
-      {rows.map(([id, rawLabel, value]) => {
-        const label = cap(rawLabel);
-        const required = STEPS[indexOf(id)].required;
-        return (
-          <div key={id} className="col-span-3 grid grid-cols-subgrid items-center py-1.5">
-            <dt className="max-w-28 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
-            <dd className={`min-w-0 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
-              {value || (required ? L("꼭 필요해요") : L("건너뜀"))}
-            </dd>
-            <button
-              type="button"
-              onClick={() => onEdit(id)}
-              aria-label={L`${label} 수정`}
-              className="min-h-11 shrink-0 rounded-lg px-2.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"
-            >
-              {L("수정")}
-            </button>
-          </div>
-        );
-      })}
-    </dl>
+    <div className="space-y-5">
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)_auto] gap-x-3 divide-y divide-stone-100 dark:divide-stone-800">
+        {main.map(([id, rawLabel, value]) => {
+          const label = cap(rawLabel);
+          const required = STEPS[indexOf(id)].required && rawLabel !== L("실제 선택");
+          return (
+            <div key={rawLabel} className="col-span-3 grid grid-cols-subgrid items-center py-1.5">
+              <dt className="max-w-28 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
+              <dd className={`min-w-0 truncate text-sm ${value ? "" : required ? "font-medium text-rose-700 dark:text-rose-400" : "text-stone-500 dark:text-stone-400"}`}>
+                {value || (required ? L("꼭 필요해요") : L("건너뜀"))}
+              </dd>
+              <button
+                type="button"
+                onClick={() => onEdit(id)}
+                aria-label={L`${label} 수정`}
+                className="min-h-11 shrink-0 rounded-lg px-2.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"
+              >
+                {L("수정")}
+              </button>
+            </div>
+          );
+        })}
+      </dl>
+      <section aria-labelledby="extra-title" className="space-y-2.5 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 id="extra-title" className="flex items-center gap-1.5 text-sm font-semibold">
+            {L("더 알려주기")}
+            <Badge required={false} />
+          </h2>
+          <span className="text-xs text-stone-500 tabular-nums dark:text-stone-400">
+            {filled} / {EXTRA.length}
+          </span>
+        </div>
+        <ul className="grid grid-cols-2 gap-2">
+          {EXTRA.map((s) => {
+            const value = extra[s.id];
+            return (
+              <li key={s.id} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => onEdit(s.id)}
+                  className={`flex min-h-14 w-full flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                    value
+                      ? "border-indigo-200 bg-white hover:border-indigo-400 dark:border-indigo-900 dark:bg-stone-900"
+                      : "border-dashed border-field bg-white hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{cap(s.short)}</span>
+                  <span className={`w-full truncate text-xs ${value ? "text-stone-600 dark:text-stone-300" : "text-indigo-700 dark:text-indigo-300"}`}>{value || L("+ 추가")}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+    </div>
   );
 }
 
