@@ -45,6 +45,7 @@ export function usPromptFor(req: NarrateRequest): string {
         data("turning_point", req.turningPoint),
         `Age at the turning point: ${req.age}${lifeStage(req.age) ? ` (${lifeStage(req.age)})` : ""}`,
         "If profile.universityYear is set, it is the year they started college. Before September of that year they have not started yet (a gap year, say); within four years after, they are enrolled.",
+        "Empty schools, college or MBTI in the profile were not asked. Decide them plausibly from the age, the turning point and how they describe their life now, naming a real school of the time when one is needed.",
         "situation, initial and choices must all be possible at this age. Under 18 they are not a college student or employee, and have no spouse, children or assets. For a 9-year-old, write the worries and choices of a grade-schooler: school, family, friends, after-school activities, play. The college or job in the profile is a future that hasn't come yet.",
         `Era notes for reference: ${req.eraHints.join(" ") || "none"}`,
         turningPeriod(req.turningPoint) ? `Era: ${turningPeriod(req.turningPoint)}` : "",

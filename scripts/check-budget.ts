@@ -88,9 +88,10 @@ for (const major of ["경영학", "컴퓨터공학", "의예과", "물리학"]) 
   }
 }
 
-// 2. A working adult who names a university starts with that degree; one who doesn't is a high school graduate.
-for (const [uni, want] of [["부산대학교", "bachelor"], ["", "high"], ["인하공업전문대학", "college"]] as [string, Degree][]) {
-  const p = { ...base, birthDate: "1980-02-01", university: uni, major: "기계공학" };
+// 2. A working adult who names a university starts with that degree. Schools are no longer asked, so one who names none
+//    is taken as a college graduate, unless their own words say high school was the end of it.
+for (const [uni, want, now] of [["부산대학교", "bachelor", ""], ["", "bachelor", ""], ["", "high", "고졸로 공장에 들어가 20년째 일한다."], ["인하공업전문대학", "college", ""]] as [string, Degree, string][]) {
+  const p = { ...base, birthDate: "1980-02-01", university: uni, major: "기계공학", currentLife: now };
   const t: TurningPoint = { date: "2012-05", situation: "이직을 고민했다.", actualChoice: "남았다", regret: "", kind: "취업" };
   const life = createLife(p, t, fallbackOpening(p, t));
   if (degreeOf(life.flags) !== want) fail(`start with university "${uni}": ${degreeOf(life.flags)}, expected ${want}`);

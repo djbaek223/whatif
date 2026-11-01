@@ -7,6 +7,17 @@ import { L, V } from "./i18n";
 const COLLEGE = /전문대/;
 const GRAD = /대학원|박사|석사/;
 
+// The profile no longer asks for schools (2026-11), so whether someone went to college is read from their own words.
+const NO_COLLEGE =
+  /고졸|중졸|검정고시|대학\S{0,2}\s?(안 |못 |가지 않|가지 못|진학하지 않|포기)|진학\S{0,2}\s?(포기|안 |하지 않)|high school (diploma|graduate)|(never|didn'?t|did not) (go|went) to college|no college|without (a degree|going to college)|skipp(ed|ing) college/i;
+const SAYS_COLLEGE = /대학|전문대|지방대|교대|의대|명문대|입학|진학|합격|학번|college|university|state school/i;
+
+/** The player's words say they did not go (or are not going) to college. */
+export const saidNoCollege = (...texts: string[]) => NO_COLLEGE.test(texts.join(" "));
+
+/** The choice they made at an exam-season turning point led to university: it names one and doesn't turn it down. */
+export const choseCollege = (choice: string) => SAYS_COLLEGE.test(choice) && !NO_COLLEGE.test(choice);
+
 /** The degree a course at this school leads to: an associate's at a 전문대, a bachelor's otherwise; graduate school gives a master's, then a PhD. */
 export function programFor(level: "university" | "graduate" | "abroad", school: string | undefined, degree: Degree): Degree {
   if (level === "abroad") return "phd";

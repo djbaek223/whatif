@@ -21,10 +21,7 @@ export function characterFacts(p: Profile, tp: TurningPoint, now: Date): { key: 
   add("name", L("별명"), clip(p.name, 16));
   add("gender", L("성별"), p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender));
   add("hometown", L("자란 곳"), [p.country ? countryName(p.country) : "", clip(p.hometown, 16)].filter(Boolean).join(" · "));
-  add("schools", L("학교"), [p.elementary, p.middle, p.high].map((s) => clip(s, 10)).filter(Boolean).join(" → "));
-  add("university", L("대학"), [clip(p.university, 14), clip(p.major, 12)].filter(Boolean).join(" · "));
   add("family", L("가족"), clip(p.family, 24));
-  add("mbti", "MBTI", p.mbti);
   add("personality", L("성격"), clip(p.personality, 24));
   add("current", L("지금"), clip(p.currentLife, 24));
   const kind = kindDef(tp.kind);
@@ -64,7 +61,7 @@ export function CharacterCard({ profile, tp, now, compact = false }: { profile: 
       <div className="flex flex-col items-center text-center">
         <Avatar age={age} gender={profile.gender} size={96} />
         <p className="mt-3 text-lg font-bold">{title}</p>
-        <p className="text-sm text-stone-500 dark:text-stone-400">{age !== null ? L`${age}살 · ${profile.mbti || L("성향 미정")}` : L("태어난 날을 알려주면 나타나요")}</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">{age !== null ? [L`${age}살`, clip(profile.hometown, 12)].filter(Boolean).join(" · ") : L("태어난 날을 알려주면 나타나요")}</p>
       </div>
       <ul className="mt-4 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 border-t border-stone-100 pt-4 text-sm dark:border-stone-800">
         {facts.map((f) => (

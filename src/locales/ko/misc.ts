@@ -1,7 +1,6 @@
 // Korean for the other English texts of the American rules: budget lines, the calendar, suggested paths, placeholders.
 export const US_MISC_KO: Record<string, string> = {
   "e.g. Columbus, Ohio": "예: 오하이오주 콜럼버스",
-  "e.g. Lincoln Elementary": "예: 링컨 초등학교",
   "Four years of active duty, out in {0}.": "4년 현역 복무, {0} 전역 예정이다.",
   "College is on hold: back in {0}, graduating {1}.": "대학은 휴학했다. {0} 복학, {1} 졸업 예정.",
   "Took a gap year to work and reapply. Decisions come in spring {0}; college starts in September {1} at the earliest.": "1년 동안 일하며 대학에 다시 지원하기로 했다. 합격 발표는 {0}년 봄, 대학은 빨라도 {1}년 9월에 들어간다.",

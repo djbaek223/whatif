@@ -1,4 +1,4 @@
-// Helpers for the profile and turning point questions: school years, sentence templates, suggestions and the MBTI quiz.
+// Helpers for the profile and turning point questions: school years, sentence templates, suggestions and personality chips.
 import { isEn, isUS, type Region } from "./region";
 import type { TurningPoint } from "./types";
 import { L } from "./i18n";
@@ -221,16 +221,6 @@ export function ageIn(birthDate: string, ym: string): number | null {
   if (!by || !bm || !/^\d{4}-\d{2}$/.test(ym)) return null;
   return Math.floor((monthIndex(ym) - (by * 12 + bm - 1)) / 12);
 }
-
-export const MBTI_TYPES = ["ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP", "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"];
-
-/** Four questions, one per MBTI axis. Rough, but enough to steer the story. */
-export const MBTI_QUIZ: { q: string; options: [string, string]; letters: [string, string] }[] = [
-  { get q() { return L("오랜만에 쉬는 주말, 더 끌리는 쪽은?"); }, get options() { return [L("친구들을 만나 밖에서 논다"), L("집에서 혼자 충전한다")] as [string, string]; }, letters: ["E", "I"] },
-  { get q() { return L("새 가전제품을 샀을 때 나는?"); }, get options() { return [L("설명서를 차근차근 읽는다"), L("일단 이것저것 눌러 본다")] as [string, string]; }, letters: ["S", "N"] },
-  { get q() { return L("친구가 고민을 털어놓으면 먼저 하는 말은?"); }, get options() { return [L("“그럼 이렇게 해 봐”"), L("“많이 힘들었겠다”")] as [string, string]; }, letters: ["T", "F"] },
-  { get q() { return L("여행을 갈 때 나는?"); }, get options() { return [L("일정표를 미리 짠다"), L("가서 정한다")] as [string, string]; }, letters: ["J", "P"] },
-];
 
 export const personalityChips = () => [L("외향적"), L("내성적"), L("도전적"), L("신중함"), L("성실함"), L("호기심 많음"), L("다정함"), L("현실적"), L("가족 중심"), L("여유로움"), L("운동 좋아함"), L("여행 좋아함")];
 

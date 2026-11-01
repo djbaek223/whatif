@@ -1,5 +1,6 @@
 // Template narration used when no AI API key is configured, so the prototype always plays end to end.
 import { ageAt } from "../events";
+import { choseCollege } from "../education";
 import { eraHints } from "../era";
 import { formatMi, formatWealth, heuristicInitial, statusLabel, turningPointMi } from "../engine";
 import type { LifeState, Profile, TurningPoint } from "../types";
@@ -36,13 +37,17 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
       situation: `${tp.situation || "That day, you stood at a fork in the road."} Back then you chose "${tp.actualChoice || "the familiar path"}." What will you do this time?`,
       initial: heuristicInitial(profile, tp),
       choices: [
-        { label: tp.actualChoice || "Make the same choice as before", preset: "original", jobTitle: "", place: "", original: true, education: age >= 17 && student && profile.university ? "university" : "same" },
+        { label: tp.actualChoice || "Make the same choice as before", preset: "original", jobTitle: "", place: "", original: true, education: age >= 17 && student && (profile.university.trim() || choseCollege(tp.actualChoice)) ? "university" : "same" },
         ...alternatives,
       ],
     };
   }
   return {
-    persona: `${name}${josa(name, "는", "은")} ${profile.mbti ? `${profile.mbti} 성향의 ` : ""}사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`.slice(0, 300),
+    // MBTI is no longer asked; it stays for profiles saved before.
+    persona: (profile.mbti
+      ? `${name}${josa(name, "는", "은")} ${profile.mbti} 성향의 사람이다. ${profile.personality || "스스로를 한 문장으로 설명하기 어려워한다."}`
+      : `${name}${josa(name, "는", "은")} ${profile.personality ? `스스로를 이렇게 말한다. ${profile.personality}` : "스스로를 한 문장으로 설명하기 어려워하는 사람이다."}`
+    ).slice(0, 300),
     stats: mbtiStats(profile.mbti),
     era: [
       `${formatMi(mi)}, ${name}${josa(name, "는", "은")} ${age}세였다.`,
@@ -57,8 +62,8 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
         jobTitle: "",
         place: "",
         original: true,
-        // Only a turning point around the entrance exam leads straight to university.
-        education: age >= 17 && student && profile.university ? "university" : "same",
+        // Only a turning point around the entrance exam leads straight to university, when the choice made was college.
+        education: age >= 17 && student && (profile.university.trim() || choseCollege(tp.actualChoice)) ? "university" : "same",
       },
       ...alternatives,
     ],
