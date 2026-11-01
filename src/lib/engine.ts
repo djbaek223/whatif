@@ -31,7 +31,7 @@ import { addThread, aiWritable, closeThread, contradicts, hybridOn, isCore, stoc
 import { sinceChapter } from "./storyEvents";
 import { futureCandidates, lastRealNewsMi, newsBetween, newsText, type NewsItem } from "./news";
 import { ID_TEMPER, affinity, effectTheme, eventCategory, eventTheme, lean, relativeAffinity, temperFactor, temperFrom, traitsFrom } from "./personal";
-import { inRegion, isEn, isUS, langFor, region, type Lang, type Region } from "./region";
+import { inRegion, isEn, isUS, langFor, loveFor, region, setLove, type Lang, type Love, type Region } from "./region";
 import { Rng, newSeed } from "./rng";
 import { DEGREE_LABELS } from "./types";
 import type {
@@ -181,7 +181,7 @@ const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직|associate|office worker|employee|new hire)$/i;
 
 export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region; lang?: Lang } = {}): LifeState {
-  return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts), opts.lang);
+  return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts), opts.lang, loveFor(profile.gender));
 }
 
 function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region; lang?: Lang }): LifeState {
@@ -223,6 +223,12 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     // Children who already exist at the turning point get rough birth months, oldest first.
     kidsBorn: Array.from({ length: Math.max(0, Math.min(5, init.children)) }, (_, i) => mi - 36 - (Math.min(5, init.children) - 1 - i) * 30),
   };
+  // A turning point told as "my girlfriend and I..." keeps her a "she", whatever the player's own gender.
+  const told = loveFromText([tp.situation, tp.actualChoice, tp.regret].join(" "));
+  if (told) {
+    flags.love = told;
+    setLove(told);
+  }
   flags.degree = startDegree(flags, profile, age);
   if (flags.education === "university" || flags.education === "graduate")
     flags.program = programFor(flags.education, school, flags.degree);
@@ -875,6 +881,22 @@ const INTENT_WORDS: [CustomChange, RegExp][] = [
   ["buyHome", /(집|아파트)[을를]?\s?(사|산|샀|마련|매수)|영끌|\bbuy (a|the|our|my) (house|home|condo|place)\b/i],
 ];
 
+// The love interest's gender in the player's own words ("ask her out", "남자친구와 결혼한다"), read only from words about love.
+const LOVE_TALK = /고백|사귀|연애|결혼|청혼|프러포즈|이별|헤어|짝사랑|좋아하|여자\s?친구|남자\s?친구|여친|남친|아내|남편|와이프|\b(love|date|dating|marry|married|propose|ask (her|him) out|confess|crush|girlfriend|boyfriend|wife|husband|fianc[eé]e?|break up|sweetheart)\b/i;
+const LOVE_SHE = /여자\s?친구|여친|아내|와이프|그녀|그 여자|\b(she|her|hers|girlfriend|wife|fianc[eé]e)\b/i;
+const LOVE_HE = /남자\s?친구|남친|남편|그 남자|\b(he|him|his|boyfriend|husband|fianc[eé])\b/i;
+
+/** "she" or "he" when the player's words about love name one (and only one); undefined otherwise. */
+export function loveFromText(text: string | undefined): Love | undefined {
+  if (!text || !LOVE_TALK.test(text)) return undefined;
+  const she = LOVE_SHE.test(text);
+  const he = LOVE_HE.test(text);
+  return she === he ? undefined : she ? "she" : "he";
+}
+
+/** The pronoun for this life's love interest and partner: as the player named it, else from the player's gender. */
+export const loveOf = (s: Pick<LifeState, "flags" | "profile">): Love => s.flags.love ?? loveFor(s.profile.gender);
+
 /** Reads a life change from the player's own words, when the narrator can't: "회사를 그만두고 카페를 차린다" opens a cafe. */
 export function intentFromText(text: string, s: LifeState): Intent | null {
   const t = text.trim();
@@ -937,6 +959,12 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
     effect = customEffect(pending.custom[optionId]);
   } else {
     effect = eventById(pending.eventId)?.choices?.find((c) => c.id === optionId)?.effect;
+  }
+  // "Ask him out" names who the player loves; the outcome and every later text say "him".
+  const named = loveFromText(freeText);
+  if (named) {
+    s.flags.love = named;
+    setLove(named);
   }
   // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
   // even if the closest option was about staying at the company.
@@ -1690,6 +1718,16 @@ function costLineHere(s: LifeState): string {
 }
 
 /** Plain facts about this life right now, for the narrator. Everything it writes must agree with these. */
+/**
+ * For an English narrator, the pronoun of the person the player likes, dates or marries, so a crush is "her" or "him"
+ * and not "them". Korean says 그 사람, so the Korean facts don't carry it.
+ */
+export function loveFact(l: Love): string {
+  if (l === "they") return "Love interest and partner: gender not given. Refer to them by name or as they/them.";
+  const [w, p] = l === "she" ? ["a woman", "she/her"] : ["a man", "he/him"];
+  return `Love interest and partner: ${w}. Anyone the player has a crush on, dates or marries is ${p}, never they/them, unless the player's own words say otherwise.`;
+}
+
 function lifeFactsHere(s: LifeState): string {
   const f = s.flags;
   const age = ageOf(s);
@@ -1718,6 +1756,7 @@ function lifeFactsHere(s: LifeState): string {
     ...timelineFacts(s).map((t) => L`날짜: ${t}`),
     L`일: ${work}`,
     L`연애·결혼: ${partner}`,
+    isEn() ? loveFact(loveOf(s)) : "",
     L`자녀: ${kids}`,
     L`집: ${home}`,
     L`순자산: ${formatWealth(s.wealth)}`,
@@ -1758,7 +1797,7 @@ function lifeSummaryHere(s: LifeState, recent = 12): string {
 const inLife =
   <A extends unknown[], R>(fn: (s: LifeState, ...rest: A) => R) =>
   (s: LifeState, ...rest: A): R =>
-    inRegion(s.region, () => fn(s, ...rest), s.lang);
+    inRegion(s.region, () => fn(s, ...rest), s.lang, loveOf(s));
 
 /**
  * Names as they were in the life's year, on whatever a step added or changed: new feed lines, the choice on screen,

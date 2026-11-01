@@ -42,12 +42,15 @@ const EPISODE_RULES = [
 const EN_FOR_KR = `- 이 플레이어는 영어로 읽습니다. 위의 문체·돈 규칙 대신 이 규칙을 따릅니다: 답의 모든 텍스트는 자연스러운 영어로 씁니다. 한국의 사람·지명·회사·학교 이름은 로마자로 씁니다 (예: Samsung Electronics, Seoul National University, Daejeon). 한국 고유의 제도(수능, 재수, 군 복무, 전세)는 짧게 풀어 씁니다 (예: the suneung college entrance exam). 본문의 돈은 $45,000처럼 달러로 쓰고, JSON 숫자 필드의 돈은 엔진 단위(1 = $10, 즉 $45,000은 4500)입니다.`;
 const KO_FOR_US = `- This player reads Korean. These rules replace the language and money rules above: every text field in your reply is in natural Korean (한국어), warm and plain. Write American names of people and places in Hangul where a usual Korean form exists (오하이오주 콜럼버스, 마이크), and companies and schools as Koreans usually write them (구글, 오하이오주립대). Money in text is written in 만원 numbers equal to the engine units (4500 units → 4500만원); the JSON number fields keep the same units.`;
 
+// English gives the person one loves a pronoun, and left to itself the narrator writes "them". Korean says 그 사람.
+const EN_LOVE = `- Use "she" or "he" for the person the player has a crush on, dates or marries, as the "Love interest and partner" line in facts says. With no facts (the opening), a man's (gender 남 or male) love interest is she/her and a woman's (여 or female) is he/him, unless the player's own words (situation, choices) say otherwise. Use they/them only when the player's gender is not given.`;
+
 /** The system message: the country's narrator rules, the language they are told in, and the reply's JSON schema. */
 export function systemFor(schema: z.ZodType): string {
   const json = z.toJSONSchema(schema);
   const shown = JSON.stringify(isEn() ? englishSchema(json, isUS() ? "us" : "kr") : koreanSchema(json, isUS() ? "us" : "kr"));
-  if (isUS()) return `${isEn() ? US_SYSTEM : `${US_SYSTEM.replace(/\n- (Write in warm|Every text field)[^\n]*/g, "")}\n${KO_FOR_US}`}\n\nJSON schema:\n${shown}`;
-  return `${isEn() ? `${SYSTEM}\n${EN_FOR_KR}` : SYSTEM}\n\nJSON 스키마:\n${shown}`;
+  if (isUS()) return `${isEn() ? `${US_SYSTEM}\n${EN_LOVE}` : `${US_SYSTEM.replace(/\n- (Write in warm|Every text field)[^\n]*/g, "")}\n${KO_FOR_US}`}\n\nJSON schema:\n${shown}`;
+  return `${isEn() ? `${SYSTEM}\n${EN_FOR_KR}\n${EN_LOVE}` : SYSTEM}\n\nJSON 스키마:\n${shown}`;
 }
 
 /** The reply schema and user prompt for a narration request, written for the life's country. Pure, so scripts can count its tokens. */

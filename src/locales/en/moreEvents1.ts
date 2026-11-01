@@ -192,7 +192,7 @@ export const MORE1_EN: Record<string, string> = {
   "배우자는 고개를 끄덕였지만 한동안 말수가 줄었다.": "Your spouse nodded, but was quiet for a while.",
   "배우자의 수술": "Spouse's surgery",
   "수술": "surgery",
-  "배우자가 수술을 받았다. 병실 보조침대에서 쪽잠을 자며 곁을 지켰다.": "Your spouse had surgery. You slept on the hospital recliner and stayed by their side.",
+  "배우자가 수술을 받았다. 병실 보조침대에서 쪽잠을 자며 곁을 지켰다.": "Your spouse had surgery. You slept on the hospital recliner and stayed by {their} side.",
   "수술비": "Surgery bills",
   "황혼의 인연": "Late love",
   "황혼": "later life",

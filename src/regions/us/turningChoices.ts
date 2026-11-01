@@ -106,11 +106,11 @@ export function usPool(theme: TpTheme, c: Ctx): Candidate[] {
       ];
     case "love":
       return [
-        { label: T("Work up the nerve and tell them how I feel"), preset: "love", when: (x) => !x.partnered },
-        { label: T("Marry them"), preset: "love", when: (x) => x.age >= 22 },
+        { label: T("Work up the nerve and tell {them} how I feel"), preset: "love", when: (x) => !x.partnered },
+        { label: T("Marry {them}"), preset: "love", when: (x) => x.age >= 22 },
         { label: T("Break up and focus on my own path"), preset: "study" },
         { label: T("Hold off on marriage a little longer"), preset: "career", when: (x) => x.age >= 22 },
-        { label: T("Follow them to a new city"), preset: "move" },
+        { label: T("Follow {them} to a new city"), preset: "move" },
         { label: T("Go along with what my family wants"), preset: "family" },
       ];
     case "move":

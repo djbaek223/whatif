@@ -31,6 +31,8 @@ const US: [Partial<Profile>, TurningPoint][] = [
 ];
 
 const HANGUL = /[가-힣]/;
+const PRONOUN_TOKEN = /\{(they|them|their|theirs)\}/i;
+const unfilled = new Set<string>();
 // Latin words of three letters or more that are not names or acronyms; a Korean screen may still show names.
 const ENGLISH = /\b(the|and|was|you|your|with|from|that|this|for|have|had|got|into)\b/i;
 
@@ -78,10 +80,15 @@ for (const [region, base, cases] of [["kr", KR_BASE, KR], ["us", US_BASE, US]] a
     }
     for (const t of ko.texts) if (ENGLISH.test(t) && !HANGUL.test(t)) wrong.ko.set(t, (wrong.ko.get(t) ?? 0) + 1);
     for (const t of en.texts) if (HANGUL.test(t)) wrong.en.set(t, (wrong.en.get(t) ?? 0) + 1);
+    // A love interest's pronoun left unfilled ("Marry {them}") on either screen (i18n.ts withLove).
+    for (const t of [...ko.texts, ...en.texts]) if (PRONOUN_TOKEN.test(t)) unfilled.add(t);
   }
   console.log(`${region}: ${differ}/${n} lives differ by language; texts in the wrong language: ko ${wrong.ko.size}, en ${wrong.en.size}`);
   for (const lang of ["ko", "en"] as const)
     for (const [t, c] of [...wrong[lang]].sort((a, b) => b[1] - a[1]).slice(0, Number(process.env.SHOW ?? 15))) { const at = Math.max(0, t.search(lang === "en" ? HANGUL : ENGLISH) - 60); console.log(`  ${region}×${lang} (${c}) ${at ? "…" : ""}${t.replace(/\n/g, " / ").slice(at, at + 160)}`); }
   bad += differ + wrong.ko.size + wrong.en.size;
 }
+console.log(`love pronouns left unfilled: ${unfilled.size}`);
+for (const t of [...unfilled].slice(0, 10)) console.log(`  ${t.slice(0, 160)}`);
+bad += unfilled.size;
 process.exit(bad ? 1 : 0);
