@@ -66,14 +66,14 @@ export function CharacterCard({ profile, tp, now, compact = false }: { profile: 
         <p className="mt-3 text-lg font-bold">{title}</p>
         <p className="text-sm text-stone-500 dark:text-stone-400">{age !== null ? L`${age}살 · ${profile.mbti || L("성향 미정")}` : L("태어난 날을 알려주면 나타나요")}</p>
       </div>
-      <ul className="mt-4 space-y-2 border-t border-stone-100 pt-4 text-sm dark:border-stone-800">
+      <ul className="mt-4 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-2 border-t border-stone-100 pt-4 text-sm dark:border-stone-800">
         {facts.map((f) => (
-          <li key={f.key} className="flex gap-2" style={{ animation: "fadein .35s ease-out" }}>
-            <span className="w-12 shrink-0 text-xs leading-5 text-stone-500 dark:text-stone-400">{f.label}</span>
+          <li key={f.key} className="col-span-2 grid grid-cols-subgrid" style={{ animation: "fadein .35s ease-out" }}>
+            <span className="max-w-20 text-xs leading-5 text-stone-500 dark:text-stone-400">{f.label}</span>
             <span className="min-w-0 break-words">{f.text}</span>
           </li>
         ))}
-        {facts.length === 0 && <li className="text-center text-xs text-stone-500 dark:text-stone-400">{L("답할 때마다 여기에 하나씩 쌓여요.")}</li>}
+        {facts.length === 0 && <li className="col-span-2 text-center text-xs text-stone-500 dark:text-stone-400">{L("답할 때마다 여기에 하나씩 쌓여요.")}</li>}
       </ul>
     </aside>
   );
