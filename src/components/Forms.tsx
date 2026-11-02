@@ -203,13 +203,19 @@ export function Onboarding({
             return len < MIN_SITUATION ? { id: "tp-situation", text: L`조금만 더 적어 주세요. ${MIN_SITUATION}자 이상이면 돼요 (지금 ${len}자)` } : null;
           })(),
   };
+  // The first screen needs all four answers; each missing one shows its own message once 다음 was pressed.
+  const profileErr = {
+    name: tried && !p.name.trim() ? L("별명을 정해 주세요. 막막하면 추천을 눌러 보세요") : null,
+    gender: tried && !p.gender ? L("성별을 골라 주세요") : null,
+    hometown: tried && !p.hometown.trim() ? L("자란 지역을 적어 주세요") : null,
+  };
   const invalid = (id: StepId) =>
-    id === "birth" ? !p.birthDate || !!typedError : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false;
+    id === "birth" ? !p.birthDate || !!typedError || !p.name.trim() || !p.gender || !p.hometown.trim() : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false;
   const err = errors[cur.id] ?? null;
   // Answered questions get a check on the step bar.
   const answered = (id: StepId) =>
     ({
-      birth: !!p.birthDate,
+      birth: !!p.birthDate && !!p.name.trim() && !!p.gender && !!p.hometown.trim(),
       family: !!p.family.trim(),
       personality: !!p.personality.trim(),
       current: !!p.currentLife.trim(),
@@ -237,8 +243,9 @@ export function Onboarding({
     }
     if (invalid(cur.id)) {
       setTried(true);
-      const id = errors[cur.id]?.id ?? (cur.id === "birth" ? "birth" : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
-      document.getElementById(id)?.focus();
+      const id = errors[cur.id]?.id ?? (cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? "birth" : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
+      const el = document.getElementById(id);
+      (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("button, input"))?.focus();
       return;
     }
     go(toReview || !cur.main ? REVIEW : step + 1);
@@ -268,10 +275,10 @@ export function Onboarding({
       case "birth":
         return (
           <>
-            {question(L("주인공에 대해 알려 주세요"), L("생년월일만 꼭 필요해요. 나머지는 비워 둬도 괜찮아요."))}
-            <Field label={L("별명")} hint={L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요.")}>
+            {question(L("주인공에 대해 알려 주세요"), L("네 가지 모두 꼭 필요해요. 이야기의 시대와 사건을 맞추는 데 써요."))}
+            <Field required label={L("별명")} error={profileErr.name ?? undefined} errorId="nickname-error" hint={L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요.")}>
               <span className="flex gap-2">
-                <Input data-autofocus value={p.name} onChange={setField("name")} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
+                <Input id="nickname" data-autofocus value={p.name} onChange={setField("name")} aria-invalid={!!profileErr.name || undefined} aria-describedby={profileErr.name ? "nickname-error" : undefined} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
                 <Button
                   type="button"
                   variant="ghost"
@@ -297,8 +304,8 @@ export function Onboarding({
                 onTypedError={setTypedError}
               />
             </Field>
-            <Field group label={L("성별")} hint={L("입대 같은 일부 사건에만 쓰여요.")}>
-              <span className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
+            <Field group required label={L("성별")} error={profileErr.gender ?? undefined} errorId="gender-error" hint={L("입대 같은 일부 사건에만 쓰여요.")}>
+              <span id="gender-group" className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
                 {(["남", "여", "기타"] as Gender[]).map((g) => (
                   <Choice key={g} selected={p.gender === g} onClick={() => pick("gender", g)}>
                     {({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[g]}
@@ -306,7 +313,7 @@ export function Onboarding({
                 ))}
               </span>
             </Field>
-            <Field group label={L("자란 곳")} hint={L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
+            <Field group required label={L("자란 곳")} error={profileErr.hometown ?? undefined} errorId="hometown-error" hint={L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
               <span role="group" aria-label={L("자란 나라")} className="grid grid-cols-2 gap-2">
                 {COUNTRIES.map((c) => (
                   <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
@@ -314,7 +321,7 @@ export function Onboarding({
                   </Choice>
                 ))}
               </span>
-              <Input aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
+              <Input id="hometown-input" aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} aria-invalid={!!profileErr.hometown || undefined} aria-describedby={profileErr.hometown ? "hometown-error" : undefined} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
             </Field>
           </>
         );
@@ -735,10 +742,10 @@ function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: Tur
   // The quick-start answers, then the optional ones.
   // [step that asks it, label, answer, required]
   const main: [StepId, string, string, boolean][] = [
-    ["birth", L("별명"), p.name, false],
+    ["birth", L("별명"), p.name, true],
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : "", true],
-    ["birth", L("성별"), gender, false],
-    ["birth", L("자란 곳"), [countryName(country), p.hometown].filter(Boolean).join(" · "), false],
+    ["birth", L("성별"), gender, true],
+    ["birth", L("자란 곳"), p.hometown.trim() ? [countryName(country), p.hometown].join(" · ") : "", true],
     ["kind", L("갈림길"), tp.kind ?? "", false],
     ["date", L("그때"), tp.date ? ymText(tp.date) : "", true],
     ["situation", L("상황"), tp.situation, true],
