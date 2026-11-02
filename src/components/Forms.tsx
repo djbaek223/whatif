@@ -109,10 +109,13 @@ export function Onboarding({
   initial,
   onDone,
   onExit,
+  onLeave,
 }: {
   initial: Omit<WizardDraft, "step"> & { step?: number };
   onDone: (p: Profile, tp: TurningPoint, remember: boolean) => void;
   onExit: () => void;
+  /** 처음으로: back to the main screen from any question, with the answers so far kept for 시작하기 to pick up. */
+  onLeave: (draft: WizardDraft) => void;
 }) {
   const [now] = useState(() => new Date());
   const [step, setStep] = useState(() => startStep(initial));
@@ -241,6 +244,11 @@ export function Onboarding({
     go(toReview || !cur.main ? REVIEW : step + 1);
   };
   // An extra question opened from the summary goes back there either way.
+  const leave = () => {
+    const d: WizardDraft = { step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview };
+    writeDraft(d, remember);
+    onLeave(d);
+  };
   const back = () => (!cur.main ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
 
   const pick = (k: keyof Profile, v: string) => setP({ ...p, [k]: p[k] === v ? "" : v });
@@ -550,6 +558,14 @@ export function Onboarding({
   return (
     <div ref={root} className="lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-8">
       <div className="space-y-4">
+        <button
+          type="button"
+          onClick={leave}
+          className="-mb-1 inline-flex min-h-11 items-center gap-1 rounded-lg pr-3 text-sm font-medium text-stone-600 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:text-indigo-300"
+        >
+          <span aria-hidden>←</span>
+          {L("처음으로")}
+        </button>
         <Stepper step={step} done={answered} onPick={(i) => i !== step && go(i)} />
         <div className="lg:hidden">
           <CharacterCard profile={p} tp={tp} now={now} compact />
