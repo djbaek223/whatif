@@ -22,6 +22,8 @@ for (const [text, want] of [
   ["비트코인에 투자한다", "비트코인"],
   ["1000만원으로 비트코인을 산다", "비트코인"],
   ["삼성전자 주식을 산다", "삼성전자 주식"],
+  ["테슬라에 투자한다", "테슬라 주식"],
+  ["Invest in Nvidia", "엔비디아 주식"],
   ["국내 주식형 펀드에 나눠 넣는다", "펀드"],
   ["Put my savings into Bitcoin", "비트코인"],
   ["buy an index fund", "펀드"],
@@ -124,6 +126,26 @@ for (const nearest of ["0", "2"]) {
     worst = Math.min(worst, after.wealth - life.wealth);
   }
   if (worst < -1000 * 1.6) fail(`a gamble with 1,000만원 lost ${-worst}`);
+}
+
+// 6b. A company with its own prices: Samsung bought in January 2013 and sold in January 2021 follows Samsung (about ×2.9),
+// Tesla bought in mid-2019 and sold at the end of 2021 follows Tesla (×25+), and a company not listed yet is the market's shares.
+{
+  const cases: [string, number, number, number, number][] = [
+    ["삼성전자 주식을 1000만원어치 산다", 2013 * 12, 2021 * 12, 2.5, 3.3],
+    ["테슬라 주식에 투자한다", 2019 * 12 + 5, 2021 * 12 + 10, 20, 30],
+  ];
+  for (const [text, from, to, lo, hi] of cases) {
+    const life = { ...atTurningPoint(), mi: from };
+    const after = resolveChoice(life, "0", text);
+    const h = after.flags.holding;
+    const r = h ? worth(h, to) / h.cost : 0;
+    console.log(`"${text}" → ${h?.name} ×${r.toFixed(2)}`);
+    if (!h?.ticker || r < lo || r > hi) fail(`"${text}": ${h?.name} ×${r.toFixed(2)}, want ${lo}-${hi}`);
+  }
+  const early = resolveChoice({ ...atTurningPoint(), mi: 1999 * 12 }, "0", "현대차 주식에 투자한다").flags.holding;
+  if (early?.ticker || early?.name !== "주식") fail(`현대차 in 1999 → ${JSON.stringify(early)}`);
+  if (investIn("애플 노트북을 산다")) fail("애플 노트북을 산다 read as Apple shares");
 }
 
 // 7. English.

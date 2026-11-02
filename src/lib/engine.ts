@@ -58,7 +58,7 @@ import { kindDef, schoolYears } from "./onboarding";
 import { ROUTINE, seasonMore, workLines } from "./routine";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
-import { buy, holdingFact, investIn, saleText, stakeFor, worth, type Bet } from "./invest";
+import { buy, holdingFact, investIn, saleText, stakeFor, tradable, worth, type Bet } from "./invest";
 import { L, T, V } from "./i18n";
 
 export { formatWealth };
@@ -556,7 +556,9 @@ function investEffect(bet: Bet, s: LifeState, text: string, scene?: string): Eff
 
 /** Whether the player's words buy an asset this life can buy now (an adult, in a year it existed). */
 function betIn(text: string | undefined, s: LifeState): Bet | null {
-  const bet = investIn(text);
+  const said = investIn(text);
+  // A company not listed yet that month (네이버 in 1995) is bought as shares of the market.
+  const bet = said && tradable(said, s.mi);
   return bet && ageOf(s) >= 18 && !anachronism(bet.name, Math.floor(s.mi / 12)) ? bet : null;
 }
 

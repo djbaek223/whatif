@@ -13,6 +13,7 @@ import type { Holding, InvestAsset, LifeState } from "./types";
 export interface Bet {
   asset: InvestAsset;
   name: string; // Korean key, shown with V(): "비트코인", "주식", "삼성전자 주식", "펀드"
+  ticker?: string; // a listed company with its own prices (TICKERS)
 }
 
 // What the player bought, read from their words. Saving (적금, 예금) is not an investment here.
@@ -32,11 +33,22 @@ const KINDS: [InvestAsset, RegExp, (m: RegExpMatchArray) => string][] = [
 export function investIn(text: string | undefined): Bet | null {
   const t = text?.trim();
   if (!t || NEGATED.test(t) || NOT_BUY.test(t) || /적금|예금|저축|savings account|\bCDs?\b/i.test(t) && !/주식|펀드|코인|stock|fund|crypto|bitcoin/i.test(t)) return null;
+  // A company with its own price table, named with a word about buying its shares ("삼성전자 주식을 산다", "테슬라에 투자한다").
+  if (STOCK_TALK.test(t)) {
+    const tk = TICKERS.find((x) => x.re.test(t));
+    if (tk) return { asset: "stock", name: `${tk.ko} 주식`, ticker: tk.id };
+  }
   for (const [asset, re, name] of KINDS) {
     const m = t.match(re);
     if (m && BUY.test(t)) return { asset, name: name(m) };
   }
   return null;
+}
+
+/** The listed company's own name in the text, if its shares could be bought that month; else the market's shares. */
+export function tradable(bet: Bet, mi: number): Bet {
+  const tk = bet.ticker ? TICKERS.find((x) => x.id === bet.ticker) : undefined;
+  return !tk || mi >= mo(tk.points[0]) ? bet : { asset: "stock", name: "주식" };
 }
 
 /** An amount of money named in a text, in engine units (만원; ten dollars in an American life). */
@@ -96,6 +108,49 @@ const SP500: Point[] = [
   [2023, 12, 4770], [2024, 12, 5880], [2025, 4, 5500], [2025, 10, 6800],
 ];
 
+// Single companies, priced in their own currency and adjusted for splits; the first point is when it can be bought here.
+// Rough on purpose: year-end levels and the big turns, so a 2013 Samsung or a 2019 Tesla plays out as it did.
+// Only words about shares: "애플 노트북을 산다" buys a laptop, not Apple.
+const STOCK_TALK = /주식|주주|종목|투자|매수|\b(stocks?|shares|invest\w*)\b/i;
+const TICKERS: { id: string; ko: string; re: RegExp; points: Point[] }[] = [
+  { id: "samsung", ko: "삼성전자", re: /삼성전자|삼전|samsung/i, points: [
+    [1990, 1, 600], [1995, 12, 2400], [1997, 12, 940], [1999, 12, 6000], [2000, 12, 3600], [2002, 12, 6400], [2004, 12, 9000],
+    [2007, 12, 11000], [2008, 10, 8500], [2010, 12, 19000], [2012, 12, 30400], [2014, 12, 26600], [2016, 12, 36000], [2017, 12, 51000],
+    [2018, 12, 38700], [2019, 12, 55800], [2020, 12, 81000], [2021, 1, 89000], [2022, 9, 53000], [2023, 12, 78500], [2024, 11, 50000],
+    [2025, 10, 98000]] },
+  { id: "hynix", ko: "SK하이닉스", re: /하이닉스|hynix/i, points: [
+    [2012, 3, 27000], [2012, 12, 26000], [2014, 12, 47000], [2016, 12, 44000], [2017, 12, 76000], [2018, 12, 59000], [2020, 12, 118000],
+    [2022, 12, 75000], [2023, 12, 141000], [2024, 6, 230000], [2024, 12, 172000], [2025, 10, 500000]] },
+  { id: "hyundai", ko: "현대자동차", re: /현대\s?자동차|현대차|hyundai/i, points: [
+    [2000, 12, 13000], [2002, 12, 30000], [2005, 12, 90000], [2008, 10, 45000], [2010, 12, 180000], [2012, 4, 270000], [2014, 12, 170000],
+    [2016, 12, 146000], [2019, 12, 122000], [2020, 12, 192000], [2021, 1, 255000], [2022, 12, 152000], [2024, 6, 280000], [2025, 10, 260000]] },
+  { id: "naver", ko: "네이버", re: /네이버|naver/i, points: [
+    [2013, 12, 145000], [2016, 12, 155000], [2018, 12, 120000], [2020, 12, 290000], [2021, 7, 450000], [2022, 12, 177000],
+    [2023, 12, 224000], [2024, 12, 213000], [2025, 10, 250000]] },
+  { id: "kakao", ko: "카카오", re: /카카오|kakao/i, points: [
+    [2014, 12, 26000], [2017, 12, 27000], [2019, 12, 31000], [2020, 12, 78000], [2021, 6, 160000], [2022, 12, 53000], [2023, 12, 54000],
+    [2024, 12, 38000], [2025, 10, 60000]] },
+  { id: "apple", ko: "애플", re: /애플|apple/i, points: [
+    [1990, 1, 0.3], [1997, 12, 0.12], [2000, 3, 1.0], [2003, 4, 0.23], [2007, 12, 7], [2009, 1, 3], [2012, 9, 25], [2013, 4, 14],
+    [2015, 5, 33], [2016, 5, 23], [2018, 10, 55], [2019, 1, 38], [2020, 12, 132], [2022, 12, 129], [2023, 12, 192], [2024, 12, 250],
+    [2025, 4, 200], [2025, 10, 260]] },
+  { id: "microsoft", ko: "마이크로소프트", re: /마이크로소프트|마소|microsoft|\bMSFT\b/i, points: [
+    [1990, 1, 1], [1999, 12, 58], [2002, 7, 22], [2008, 12, 19], [2012, 12, 27], [2016, 12, 62], [2019, 12, 158], [2021, 12, 336],
+    [2022, 12, 240], [2023, 12, 376], [2024, 12, 421], [2025, 10, 520]] },
+  { id: "amazon", ko: "아마존", re: /아마존|amazon/i, points: [
+    [1998, 1, 0.25], [1999, 12, 4.4], [2001, 9, 0.3], [2007, 12, 4.6], [2008, 11, 2.4], [2013, 12, 20], [2018, 8, 100], [2018, 12, 75],
+    [2020, 12, 163], [2022, 12, 84], [2023, 12, 152], [2024, 12, 220], [2025, 10, 220]] },
+  { id: "google", ko: "구글", re: /구글|알파벳|google|alphabet/i, points: [
+    [2004, 8, 2.5], [2007, 11, 17], [2008, 11, 7], [2013, 12, 28], [2018, 12, 52], [2020, 12, 87], [2021, 11, 148], [2022, 12, 88],
+    [2023, 12, 140], [2024, 12, 190], [2025, 4, 150], [2025, 10, 260]] },
+  { id: "nvidia", ko: "엔비디아", re: /엔비디아|nvidia/i, points: [
+    [2000, 1, 0.1], [2002, 1, 0.5], [2002, 10, 0.06], [2007, 10, 0.9], [2008, 11, 0.15], [2015, 12, 0.8], [2018, 9, 7], [2018, 12, 3.3],
+    [2020, 12, 13], [2021, 11, 33], [2022, 10, 11], [2023, 12, 49], [2024, 12, 135], [2025, 4, 95], [2025, 10, 200]] },
+  { id: "tesla", ko: "테슬라", re: /테슬라|tesla/i, points: [
+    [2010, 7, 1.3], [2013, 12, 10], [2016, 12, 14], [2019, 6, 15], [2020, 12, 235], [2021, 11, 400], [2022, 12, 123], [2023, 7, 270],
+    [2024, 4, 145], [2024, 12, 400], [2025, 4, 250], [2025, 10, 450]] },
+];
+
 // Yearly drift and swing (log) for months outside the known prices.
 const WALK: Record<InvestAsset, [number, number]> = { crypto: [0.15, 0.6], altcoin: [0.05, 0.8], stock: [0.05, 0.2], fund: [0.06, 0.16] };
 // How far one holding wanders from its market each year: one company's shares, one coin, or a fund's fees.
@@ -123,8 +178,8 @@ function walk(asset: InvestAsset, seed: number, a: number, b: number): number {
 }
 
 /** The market's level in month mi (log), from the known prices or the life's own walk past them. */
-function market(asset: InvestAsset, mi: number, seed: number): number {
-  const pts = asset === "crypto" || asset === "altcoin" ? BTC : isUS() ? SP500 : KOSPI;
+function market(asset: InvestAsset, mi: number, seed: number, ticker?: string): number {
+  const pts = (ticker && TICKERS.find((x) => x.id === ticker)?.points) || (asset === "crypto" || asset === "altcoin" ? BTC : isUS() ? SP500 : KOSPI);
   const first = pts[0];
   const last = pts[pts.length - 1];
   if (mi <= mo(first)) return Math.log(first[2]) + walk(asset, seed, mo(first), mi);
@@ -136,9 +191,10 @@ function market(asset: InvestAsset, mi: number, seed: number): number {
 }
 
 /** This holding's own price in month mi (log): the market's, plus how the one stock or coin did. */
-function price(h: Pick<Holding, "asset" | "seed" | "since">, mi: number): number {
-  const own = OWN[h.asset];
-  let x = market(h.asset, mi, h.seed);
+function price(h: Pick<Holding, "asset" | "seed" | "since" | "ticker">, mi: number): number {
+  // A company with its own prices already moves on its own; only past them does it wander like one stock.
+  const own = h.ticker ? 0 : OWN[h.asset];
+  let x = market(h.asset, mi, h.seed, h.ticker);
   if (own) {
     const years = (mi - h.since) / 12;
     const step = Math.floor(years);
@@ -170,7 +226,7 @@ export const hacked = (h: Holding, mi: number) => {
 
 /** Buys into a holding (or adds to the same one). Returns the new holding. */
 export function buy(prev: Holding | undefined, bet: Bet, stake: number, mi: number, seed: number): Holding {
-  const base: Holding = prev && prev.name === bet.name ? prev : { asset: bet.asset, name: bet.name, cost: 0, units: 0, since: mi, seed: seed || 1 };
+  const base: Holding = prev && prev.name === bet.name ? prev : { asset: bet.asset, name: bet.name, ...(bet.ticker ? { ticker: bet.ticker } : {}), cost: 0, units: 0, since: mi, seed: seed || 1 };
   return { ...base, cost: base.cost + stake, units: base.units + stake / Math.exp(price(base, mi)) };
 }
 

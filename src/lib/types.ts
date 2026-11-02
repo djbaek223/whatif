@@ -99,6 +99,7 @@ export type InvestAsset = "crypto" | "altcoin" | "stock" | "fund";
 export interface Holding {
   asset: InvestAsset;
   name: string; // Korean key, shown with V(): "비트코인", "삼성전자 주식"
+  ticker?: string; // a listed company priced from its own table (invest.ts TICKERS)
   cost: number; // engine units put in
   units: number; // cost over the price when bought
   since: number; // month index of the first buy
