@@ -124,6 +124,8 @@ export const UI_EN: Record<string, string> = {
   "지금 플레이 중인 장면(별명, 나이, 날짜)이 함께 전달돼요.": "The scene you're on (nickname, age, date) is sent along with it.",
 
   // Profile and turning point questions
+  "이어서 입력하기": "Continue where I left off",
+  "처음부터 다시 입력": "Start over",
   "확인": "Review",
   "생년월일만 꼭 필요해요. 나머지는 비워 둬도 괜찮아요.": "Only the birthday is required. Feel free to leave the rest blank.",
   "주인공에 대해 알려 주세요": "Tell us about the main character",

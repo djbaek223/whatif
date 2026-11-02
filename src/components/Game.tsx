@@ -201,6 +201,10 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   };
 
   const startNew = () => {
+    if (draft) return setScreen("profile"); // came back from 처음으로: pick up where they left off
+    startFresh();
+  };
+  const startFresh = () => {
     setProfile(stored?.profile ?? saved?.profile ?? EMPTY_PROFILE);
     setTp(EMPTY_TP);
     setDraft(null);
@@ -414,8 +418,13 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
           </div>
           <div className="space-y-3">
             <Button className="w-full py-4 text-base" onClick={startNew}>
-              {L("시작하기")}
+              {draft ? L("이어서 입력하기") : L("시작하기")}
             </Button>
+            {draft && (
+              <Button variant="ghost" className="w-full" onClick={startFresh}>
+                {L("처음부터 다시 입력")}
+              </Button>
+            )}
             {saved?.life && (
               <Button variant="ghost" className="w-full" onClick={resume}>
                 {L("이어하기")}
@@ -455,6 +464,10 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
             onExit={() => {
               clearDraft();
               setDraft(null);
+              setScreen("intro");
+            }}
+            onLeave={(d) => {
+              setDraft(d);
               setScreen("intro");
             }}
             onDone={(p, t, keep) => {
