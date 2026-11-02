@@ -89,6 +89,21 @@ export interface LifeFlags {
   degree?: Degree; // highest degree finished
   program?: Degree; // the degree the current course leads to, credited once its last month has passed
   love?: Love; // the love interest's pronoun when the player named one in their own words (else region.ts loveFor)
+  holding?: Holding; // an investment the player bought in their own words and hasn't sold (invest.ts)
+}
+
+/** What an investment is in: Bitcoin, another coin, one company's shares, or a fund that follows the market. */
+export type InvestAsset = "crypto" | "altcoin" | "stock" | "fund";
+
+/** An investment held (invest.ts). Its worth follows the asset's real price from the month it was bought. */
+export interface Holding {
+  asset: InvestAsset;
+  name: string; // Korean key, shown with V(): "비트코인", "삼성전자 주식"
+  ticker?: string; // a listed company priced from its own table (invest.ts TICKERS)
+  cost: number; // engine units put in
+  units: number; // cost over the price when bought
+  since: number; // month index of the first buy
+  seed: number; // this holding's own luck (one company's shares, an exchange hack)
 }
 
 /** What a choice is about. Temperament and past choices make some themes come up more often. */

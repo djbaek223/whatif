@@ -13,6 +13,7 @@ import { UI_EN } from "./en/ui";
 import { EN_KR } from "./en/korea";
 import { KR_NEWS_EN } from "./en/news";
 import { EN_NAMES } from "./en/names";
+import { INVEST_EN } from "./en/invest";
 
-export const EN: Record<string, string> = { ...EN_NAMES, ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN, ...STORY_EN, ...ROUTINE_EN, ...SCENE_EN, ...GIVING_EN, ...UI_EN, ...KR_NEWS_EN };
+export const EN: Record<string, string> = { ...EN_NAMES, ...ENGINE, ...MISC, ...EVENTS_EN, ...LIFE_EN, ...MORE1_EN, ...MORE2_EN, ...STORY_EN, ...ROUTINE_EN, ...SCENE_EN, ...GIVING_EN, ...INVEST_EN, ...UI_EN, ...KR_NEWS_EN };
 export { EN_KR, EN_NAMES };

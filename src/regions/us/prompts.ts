@@ -116,6 +116,7 @@ export function usPromptFor(req: NarrateRequest): string {
       return [
         "The player wrote their own decision instead of picking an option. Choose the id of the option closest in meaning.",
         "If the decision changes a big part of their life, put it in change. For example, 'Quit and open a coffee shop' → startBusiness, jobTitle 'coffee shop owner'. Judge from the player's words alone, whatever the options say.",
+        "Buying Bitcoin, stocks or a fund is investing, not starting a business: 'Put my savings into Bitcoin' is change none (the engine buys that asset at that month's price).",
         `allowed_changes (big changes possible from the current state): ${(req.allowed ?? ["none"]).join(", ")}`,
         data("decision", req.text),
         JSON.stringify(req.options),

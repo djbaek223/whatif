@@ -24,7 +24,7 @@ export const isCore = (ev: EventDef) => CORE.has(ev.id);
 const POOL_ONLY = new Set([
   "kid-first", "kid-school", "kid-middle-school", "kid-adult", "kid-csat", "kid-leaves", "kid-job", "kid-wedding-fund",
   "grandkid-care", "grandkid-school", "army-life", "parents-70", "sibling-wedding", "spouse-surgery", "will",
-  "inheritance", "biz-offer", "biz-result", "venture-result", "lend-return", "channel-grow", "channel-sponsor",
+  "inheritance", "biz-offer", "biz-result", "venture-result", "invest-check", "lend-return", "channel-grow", "channel-sponsor",
   "mentor-call", "crew-love", "crew-friends",
   // Big gifts: their donate flag feeds the memoir board's 기부 record, which a rewritten option would lose.
   "give-scholarship", "give-sponsor", "give-disaster", "give-bequest",
@@ -33,7 +33,7 @@ const POOL_ONLY = new Set([
 /** An effect that changes the life for good (job, school, partner, home, pay). Those belong to the engine. */
 function lasting(e: Effect | undefined): boolean {
   if (!e) return false;
-  if (e.flags || e.hire || e.switchJob || e.promote || e.enroll || e.buyHome || e.startBusiness || e.addChild) return true;
+  if (e.flags || e.hire || e.switchJob || e.promote || e.enroll || e.buyHome || e.startBusiness || e.addChild || e.invest || e.cashOut) return true;
   if (e.income !== undefined || e.incomePct || e.eduYears || e.busyMonths || e.homeValuePct || e.enlist || e.retake) return true;
   return lasting(e.risk?.success) || lasting(e.risk?.failure);
 }

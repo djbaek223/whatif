@@ -149,6 +149,7 @@ function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: stri
         prompt: [
           "사용자가 선택지 대신 직접 쓴 결정입니다. 의미가 가장 가까운 선택지의 id를 고르세요.",
           "그리고 이 결정이 삶의 큰 상태를 바꾸면 change에 적으세요. 예: '회사를 그만두고 카페를 차린다' → startBusiness, jobTitle '카페 사장'. 선택지와 상관없이 사용자의 글 그대로 판단합니다.",
+          "비트코인·주식·펀드를 사는 투자는 창업이 아닙니다. '비트코인에 투자한다'는 change none입니다 (엔진이 그 자산을 그 달 시세로 삽니다).",
           `allowed_changes(지금 상태에서 가능한 큰 변화): ${(req.allowed ?? ["none"]).join(", ")}`,
           data("decision", req.text),
           JSON.stringify(req.options),
