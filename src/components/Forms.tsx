@@ -17,7 +17,7 @@ import {
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
-import { Badge, Button, Card, FieldError, Input, Textarea } from "./ui";
+import { Badge, Button, Card, Field, FieldError, Input, Textarea } from "./ui";
 import { L, T } from "@/lib/i18n";
 import { ageText, ymText, ymdText, cap } from "@/lib/format";
 import { countryFor, isEn, lang, setRegion, type Region } from "@/lib/region";
@@ -39,20 +39,18 @@ export const EMPTY_PROFILE: Profile = {
   currentLife: "",
 };
 
-export type StepId = "birth" | "kind" | "date" | "situation" | "review" | "name" | "gender" | "hometown" | "family" | "personality" | "current" | "regret";
+export type StepId = "birth" | "kind" | "date" | "situation" | "review" | "family" | "personality" | "current" | "regret";
 
 // Quick start: four questions (main) and the summary, then the life begins. The rest are asked only if the player
 // opens them from the summary ("더 알려주기"); each such question goes back to the summary when answered.
 // secs is a rough time to answer, for the "about a minute left" line; short names the step on the bar and the summary.
 const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main?: boolean }[] = [
-  { id: "birth", get short() { return L("생일"); }, secs: 15, required: true, main: true },
+  // The first screen asks the birth date (required) with the nickname, gender and hometown (optional), as in Figma frame A.
+  { id: "birth", get short() { return L("기본 정보"); }, secs: 25, required: true, main: true },
   { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
   { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
   { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
   { id: "review", get short() { return L("시작"); }, secs: 5, main: true },
-  { id: "name", get short() { return L("별명"); }, secs: 8 },
-  { id: "gender", get short() { return L("성별"); }, secs: 4 },
-  { id: "hometown", get short() { return L("자란 곳"); }, secs: 6 },
   { id: "family", get short() { return L("가족"); }, secs: 18 },
   { id: "personality", get short() { return L("성격"); }, secs: 20 },
   { id: "current", get short() { return L("지금의 나"); }, secs: 18 },
@@ -66,8 +64,9 @@ const indexOf = (id: StepId) => STEPS.findIndex((s) => s.id === id);
 // The questions before the schools and MBTI were dropped (2026-11), to read a draft saved then by its step number.
 const OLD_STEPS = ["birth", "name", "gender", "hometown", "schools", "university", "family", "mbti", "personality", "current", "kind", "date", "situation", "actual", "regret", "review"];
 /** Where a restored draft opens: its saved question, or for an older draft the next question still on the quick path. */
-function startStep(d: { step?: number; at?: StepId }): number {
-  if (d.at && indexOf(d.at) >= 0) return indexOf(d.at);
+function startStep(d: { step?: number; at?: string }): number {
+  if (d.at && indexOf(d.at as StepId) >= 0) return indexOf(d.at as StepId);
+  if (d.at && ["name", "gender", "hometown"].includes(d.at)) return 0; // asked on the first screen since 2026-11-02
   const i = OLD_STEPS.slice(d.step ?? 0).map((id) => indexOf(id as StepId)).find((n) => n >= 0 && STEPS[n].main);
   return i ?? 0;
 }
@@ -85,7 +84,7 @@ const looksLikeRealName = (name: string) => /^[가-힣]{2,4}$/.test(name.trim())
 /** What is kept in the browser while the questions are answered, so a refresh picks up where it left off. */
 export interface WizardDraft {
   step: number;
-  at?: StepId; // the question by name; drafts saved before it count steps in OLD_STEPS
+  at?: string; // the StepId of the question by name; drafts saved before it count steps in OLD_STEPS
   profile: Profile;
   tp: TurningPoint;
   blanks: TpBlanks;
@@ -208,9 +207,6 @@ export function Onboarding({
   const answered = (id: StepId) =>
     ({
       birth: !!p.birthDate,
-      name: !!p.name.trim(),
-      gender: !!p.gender,
-      hometown: !!p.hometown.trim(),
       family: !!p.family.trim(),
       personality: !!p.personality.trim(),
       current: !!p.currentLife.trim(),
@@ -253,7 +249,7 @@ export function Onboarding({
     <div className="space-y-1.5">
       <h1 tabIndex={-1} className="text-[22px] leading-snug font-bold outline-none sm:text-2xl">
         {title}
-        {cur.id !== "review" && (cur.required || !cur.main) && <Badge required={!!cur.required} className="ml-2 align-middle" />}
+        {cur.id !== "review" && cur.id !== "birth" && (cur.required || !cur.main) && <Badge required={!!cur.required} className="ml-2 align-middle" />}
       </h1>
       {hint && <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{hint}</p>}
     </div>
@@ -264,64 +260,54 @@ export function Onboarding({
       case "birth":
         return (
           <>
-            {question(L("언제 태어났나요?"), L("나이와 그 시절 이야기를 맞추는 데 써요."))}
-            <DatePicker
-              id="birth"
-              value={birth}
-              onChange={setBirthYmd}
-              min={{ y: 1930, m: 1 }}
-              max={{ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() }}
-              error={err?.text}
-              onTypedError={setTypedError}
-            />
-          </>
-        );
-      case "name":
-        return (
-          <>
-            {question(L("이야기 속에서 뭐라고 부를까요?"), L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요."))}
-            <div className="flex gap-2">
-              <Input data-autofocus aria-label={L("별명")} value={p.name} onChange={setField("name")} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  const pool = nicknames().filter((n) => n !== p.name);
-                  setP({ ...p, name: pool[Math.floor(Math.random() * pool.length)] });
-                }}
-                className="shrink-0 py-2.5"
-              >
-                {L("추천")}
-              </Button>
-            </div>
-            {looksLikeRealName(p.name) && <p className="text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</p>}
-          </>
-        );
-      case "gender":
-        return (
-          <>
-            {question(L("성별을 알려 주세요"), L("입대 같은 일부 사건에만 쓰여요."))}
-            <div className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
-              {(["남", "여", "기타"] as Gender[]).map((g) => (
-                <Choice key={g} selected={p.gender === g} onClick={() => pick("gender", g)}>
-                  {({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[g]}
-                </Choice>
-              ))}
-            </div>
-          </>
-        );
-      case "hometown":
-        return (
-          <>
-            {question(L("어디서 자랐나요?"), L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요."))}
-            <div role="group" aria-label={L("자란 나라")} className="mb-3 grid grid-cols-2 gap-2">
-              {COUNTRIES.map((c) => (
-                <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
-                  <span aria-hidden>{c === "us" ? "🇺🇸" : "🇰🇷"}</span> {countryName(c)}
-                </Choice>
-              ))}
-            </div>
-            <Input data-autofocus aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
+            {question(L("주인공에 대해 알려 주세요"), L("생년월일만 꼭 필요해요. 나머지는 비워 둬도 괜찮아요."))}
+            <Field label={L("별명")} hint={L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요.")}>
+              <span className="flex gap-2">
+                <Input data-autofocus value={p.name} onChange={setField("name")} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    const pool = nicknames().filter((n) => n !== p.name);
+                    setP({ ...p, name: pool[Math.floor(Math.random() * pool.length)] });
+                  }}
+                  className="shrink-0 py-2.5"
+                >
+                  {L("추천")}
+                </Button>
+              </span>
+              {looksLikeRealName(p.name) && <span className="block text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</span>}
+            </Field>
+            <Field group required label={L("생년월일")} hint={L("나이와 그 시절 이야기를 맞추는 데 써요.")}>
+              <DatePicker
+                id="birth"
+                value={birth}
+                onChange={setBirthYmd}
+                min={{ y: 1930, m: 1 }}
+                max={{ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() }}
+                error={err?.text}
+                onTypedError={setTypedError}
+              />
+            </Field>
+            <Field group label={L("성별")} hint={L("입대 같은 일부 사건에만 쓰여요.")}>
+              <span className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
+                {(["남", "여", "기타"] as Gender[]).map((g) => (
+                  <Choice key={g} selected={p.gender === g} onClick={() => pick("gender", g)}>
+                    {({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[g]}
+                  </Choice>
+                ))}
+              </span>
+            </Field>
+            <Field group label={L("자란 곳")} hint={L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
+              <span role="group" aria-label={L("자란 나라")} className="grid grid-cols-2 gap-2">
+                {COUNTRIES.map((c) => (
+                  <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
+                    <span aria-hidden>{c === "us" ? "🇺🇸" : "🇰🇷"}</span> {countryName(c)}
+                  </Choice>
+                ))}
+              </span>
+              <Input aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
+            </Field>
           </>
         );
       case "family":
@@ -731,17 +717,18 @@ function Suggestions({ title, items, current, onPick }: { title: string; items: 
 function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: TurningPoint; country: Region; onEdit: (id: StepId) => void }) {
   const gender = p.gender && (({ 남: L("남"), 여: L("여"), 기타: L("기타") } as Record<string, string>)[p.gender] ?? p.gender);
   // The quick-start answers, then the optional ones.
-  const main: [StepId, string, string][] = [
-    ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : ""],
-    ["kind", L("갈림길"), tp.kind ?? ""],
-    ["date", L("그때"), tp.date ? ymText(tp.date) : ""],
-    ["situation", L("상황"), tp.situation],
-    ["situation", L("실제 선택"), tp.actualChoice],
+  // [step that asks it, label, answer, required]
+  const main: [StepId, string, string, boolean][] = [
+    ["birth", L("별명"), p.name, false],
+    ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : "", true],
+    ["birth", L("성별"), gender, false],
+    ["birth", L("자란 곳"), [countryName(country), p.hometown].filter(Boolean).join(" · "), false],
+    ["kind", L("갈림길"), tp.kind ?? "", false],
+    ["date", L("그때"), tp.date ? ymText(tp.date) : "", true],
+    ["situation", L("상황"), tp.situation, true],
+    ["situation", L("실제 선택"), tp.actualChoice, false],
   ];
   const extra: Record<string, string> = {
-    name: p.name,
-    gender,
-    hometown: [p.country || p.hometown ? countryName(country) : "", p.hometown].filter(Boolean).join(" · "),
     family: p.family,
     personality: p.personality,
     current: p.currentLife,
@@ -751,9 +738,8 @@ function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: Tur
   return (
     <div className="space-y-5">
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)_auto] gap-x-3 divide-y divide-stone-100 dark:divide-stone-800">
-        {main.map(([id, rawLabel, value]) => {
+        {main.map(([id, rawLabel, value, required]) => {
           const label = cap(rawLabel);
-          const required = STEPS[indexOf(id)].required && rawLabel !== L("실제 선택");
           return (
             <div key={rawLabel} className="col-span-3 grid grid-cols-subgrid items-center py-1.5">
               <dt className="max-w-28 text-xs text-stone-500 dark:text-stone-400">{label}</dt>
