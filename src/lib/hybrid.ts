@@ -12,6 +12,7 @@ import { timelineConflict } from "./timeline";
 import { anachronism } from "./period";
 import { ownsBusiness } from "./work";
 import { L } from "./i18n";
+import { clip } from "./format";
 
 const CORE = new Set([...CORE_EVENTS, ...STORY_FORKS, ...US_CORE_EVENTS].map((e) => e.id));
 
@@ -117,7 +118,7 @@ export function stockEpisodes(s: LifeState, raw: RawEpisode[] | undefined) {
   const room = age < 19 ? 30 : Math.max(50, Math.min(300, Math.round(Math.max(0, s.wealth) * 0.03)));
   const items: Episode[] = [];
   for (const e of raw.slice(0, EPISODES_PER_CALL)) {
-    const text = e.text?.trim().slice(0, 160);
+    const text = e.text?.trim() ? clip(e.text, 160) : "";
     if (!text || contradicts(s, e.title, text)) continue;
     const stats: Partial<Stats> = {};
     for (const k of ["health", "happiness", "knowledge", "relationships"] as StatKey[]) {
@@ -125,7 +126,7 @@ export function stockEpisodes(s: LifeState, raw: RawEpisode[] | undefined) {
       if (v) stats[k] = Math.max(-4, Math.min(4, v));
     }
     items.push({
-      title: (e.title?.trim() || text.slice(0, 12)).slice(0, 20),
+      title: e.title?.trim() ? clip(e.title, 20) : clip(text, 12),
       type: CATEGORIES.has(e.type as Category) ? (e.type as Category) : "daily",
       text,
       stats,
@@ -152,7 +153,7 @@ const THREAD_WAIT = 48; // months a follow-up waits for a moment to be told in b
 
 /** Remembers how a moment could come back, due 6-18 months later. The engine decides when; the narrator what. */
 export function addThread(s: LifeState, text: string | undefined, months: number) {
-  const t = text?.trim().slice(0, 120);
+  const t = text?.trim() ? clip(text, 120) : "";
   if (!t) return;
   s.threads = [...(s.threads ?? []), { text: t, due: s.mi + months }].slice(-THREADS_MAX);
 }

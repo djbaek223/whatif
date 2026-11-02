@@ -47,3 +47,18 @@ export const monthName = (m: number) => (isEn() ? MONTHS[m - 1] : `${m}월`);
 
 /** A label as shown on its own: English starts with a capital ("college" → "College"); Korean is unchanged. */
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Caps a narrator text at a length sized for Korean. English needs about twice the letters for the same words, so
+ * English gets 2.5x the room and, when it still runs over, is cut at a word boundary with "…" rather than mid-word.
+ * Korean is cut exactly as before.
+ */
+export function clip(text: string, koMax: number): string {
+  const t = text.trim();
+  if (!isEn()) return t.slice(0, koMax);
+  const max = Math.round(koMax * 2.5);
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.–—-]+$/, "")}…`;
+}
