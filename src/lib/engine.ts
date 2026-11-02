@@ -25,7 +25,7 @@ import {
 import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
 import { creditDegree, creditHighSchool, degreeFacts, degreeOf, programFor, saidNoCollege } from "./education";
 import { ageAt, eventsHere, ageOf, eventById, type Effect, type EventDef } from "./events";
-import { formatWealth, monthName } from "./format";
+import { clip, formatWealth, monthName } from "./format";
 import { anachronism, canon, existedIn, periodFacts, periodize } from "./period";
 import { addThread, aiWritable, closeThread, contradicts, hybridOn, isCore, stockEpisodes, takeEpisode } from "./hybrid";
 import { sinceChapter } from "./storyEvents";
@@ -1160,18 +1160,18 @@ function fillMomentHere(state: LifeState, key: string, res: MomentResult): LifeS
     }
     const id = String(options.length);
     const c: CustomOption = {
-      outcome: o.outcome.trim().slice(0, 200),
+      outcome: clip(o.outcome, 200),
       stats,
       money: Math.round(Math.max(-cap, Math.min(gainCap, o.money || 0)) / 10) * 10,
       change,
       chance: Math.max(0.15, Math.min(1, o.chance ?? 1)),
-      failure: (o.failure || "").trim().slice(0, 160),
+      failure: clip(o.failure || "", 160),
     };
     const place = o.place?.trim().slice(0, 30);
     // A company, school or trade from another year (삼성전자 in 1967, a 유튜버 in 1990) contradicts the times.
     if (!existedIn(place, Math.floor(s.mi / 12)) || anachronism(o.jobTitle ?? "", Math.floor(s.mi / 12))) continue;
     if (change === "startBusiness") {
-      c.title = (o.jobTitle?.trim() || businessTitle(`${o.label} ${o.outcome}`)).slice(0, 20);
+      c.title = clip(o.jobTitle?.trim() || businessTitle(`${o.label} ${o.outcome}`), 20);
       if (place) c.place = place;
     }
     // The narrator may pick the employer, but a reach for a top league is a gamble for someone who isn't ready.
@@ -1186,7 +1186,7 @@ function fillMomentHere(state: LifeState, key: string, res: MomentResult): LifeS
     if (plan && place && !tier && plan.kind === "enroll") plan = withPlace(plan, place);
     if (plan?.kind === "switch" && plan.salary !== undefined) plan.salary = Math.max(plan.salary, Math.round((plan.from ?? 0) * 1.03));
     const theme = THEME_SET.has(o.theme as Theme) ? (o.theme as Theme) : effectTheme(effect);
-    options.push({ id, label: o.label.trim().slice(0, 40), theme, ...(plan ? { plan, detail: planDetail(plan) } : {}) });
+    options.push({ id, label: clip(o.label, 40), theme, ...(plan ? { plan, detail: planDetail(plan) } : {}) });
   }
   if (options.length < 2) return null;
   // Rarity is the engine's: only a moment it rolled as rare (1% a year at most) is shown as one.
@@ -1194,7 +1194,7 @@ function fillMomentHere(state: LifeState, key: string, res: MomentResult): LifeS
   const tone = res.tone?.trim().slice(0, 8) || undefined;
   s.pending = {
     ...s.pending!,
-    title: res.title.trim().slice(0, 24) || s.pending!.title,
+    title: clip(res.title, 24) || s.pending!.title,
     scene: res.scene.trim() || s.pending!.scene,
     options,
     custom,
