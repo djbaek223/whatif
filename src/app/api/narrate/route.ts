@@ -1,5 +1,10 @@
 import { aiConfigured, narrate, NarratorError } from "@/lib/narrator/llm";
 import type { NarrateRequest } from "@/lib/narrator/schema";
+import { moderateAll, stringsIn } from "@/lib/moderation";
+
+/** What the player typed in a request: their own choice, or their profile and turning point. The browser checks it first. */
+const typedBy = (body: NarrateRequest): string[] =>
+  body.kind === "classify" ? [body.text] : body.kind === "opening" || body.kind === "ending" ? stringsIn([body.profile, body.turningPoint]) : [];
 
 const KINDS = new Set(["opening", "scene", "moment", "classify", "ending"]);
 const MAX_BODY = 40_000; // characters; keeps a single request from carrying an essay-sized prompt
@@ -19,6 +24,8 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, reason: "bad-json" }, { status: 400 });
   }
   if (!body || !KINDS.has(body.kind)) return Response.json({ ok: false, reason: "bad-kind" }, { status: 400 });
+  // Violence or sex the player typed never reaches the narrator, even from a page that skipped the check.
+  if (moderateAll(typedBy(body))) return Response.json({ ok: false, reason: "blocked" }, { status: 422 });
 
   try {
     const data = await narrate(body, request.signal);

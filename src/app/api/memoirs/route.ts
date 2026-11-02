@@ -3,6 +3,7 @@ import { z } from "zod";
 import { BOARD_TAG, cachedHome, cachedList } from "@/lib/boardCache";
 import { allowHit, boardConfigured, deleteMemoir, publishMemoir } from "@/lib/memoirs";
 import { plausibleRecords } from "@/lib/records";
+import { moderateAll } from "@/lib/moderation";
 
 const RegionField = z.enum(["kr", "us"]).catch("kr");
 
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
   // Three posts per ten minutes from one address, counted across every server instance.
   if (!(await allowHit("post", ip, 3, 600))) return Response.json({ ok: false, reason: "rate-limited" }, { status: 429 });
   const { region, penName, title, epitaph, memoir, deathAge, status, records } = parsed.data;
+  // The board is public: a memoir the player edited into violence or sex doesn't go up.
+  if (moderateAll([penName, title, epitaph, memoir])) return Response.json({ ok: false, reason: "blocked" }, { status: 422 });
   // Numbers that can't come out of the game are left off; the memoir itself still goes up.
   const kept = records && plausibleRecords(records, deathAge) ? { records: { ...records, badges: [...new Set(records.badges)] } } : {};
   try {

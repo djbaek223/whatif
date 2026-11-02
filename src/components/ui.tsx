@@ -84,6 +84,9 @@ export function Badge({ required, className = "" }: { required: boolean; classNa
   );
 }
 
+/** Shown when what the player typed describes violence or sex (src/lib/moderation.ts). The words stay so they can be changed. */
+export const blockedMessage = () => L("폭력적이거나 성적인 내용은 쓸 수 없어요. 다른 말로 바꿔서 다시 써 주세요.");
+
 export function FieldError({ id, children }: { id?: string; children: ReactNode }) {
   return (
     <span id={id} role="alert" className="flex items-center gap-1 text-[13px] font-medium text-rose-700 dark:text-rose-400">

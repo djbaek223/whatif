@@ -8,7 +8,8 @@ import { lang, region, type Lang } from "@/lib/region";
 import { lifeRecords, type LifeRecords } from "@/lib/records";
 import { L } from "@/lib/i18n";
 import { RecordGrid, RecordLine, tr } from "./BoardRecords";
-import { Button, Input, Spinner, Textarea } from "./ui";
+import { blockedMessage, Button, Input, Spinner, Textarea } from "./ui";
+import { moderateAll } from "@/lib/moderation";
 
 /** A post as the board shows it (src/lib/memoirs.ts). */
 export interface PublishedMemoir {
@@ -66,7 +67,7 @@ function useModal(open: boolean) {
 const dialogClass =
   "m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg rounded-2xl border border-stone-200 bg-white p-0 text-[var(--foreground)] shadow-xl backdrop:bg-stone-950/40 dark:border-stone-800 dark:bg-stone-900";
 
-type PublishStatus = "idle" | "sending" | "no-store" | "rate-limited" | "error";
+type PublishStatus = "idle" | "sending" | "no-store" | "rate-limited" | "error" | "blocked";
 
 /** Posts this life's memoir to the public board under a pen name, after the writer has read and trimmed it. */
 export function PublishDialog({
@@ -94,6 +95,8 @@ export function PublishDialog({
   const send = async (e: FormEvent) => {
     e.preventDefault();
     if (!ready) return;
+    // The board is public: violence or sex typed into the memoir stays here until it is changed.
+    if (moderateAll([penName, title, memoir])) return setStatus("blocked");
     setStatus("sending");
     const website = (e.currentTarget as HTMLFormElement).elements.namedItem("website") as HTMLInputElement | null;
     try {
@@ -117,7 +120,7 @@ export function PublishDialog({
         saveMine({ ...loadMine(), [data.memoir.id]: { key: data.deleteKey, sig: endingSig(life, ending) } });
         setStatus("idle");
         onPublished(data.memoir.id);
-      } else setStatus(data.reason === "no-store" ? "no-store" : data.reason === "rate-limited" ? "rate-limited" : "error");
+      } else setStatus(data.reason === "no-store" ? "no-store" : data.reason === "rate-limited" ? "rate-limited" : data.reason === "blocked" ? "blocked" : "error");
     } catch {
       setStatus("error");
     }
@@ -127,7 +130,8 @@ export function PublishDialog({
     "no-store": L("게시판이 아직 준비되지 않았어요."),
     "rate-limited": L("잠시 뒤에 다시 올려 주세요. 짧은 시간에 너무 많이 올렸어요."),
     error: L("올리지 못했어요. 잠시 뒤 다시 시도해 주세요."),
-  }[status as "no-store" | "rate-limited" | "error"];
+    blocked: blockedMessage(),
+  }[status as "no-store" | "rate-limited" | "error" | "blocked"];
 
   return (
     <dialog ref={dialog} aria-labelledby="publish-title" onClose={onClose} onClick={(e) => e.target === e.currentTarget && onClose()} className={dialogClass}>

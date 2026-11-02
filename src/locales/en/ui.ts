@@ -372,6 +372,7 @@ export const UI_EN: Record<string, string> = {
   "무엇을, 어떻게 할지 한 문장으로 써 주세요.": "Say what you would do, and how, in one sentence.",
   "{0}자, 최대 {1}자": "{0} of {1} characters",
   "지금은 이 선택을 읽지 못했어요. 쓴 내용은 그대로 있어요.": "Couldn't read this choice just now. What you wrote is still here.",
+  "폭력적이거나 성적인 내용은 쓸 수 없어요. 다른 말로 바꿔서 다시 써 주세요.": "Violent or sexual content isn't allowed here. Please reword it and try again.",
   "AI 없이 이대로 진행": "Go on without AI",
   "선택을 읽는 중": "Reading your choice",
   "이 선택으로 진행 →": "Go with this →",

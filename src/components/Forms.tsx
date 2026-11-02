@@ -17,7 +17,8 @@ import {
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
-import { Badge, Button, Card, Field, FieldError, Input, Textarea } from "./ui";
+import { Badge, blockedMessage, Button, Card, Field, FieldError, Input, Textarea } from "./ui";
+import { moderateAll } from "@/lib/moderation";
 import { L, T } from "@/lib/i18n";
 import { ageText, ymText, ymdText, cap } from "@/lib/format";
 import { countryFor, isEn, lang, setRegion, type Region } from "@/lib/region";
@@ -209,7 +210,19 @@ export function Onboarding({
     gender: tried && !p.gender ? L("성별을 골라 주세요") : null,
     hometown: tried && !p.hometown.trim() ? L("자란 지역을 적어 주세요") : null,
   };
+  // What each question's boxes hold. Violence or sex in any of them keeps the question open until it is changed.
+  const typed = (id: StepId): string[] =>
+    ({
+      birth: [p.name, p.hometown],
+      family: [p.family],
+      personality: [p.personality],
+      current: [p.currentLife],
+      situation: [tp.situation, tp.actualChoice],
+      regret: [tp.regret],
+    })[id as string] ?? [];
+  const blockedAt = (id: StepId) => !!moderateAll(typed(id));
   const invalid = (id: StepId) =>
+    blockedAt(id) ||
     id === "birth" ? !p.birthDate || !!typedError || !p.name.trim() || !p.gender || !p.hometown.trim() : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false;
   const err = errors[cur.id] ?? null;
   // Answered questions get a check on the step bar.
@@ -234,12 +247,16 @@ export function Onboarding({
   };
   const next = () => {
     if (cur.id === "review") {
-      const missing = STEPS.findIndex((s) => s.required && invalid(s.id));
+      const missing = STEPS.findIndex((s) => (s.required && invalid(s.id)) || blockedAt(s.id));
       if (missing >= 0) {
         go(missing, true);
         return setTried(true);
       }
       return onDone({ ...p, country }, tp, remember);
+    }
+    if (blockedAt(cur.id)) {
+      setTried(true);
+      return root.current?.querySelector<HTMLElement>("textarea, input:not([type=checkbox]):not([type=radio])")?.focus();
     }
     if (invalid(cur.id)) {
       setTried(true);
@@ -588,6 +605,7 @@ export function Onboarding({
           <Card key={cur.id}>
             <div className="space-y-4" style={{ animation: "fadein .25s ease-out" }}>
               {body}
+              {tried && blockedAt(cur.id) && <FieldError id="blocked-error">{blockedMessage()}</FieldError>}
             </div>
           </Card>
           {/* Stays at the bottom of a phone screen, so 다음 is never a scroll away. */}
