@@ -58,6 +58,7 @@ import { kindDef, schoolYears } from "./onboarding";
 import { ROUTINE, seasonMore, workLines } from "./routine";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
+import { buy, holdingFact, investIn, saleText, stakeFor, worth, type Bet } from "./invest";
 import { L, T, V } from "./i18n";
 
 export { formatWealth };
@@ -245,7 +246,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     relationships: clamp(opening.stats.relationships),
   };
   // Three suggested paths; the fourth is the user's own words, as in every later choice.
-  const choices = inPeriodChoices(opening.choices.slice(0, 3), Math.floor(mi / 12));
+  const choices = inPeriodChoices(opening.choices.slice(0, 3), Math.floor(mi / 12), tp);
   const options = choices.map((c, i) => ({
     id: String(i),
     label: c.original ? L`${c.label} (원래의 길)` : c.label,
@@ -302,8 +303,14 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
  * Drops a suggested path that belongs to another time (a laptop in 1976), keeping the real one and at least two.
  * A path whose words fit but whose place doesn't is kept; the engine picks a place of the time when it is taken.
  */
-function inPeriodChoices(choices: OpeningChoice[], year: number): OpeningChoice[] {
-  const fits = choices.filter((c) => c.original || !anachronism(`${c.label} ${c.jobTitle ?? ""}`, year));
+function inPeriodChoices(choices: OpeningChoice[], year: number, tp?: TurningPoint): OpeningChoice[] {
+  // Something the player wrote about that day themselves ("비트코인에 넣을까") was there for them, so a path about it stays
+  // even if the table puts it a few years later.
+  const said = tp ? anachronism([tp.situation, tp.actualChoice, tp.regret].join(" "), year) : null;
+  const fits = choices.filter((c) => {
+    const odd = anachronism(`${c.label} ${c.jobTitle ?? ""}`, year);
+    return c.original || !odd || odd === said;
+  });
   return fits.length >= 2 ? fits : choices;
 }
 
@@ -351,6 +358,9 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
     if (preset === "love" && age < 16) return { text: L("마음 가는 친구에게 먼저 다가갔다."), stats: { happiness: 6, relationships: 10 } };
     if (preset === "rest") return { text: L("잠시 멈춰 쉬기로 했다."), stats: { happiness: 8, knowledge: 2 } };
   }
+  // A path that buys something ("국내 주식형 펀드에 넣는다", "비트코인에 투자한다") is that investment, not a generic gamble.
+  const bet = investIn(choice.label);
+  if (bet && preset !== "original") return investEffect(bet, s, choice.label, s.pending?.scene);
   switch (preset) {
     case "original":
       return { text: L("결국 원래의 길을 다시 걸었다."), stats: { happiness: -2 } };
@@ -386,9 +396,11 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
           intense: 6,
         };
       }
+      // What goes in is part of the savings, and a failure costs at most a little more than that.
+      const stake = Math.round(Math.max(300, Math.min(1000, s.wealth * 0.4)) / 10) * 10;
       return {
         text: L("큰 모험을 시작했다."),
-        wealth: -1000,
+        wealth: -stake,
         note: L("초기 자금"),
         risk: {
           chance: () => 0.35,
@@ -398,7 +410,7 @@ function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
             flags: { employed: true, job: job || L("사업가"), company: choice.place || undefined },
             income: Math.max(450, s.income * 1.6),
           },
-          failure: { text: L("모험은 실패로 끝났지만 많은 걸 배웠다."), stats: { happiness: -10, knowledge: 8 }, wealth: -1500, note: L("정리하며 남은 손실") },
+          failure: { text: L("모험은 실패로 끝났지만 많은 걸 배웠다."), stats: { happiness: -10, knowledge: 8 }, wealth: -Math.round(stake / 20) * 10, note: L("정리하며 남은 손실") },
         },
       };
     }
@@ -537,6 +549,46 @@ function doSwitch(s: LifeState, rng: Rng, spec: NonNullable<Effect["switchJob"]>
   out.payShown = true;
 }
 
+/** An investment the player wrote in their own words, with the stake it takes from the savings. */
+function investEffect(bet: Bet, s: LifeState, text: string, scene?: string): Effect {
+  return { text: "", stats: { happiness: 2 }, invest: { ...bet, stake: stakeFor(s, text, scene) } };
+}
+
+/** Whether the player's words buy an asset this life can buy now (an adult, in a year it existed). */
+function betIn(text: string | undefined, s: LifeState): Bet | null {
+  const bet = investIn(text);
+  return bet && ageOf(s) >= 18 && !anachronism(bet.name, Math.floor(s.mi / 12)) ? bet : null;
+}
+
+/**
+ * Buys into the investment. The money stays in the savings at what was paid, as the asset's book value,
+ * and the gain or loss lands when it is sold (doCashOut, at the invest-check fork). Another asset sells the old one first.
+ */
+function doInvest(s: LifeState, spec: NonNullable<Effect["invest"]>, rng: Rng, out: Applied) {
+  if (s.flags.holding && s.flags.holding.name !== spec.name) doCashOut(s, out);
+  s.flags = { ...s.flags, holding: buy(s.flags.holding, spec, spec.stake, s.mi, Math.floor(rng.next() * 2 ** 30) + 1) };
+  out.texts.push(L`${V(spec.name)}에 ${won(spec.stake)}을 넣었다.`);
+}
+
+/** Sells the investment held at this month's price: the gain or loss goes into the savings, and into the life's memory. */
+function doCashOut(s: LifeState, out: Applied) {
+  const h = s.flags.holding;
+  if (!h) return;
+  const value = worth(h, s.mi);
+  const r = value / h.cost;
+  out.texts.push(saleText(h, s.mi));
+  s.wealth += value - h.cost;
+  const mood = r >= 3 ? 12 : r >= 1.3 ? 6 : r < 0.5 ? -10 : r < 0.9 ? -5 : 0;
+  if (mood) {
+    const before = s.stats.happiness;
+    s.stats.happiness = clamp(before + mood);
+    out.delta.happiness = (out.delta.happiness ?? 0) + (s.stats.happiness - before);
+  }
+  s.flags = { ...s.flags };
+  delete s.flags.holding;
+  s.memory = [...(s.memory ?? []), L`${stamp(s)}: 투자 정리: ${V(h.name)} ${won(h.cost)} → ${won(value)}`].slice(-MAX_MEMORY);
+}
+
 /** Opens a shop or business of one's own. The old employer is left behind; the venture's fate comes later (moreEvents: venture-result). */
 function doStartBusiness(s: LifeState, spec: NonNullable<Effect["startBusiness"]>, out: Applied) {
   const title = spec.title?.trim() || L("사업가");
@@ -661,6 +713,8 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.enroll) doEnroll(s, rng, effect.enroll, out, plan);
   if (effect.buyHome) doBuyHome(s, rng, effect.buyHome, out, plan);
   if (effect.startBusiness) doStartBusiness(s, effect.startBusiness, out);
+  if (effect.cashOut) doCashOut(s, out);
+  if (effect.invest) doInvest(s, effect.invest, rng, out);
   if (effect.homeValuePct && s.flags.homeOwner && s.flags.homeValue) {
     const before = s.flags.homeValue;
     const change = Math.round((before * effect.homeValuePct) / 100) * 100;
@@ -729,6 +783,7 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   if (b.noKids && !a.noKids) out.push(L("아이를 갖지 않기로 함"));
   if (b.homeOwner && !a.homeOwner) out.push(L`내 집 마련: ${b.homeArea ?? ""}`.trim());
   if (b.pet && !a.pet) out.push(L("반려동물을 들임"));
+  if (b.holding && b.holding.cost !== a.holding?.cost) out.push(L`투자: ${V(b.holding.name)}에 ${won(b.holding.cost - (a.holding?.name === b.holding.name ? a.holding.cost : 0))} 넣음`);
   return out;
 }
 
@@ -977,11 +1032,21 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
   }
   // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
   // even if the closest option was about staying at the company.
-  const wish = inPeriodIntent(freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null, Math.floor(s.mi / 12));
-  if (wish && allowedChanges(s).includes(wish.change) && !changesOf(effect, s).has(wish.change)) {
+  let wish = inPeriodIntent(freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null, Math.floor(s.mi / 12));
+  // Buying Bitcoin or shares is not opening a business, whatever the narrator read; only words about a business are.
+  const bet = freeText?.trim() ? betIn(freeText, s) : null;
+  if (bet && wish?.change === "startBusiness" && intentFromText(freeText!, s)?.change !== "startBusiness") wish = null;
+  const wished = !!wish && allowedChanges(s).includes(wish.change);
+  if (wish && wished && !changesOf(effect, s).has(wish.change)) {
     const text = wish.change === "startBusiness" && employee(s.flags) ? L("사표를 냈다.") : (INTENT_TEXT[wish.change] ?? "");
     effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
     if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: L("창업 자금") };
+    plan = undefined;
+  }
+  // Money the player puts into something they named ("비트코인에 투자한다") buys that, at its price that month,
+  // not the nearest option's gamble (which read as a failed business). A big change they also wrote comes first.
+  if (bet && !wished) {
+    effect = investEffect(bet, s, freeText!, pending.scene);
     plan = undefined;
   }
   // Where it happens is the player's too: "미국 대학 석사" studies in the US, not at the school the nearest option named.
@@ -1769,6 +1834,7 @@ function lifeFactsHere(s: LifeState): string {
     L`자녀: ${kids}`,
     L`집: ${home}`,
     L`순자산: ${formatWealth(s.wealth)}`,
+    f.holding ? L`투자: ${holdingFact(f.holding, s.mi)}` : "",
     L`월 고정지출: ${costLine(s)}`,
     L`능력치: 건강 ${s.stats.health}, 행복 ${s.stats.happiness}, 교육 ${s.stats.knowledge}, 관계 ${s.stats.relationships}`,
     s.flags.pet ? L("반려동물과 함께 삶") : "",

@@ -6,7 +6,7 @@ import { MORE_EVENTS } from "./moreEvents";
 import { STORY_EVENTS, STORY_FORKS } from "./storyEvents";
 import { SCENE_EVENTS } from "./sceneEvents";
 import { GIVING_EVENTS } from "./givingEvents";
-import type { Axis, Category, LifeFlags, LifeState, Stats, Theme } from "./types";
+import type { Axis, Category, InvestAsset, LifeFlags, LifeState, Stats, Theme } from "./types";
 import { inService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 import { US_CORE_EVENTS, US_MORE_EVENTS } from "../regions/us/events";
@@ -38,6 +38,8 @@ export interface Effect {
   enroll?: { level: "university" | "graduate" | "abroad"; pick?: "profile" | "fit" | "better" };
   buyHome?: "best" | "cheap";
   startBusiness?: { title?: string; name?: string; income?: number }; // opens a shop or business of one's own; how it goes plays out later
+  invest?: { asset: InvestAsset; name: string; stake: number }; // buys into an investment the player named; sold at a later fork (invest.ts)
+  cashOut?: boolean; // sells the investment held, at this month's price
   homeValuePct?: number; // change in the home's price; the gain or loss lands in wealth
   note?: string; // what a cost was for, shown with the amount
   donate?: boolean; // the money this effect spends is a gift (기부): it adds up in LifeState.donated for the memoir board

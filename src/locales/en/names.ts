@@ -1,6 +1,7 @@
 // English for the names a Korean life keeps as written (companies, universities, areas, job titles), looked up by value
 // (V in src/lib/i18n.ts) when the life is shown in English.
 export const EN_NAMES: Record<string, string> = {
+  "이더리움": "Ethereum", // an asset the player can name (invest.ts)
   "금성사": "GoldStar",
   "럭키화학": "Lucky Chemical",
   "포항종합제철": "Pohang Iron and Steel",

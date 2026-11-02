@@ -1,0 +1,27 @@
+// English for src/lib/invest.ts and the engine's investment lines: buying what the player named, and selling it later.
+export const INVEST_EN: Record<string, string> = {
+  "투자의 갈림길": "Sell or hold?",
+  "투자": "investing",
+  "수익": "returns",
+  "{0}에 {1}을 넣었다.": "Put {1} into {0}.",
+  "{0} 보유 중 ({1} 전부터 {2} 투자, 지금 평가액 약 {3}). 아직 팔지 않았으므로 번 돈이나 잃은 돈은 순자산에 들어가지 않았음":
+    "Holds {0} (put {2} in {1} ago, now worth about {3}). Not sold yet, so the gain or loss is not in net worth",
+  "거래하던 거래소가 해킹을 당해 {0} 대부분이 사라졌다. 남은 것을 모두 팔았다.": "The exchange holding your {0} was hacked, and most of it was gone. You sold what was left.",
+  "{0} 모두 팔았다. 믿기지 않는 숫자였다.": "You sold all your {0}. The number was hard to believe.",
+  "{0} 모두 팔아 수익을 냈다.": "You sold all your {0} at a profit.",
+  "{0} 모두 팔았다. 크게 벌지도 잃지도 않았다.": "You sold all your {0}, without much gain or loss.",
+  "손해를 보고 {0} 모두 팔았다.": "You sold all your {0} at a loss.",
+  "{0} {1} → {2}.": "{0} {1} → {2}.",
+  "{0} 전 {1}에 넣은 {2}이 지금 {3}이다.": "The {2} you put into {1} {0} ago is now worth {3}.",
+  "쓰던 거래소가 해킹을 당했다는 뉴스가 떴다. 남은 게 얼마 되지 않는다.": "News breaks that your exchange was hacked. Little is left.",
+  "주변에서는 꿈같은 이야기라며 부러워한다. 여기서 더 오를지, 꺾일지는 아무도 모른다.": "People around you call it a dream. Nobody knows if it climbs further from here or turns.",
+  "수익이 꽤 났다. 지금 팔면 확실하지만, 더 오를 것 같기도 하다.": "It's up nicely. Selling now locks it in, but it might still climb.",
+  "제자리걸음이다. 계속 들고 있을 이유를 다시 생각해 본다.": "It has barely moved. You wonder why you're still holding it.",
+  "손실이 났다. 밤마다 시세를 확인하게 된다.": "It's down. You check the price every night.",
+  "지금 판다": "Sell now",
+  "더 들고 간다": "Hold on longer",
+  "조금 더 들고 가기로 했다.": "You decided to hold on a while longer.",
+  "{0}: 투자 정리: {1} {2} → {3}": "{0}: sold an investment: {1} {2} → {3}",
+  "투자: {0}에 {1} 넣음": "Investment: {1} into {0}",
+  "투자: {0}": "Investment: {0}",
+};

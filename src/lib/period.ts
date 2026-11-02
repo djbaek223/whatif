@@ -56,7 +56,9 @@ const THINGS: Thing[] = [
   t(/웹툰|webtoons?/i, 2004, "웹툰", "webtoons", { us: 2014 }),
   t(/인강|인터넷 강의|온라인 강의|online (class|course|lecture)s?/i, 2002, "인터넷 강의", "online classes", { us: 2010 }),
   t(/코인\s?노래방/i, 2015, "코인노래방", "coin karaoke"),
-  t(/비트코인|가상\s?화폐|암호\s?화폐|코인(?!\s?노래|\s?세탁|\s?빨래)|bitcoin|crypto(currency)?/i, 2017, "코인", "crypto", { us: 2013, hint: true }),
+  // Bitcoin itself could be bought from Korea from 2013 (the first won exchange); the craze, 코인 talk and altcoins came in 2017.
+  t(/비트\s?코인|bitcoin/i, 2013, "비트코인", "Bitcoin", { us: 2011, hint: true }),
+  t(/가상\s?화폐|암호\s?화폐|(?<!비트\s?)코인(?!\s?노래|\s?세탁|\s?빨래)|crypto(currency)?/i, 2017, "코인", "crypto", { us: 2013, hint: true }),
   t(/생성형\s?AI|챗\s?GPT|ChatGPT|AI 챗봇|chatbots?|generative AI/i, 2023, "생성형 AI", "generative AI", { hint: true }),
   t(/\bAI\b|인공지능/i, 2016, "AI", "AI", { us: 2011 }),
   t(/재택\s?근무|remote work|work(ing|ed)? from home|\bWFH\b/i, 2020, "재택근무", "working from home", { hint: true }),

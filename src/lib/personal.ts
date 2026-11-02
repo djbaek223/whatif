@@ -70,7 +70,7 @@ export function effectTheme(e: Effect): Theme {
   if (e.enroll || e.eduYears || e.flags?.education) return "study";
   if (e.addChild || e.flags?.noKids) return "family";
   if (e.flags?.partner) return "love";
-  if (e.buyHome || e.wealthPct) return "money";
+  if (e.buyHome || e.wealthPct || e.invest || e.cashOut) return "money";
   if (e.risk && (e.wealth ?? 0) < 0) return "risk";
   const st = e.stats ?? {};
   const top = (Object.entries(st) as [string, number][]).sort((a, b) => b[1] - a[1])[0];

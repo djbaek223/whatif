@@ -7,6 +7,7 @@ import { onCampus, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 import { formatWealth } from "./format";
 import { L } from "./i18n";
+import { INVEST_EVENTS } from "./invest";
 import { isEn, isUS } from "./region";
 
 const year = (s: LifeState) => Math.floor(s.mi / 12);
@@ -1717,4 +1718,4 @@ const AGE_FILL: EventDef[] = [
   },
 ];
 
-export const MORE_EVENTS: EventDef[] = [...ERA_EVENTS, ...CHAIN_EVENTS, ...RARE_EVENTS, ...FAMILY_EVENTS, ...SMALL_DILEMMAS, ...AGE_FILL];
+export const MORE_EVENTS: EventDef[] = [...ERA_EVENTS, ...CHAIN_EVENTS, ...INVEST_EVENTS, ...RARE_EVENTS, ...FAMILY_EVENTS, ...SMALL_DILEMMAS, ...AGE_FILL];
