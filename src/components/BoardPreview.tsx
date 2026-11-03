@@ -34,10 +34,10 @@ export function BoardPreview({ lang }: { lang: Lang }) {
   return (
     <section aria-labelledby="board-preview" className="space-y-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="board-preview" className="text-base font-bold">
-          {popular ? L("공감을 많이 받은 인생") : L("다른 사람들의 인생")}
+        <h2 id="board-preview" className="text-base font-extrabold sm:text-lg">
+          {popular ? L("공감을 많이 받은 인생") : L("먼저 살아본 인생들")}
         </h2>
-        <span className="flex gap-3 text-sm font-medium">
+        <span className="flex shrink-0 gap-3 whitespace-nowrap text-sm font-semibold">
           <Link href={`${base}/hall`} className="text-indigo-700 underline-offset-2 hover:underline dark:text-indigo-300">
             {L("명예의 전당")}
           </Link>
@@ -47,26 +47,40 @@ export function BoardPreview({ lang }: { lang: Lang }) {
         </span>
       </div>
       {items.length ? (
-        <ul className="space-y-2">
+        // A row of tapes: swiped sideways on a phone, three across on a wide screen.
+        <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
           {items.map((m) => (
-            <li key={m.id}>
-              <Link href={`${base}/${m.id}`} className="block rounded-xl border border-stone-200 bg-white px-4 py-3 hover:border-indigo-400 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-indigo-500">
-                <span className="block font-semibold">{m.title}</span>
-                {m.epitaph && <span className="mt-0.5 block truncate text-sm italic text-stone-600 dark:text-stone-400">&ldquo;{m.epitaph}&rdquo;</span>}
-                <RecordLine records={m.records} lang={lang} />
-                <span className="mt-1 flex items-center justify-between gap-2 text-xs text-stone-500 dark:text-stone-400">
-                  <span>
-                    {m.penName || L("익명")} · {L`${m.deathAge}세`}
+            <li key={m.id} className="w-[78%] max-w-72 flex-none snap-start sm:w-auto sm:max-w-none">
+              <Link
+                href={`${base}/${m.id}`}
+                className="flex h-full flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white hover:border-indigo-400 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-indigo-500"
+              >
+                <span className="flex items-center justify-between gap-2 bg-[#16122b] px-3.5 py-2 text-xs text-[#e4defc]">
+                  <span className="truncate font-mono">
+                    <span aria-hidden>▶ </span>
+                    {m.penName || L("익명")}
+                  </span>
+                  <span className="flex-none tabular-nums">
+                    {L`${m.deathAge}세`}
                     {!!m.likes && <> · ❤ {m.likes}</>}
                   </span>
-                  {m.records && <BadgeRow ids={m.records.badges} lang={lang} max={5} />}
+                </span>
+                <span className="flex flex-1 flex-col px-3.5 py-3">
+                  <span className="block font-bold leading-snug">{m.title}</span>
+                  {m.epitaph && <span className="mt-1 block truncate text-sm italic text-stone-600 dark:text-stone-400">&ldquo;{m.epitaph}&rdquo;</span>}
+                  <RecordLine records={m.records} lang={lang} />
+                  {m.records && (
+                    <span className="mt-auto block pt-2">
+                      <BadgeRow ids={m.records.badges} lang={lang} max={5} />
+                    </span>
+                  )}
                 </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="rounded-xl border border-dashed border-stone-300 px-4 py-3 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
+        <p className="rounded-2xl border border-dashed border-stone-300 px-4 py-3 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
           {L("아직 올라온 회고록이 없어요. 인생을 끝까지 살고 첫 회고록을 올려 보세요.")}
         </p>
       )}

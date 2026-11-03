@@ -36,12 +36,13 @@ import { EndingView } from "./Ending";
 import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
+import { TitleScreen } from "./Title";
 import { PlayView, type FreeResult } from "./Play";
 import { moderate } from "@/lib/moderation";
 import { stopsProgress } from "@/lib/playUi";
-import { Button } from "./ui";
 import { OpeningWait, REWIND_MS, reducedMotion } from "./Waiting";
 import { L } from "@/lib/i18n";
+import { ageText, ymText } from "@/lib/format";
 import { countryFor, inRegion, langFor, loveFor, setLang, setLove, setRegion, type Lang, type Region } from "@/lib/region";
 import { fromTag, LANG_COOKIE } from "@/lib/langPick";
 
@@ -384,77 +385,55 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   }, [pendingKey, wantsScene]);
 
   return (
-    <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : screen === "play" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
+    <main className={`mx-auto flex w-full flex-1 flex-col ${screen === "intro" ? "" : "px-4"} ${screen === "intro" ? "" : screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : screen === "play" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
       {screen === "intro" && (
-        <div className="relative flex flex-1 flex-col justify-center gap-8 py-12 sm:gap-10 sm:py-16">
-          <div role="group" aria-label="Language · 언어" className="fixed right-4 top-4 z-10 flex rounded-full border border-stone-200 bg-[var(--background)] p-0.5 text-sm dark:border-stone-800">
-            <span aria-hidden className="flex items-center pl-2.5 pr-1 text-stone-500 dark:text-stone-400">
-              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="10" cy="10" r="7.5" />
-                <path d="M2.5 10h15M10 2.5c2.2 2.3 3.2 4.8 3.2 7.5s-1 5.2-3.2 7.5c-2.2-2.3-3.2-4.8-3.2-7.5s1-5.2 3.2-7.5z" />
-              </svg>
-            </span>
-            {LANGS.map((l) => (
-              <button
-                key={l.id}
-                type="button"
-                lang={l.id}
-                aria-pressed={lang === l.id}
-                onClick={() => pickLang(l.id)}
-                className={`min-h-9 rounded-full px-3 font-medium transition ${
-                  lang === l.id ? "bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900" : "text-stone-600 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
-                }`}
-              >
-                {l.name}
-              </button>
-            ))}
+        <div className="flex flex-1 flex-col">
+          <TitleScreen
+            langs={LANGS}
+            lang={lang}
+            onLang={pickLang}
+            onPick={startFresh}
+            slot={
+              draft
+                ? { label: L("이어서 입력하기"), onClick: startNew }
+                : saved?.life
+                  ? {
+                      label: L("이어하기"),
+                      detail: saved.life.dead
+                        ? L`${saved.life.deathAge ?? ageAt(saved.life.profile.birthDate, saved.life.mi)}세에 끝난 인생`
+                        : `${ymText(`${Math.floor(saved.life.mi / 12)}-${(saved.life.mi % 12) + 1}`)}, ${ageText(ageAt(saved.life.profile.birthDate, saved.life.mi), "살")}`,
+                      onClick: resume,
+                    }
+                  : null
+            }
+            footer={
+              <>
+                {stored && (
+                  <p>
+                    {L("저장된 기본정보:")} <b className="font-semibold text-[#efeaff]">{stored.profile.name || L("별명 없음")}</b> · {L`${stored.profile.birthDate.slice(0, 4)}년생`}{" "}
+                    <button type="button" onClick={eraseDevice} className="-my-2 px-1 py-2 text-[#ffb3c7] underline underline-offset-2 hover:text-white">
+                      {L("지우기")}
+                    </button>
+                  </p>
+                )}
+                <p>
+                  <span aria-hidden>🔒 </span>
+                  {L("입력한 정보는 서버에 남지 않아요")}
+                  {!stored && saved && (
+                    <>
+                      {" · "}
+                      <button type="button" onClick={eraseDevice} className="-my-2 py-2 underline underline-offset-2 hover:text-white">
+                        {L("진행 기록 지우기")}
+                      </button>
+                    </>
+                  )}
+                </p>
+              </>
+            }
+          />
+          <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+            <BoardPreview lang={lang} />
           </div>
-          <div>
-            <p className="text-sm font-semibold tracking-widest text-indigo-600 dark:text-indigo-400">WHAT IF</p>
-            <h1 className="mt-3 text-4xl font-bold leading-tight">
-              {L("그때 다른 선택을 했다면,")}
-              <br />
-              {L("지금 나는 어떻게 살고 있을까?")}
-            </h1>
-            <p className="mt-5 text-lg leading-relaxed text-stone-600 dark:text-stone-400">
-              {L("인생의 한 순간으로 돌아가 다른 선택을 하고, 그 인생을 마지막 날까지 살아보세요.")}
-            </p>
-          </div>
-          <div className="space-y-3">
-            {draft && (
-              <Button className="w-full py-4 text-base" onClick={startNew}>
-                {L("이어서 입력하기")}
-              </Button>
-            )}
-            <ModeCards onPick={startFresh} again={!!draft} />
-            {saved?.life && (
-              <Button variant="ghost" className="w-full" onClick={resume}>
-                {L("이어하기")}
-              </Button>
-            )}
-            {stored && (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3 text-sm dark:border-stone-800">
-                <span className="text-stone-600 dark:text-stone-400">
-                  {L("저장된 기본정보:")} <b className="text-stone-900 dark:text-stone-100">{stored.profile.name || L("별명 없음")}</b> · {L`${stored.profile.birthDate.slice(0, 4)}년생`}
-                </span>
-                <button type="button" onClick={eraseDevice} className="-my-2 shrink-0 px-1 py-2 text-rose-700 underline-offset-2 hover:underline dark:text-rose-400">
-                  {L("지우기")}
-                </button>
-              </div>
-            )}
-            <p className="text-center text-xs text-stone-500 dark:text-stone-400">
-              {ai ? L("AI 내레이션이 켜져 있어요.") : L("AI 키가 없어 기본 문장으로 진행해요.")} {L("입력한 정보는 서버에 보관하지 않아요.")}
-              {!stored && saved && (
-                <>
-                  {" "}
-                  <button type="button" onClick={eraseDevice} className="-my-2 py-2 underline underline-offset-2">
-                    {L("진행 기록 지우기")}
-                  </button>
-                </>
-              )}
-            </p>
-          </div>
-          <BoardPreview lang={lang} />
         </div>
       )}
 
@@ -544,70 +523,5 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
         />
       )}
     </main>
-  );
-}
-
-/**
- * The two ways in, side by side on the first screen: 빠른 시작 (the first screen and a year, about 30 seconds) and
- * 자세히 시작 (the moment itself, what was chosen, and more), with how long each takes and how personal the story gets.
- */
-function ModeCards({ onPick, again }: { onPick: (quick: boolean) => void; again: boolean }) {
-  const modes = [
-    {
-      quick: true,
-      title: L("빠른 시작"),
-      time: L("약 30초"),
-      asks: L("별명 · 생년월일 · 성별 · 자란 곳 + 돌아갈 해"),
-      text: L("해만 고르면 바로 그 시절로 가요. 학교와 그때의 처지는 시대에 맞춰 채워져요."),
-      level: 1,
-      levelText: L("가볍게 맛보기"),
-    },
-    {
-      quick: false,
-      title: L("자세히 시작"),
-      time: L("약 2분"),
-      asks: L("기본 정보 + 그때의 갈림길 · 상황 · 실제 선택"),
-      text: L("가족, 성격, 지금의 나까지 더할 수 있어요. 적을수록 이야기가 내 삶처럼 이어져요."),
-      level: 3,
-      levelText: L("내 이야기처럼"),
-    },
-  ];
-  return (
-    <section aria-labelledby="mode-title" className="space-y-2.5">
-      <h2 id="mode-title" className="text-sm font-semibold text-stone-600 dark:text-stone-400">
-        {again ? L("새로 시작하기") : L("어떻게 시작할까요?")}
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {modes.map((m) => (
-          <button
-            key={m.title}
-            type="button"
-            onClick={() => onPick(m.quick)}
-            className={`group flex flex-col gap-2 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] ${
-              m.quick
-                ? "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-400 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                : "border-field bg-white hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
-            }`}
-          >
-            <span className="flex items-baseline justify-between gap-2">
-              <span className="text-lg font-bold">{m.title}</span>
-              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${m.quick ? "bg-white/20" : "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300"}`}>{m.time}</span>
-            </span>
-            <span className={`text-[13px] font-medium ${m.quick ? "text-indigo-100" : "text-indigo-700 dark:text-indigo-300"}`}>{m.asks}</span>
-            <span className={`text-sm leading-relaxed ${m.quick ? "text-white/90" : "text-stone-600 dark:text-stone-400"}`}>{m.text}</span>
-            <span className="mt-auto flex items-center gap-2 pt-1 text-xs font-medium">
-              <span className={m.quick ? "text-indigo-100" : "text-stone-500 dark:text-stone-400"}>{L("개인화")}</span>
-              <span aria-hidden className="flex gap-1">
-                {[1, 2, 3].map((i) => (
-                  <span key={i} className={`h-1.5 w-5 rounded-full ${i <= m.level ? (m.quick ? "bg-white" : "bg-indigo-600 dark:bg-indigo-400") : m.quick ? "bg-white/30" : "bg-stone-200 dark:bg-stone-700"}`} />
-                ))}
-              </span>
-              <span className="sr-only">{L`3단계 중 ${m.level}단계`}</span>
-              <span>{m.levelText}</span>
-            </span>
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
