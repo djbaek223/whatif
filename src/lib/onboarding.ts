@@ -228,3 +228,36 @@ export const EMPTY_TP: TurningPoint = { date: "", situation: "", actualChoice: "
 
 /** "한국" or "미국" (Korea, the US) in the display language. */
 export const countryName = (c: Region) => (c === "us" ? L("미국") : L("한국"));
+
+/**
+ * 빠른 시작: only the year to go back to. The month is the one a common turning point of that age falls in
+ * (the college exam at 18, the first job at 26), and such a school or first-job moment also gives the kind, so the
+ * paths offered fit. Any other year starts in March (September in the US), when school years and fresh starts begin.
+ * The situation stays empty: the story writes what that age and year were like (fallback.ts, the opening prompt).
+ */
+export function quickTurningPoint(birthDate: string, gender: string, year: number, now: Date): TurningPoint {
+  const [by, bm] = birthDate.split("-").map(Number);
+  const common = (isUS() ? US_COMMON : COMMON).filter((c) => !c.gender || !gender || c.gender === gender);
+  const hit = by && bm ? common.find((c) => by + c.age + (c.month < bm ? 1 : 0) === year) : undefined;
+  let month = hit?.month ?? (isUS() ? 9 : 3);
+  // This year: no later than now.
+  if (year === now.getFullYear()) month = Math.min(month, now.getMonth() + 1);
+  const kind = hit && (hit.kind === "exam" || hit.kind === "job") ? kindDef(hit.kind)?.label : undefined;
+  return { ...EMPTY_TP, date: `${year}-${String(month).padStart(2, "0")}`, ...(kind ? { kind } : {}) };
+}
+
+/** A few ages to go back to in one tap, as years, for 빠른 시작; only years already lived. */
+export function quickYears(birthDate: string, now: Date): { year: number; age: number }[] {
+  const by = Number(birthDate.slice(0, 4));
+  if (!by) return [];
+  return [10, 15, 18, 20, 25, 30, 35, 40, 50, 60]
+    .map((age) => ({ year: by + age, age }))
+    .filter((y) => y.year <= now.getFullYear())
+    .slice(-6);
+}
+
+/** 빠른 시작: the player gave only the year to go back to, nothing about the moment itself (no situation, no choice made). */
+export function quickStart(tp: unknown): boolean {
+  const t = (tp ?? {}) as { situation?: unknown; actualChoice?: unknown };
+  return !String(t.situation ?? "").trim() && !String(t.actualChoice ?? "").trim();
+}

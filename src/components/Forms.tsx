@@ -10,6 +10,8 @@ import {
   josa,
   kindDef,
   personalityChips,
+  quickTurningPoint,
+  quickYears,
   suggestions,
   tpKinds,
   type TpBlanks,
@@ -40,14 +42,16 @@ export const EMPTY_PROFILE: Profile = {
   currentLife: "",
 };
 
-export type StepId = "birth" | "kind" | "date" | "situation" | "review" | "family" | "personality" | "current" | "regret";
+export type StepId = "birth" | "year" | "kind" | "date" | "situation" | "review" | "family" | "personality" | "current" | "regret";
 
 // Quick start: four questions (main) and the summary, then the life begins. The rest are asked only if the player
 // opens them from the summary ("더 알려주기"); each such question goes back to the summary when answered.
 // secs is a rough time to answer, for the "about a minute left" line; short names the step on the bar and the summary.
-const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main?: boolean }[] = [
+// 빠른 시작 (quick) asks the first screen and then only the year to go back to (the "year" step), and starts at once.
+const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main?: boolean; quick?: boolean }[] = [
   // The first screen asks the birth date (required) with the nickname, gender and hometown (optional), as in Figma frame A.
   { id: "birth", get short() { return L("기본 정보"); }, secs: 25, required: true, main: true },
+  { id: "year", get short() { return L("돌아갈 해"); }, secs: 8, quick: true },
   { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
   { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
   { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
@@ -59,7 +63,8 @@ const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main
 ];
 const MAIN = STEPS.filter((s) => s.main);
 const REVIEW = STEPS.findIndex((s) => s.id === "review");
-const EXTRA = STEPS.filter((s) => !s.main);
+const QUICK = STEPS.filter((s) => s.id === "birth" || s.quick);
+const EXTRA = STEPS.filter((s) => !s.main && !s.quick);
 const indexOf = (id: StepId) => STEPS.findIndex((s) => s.id === id);
 
 // The questions before the schools and MBTI were dropped (2026-11), to read a draft saved then by its step number.
@@ -93,6 +98,8 @@ export interface WizardDraft {
   free: string;
   remember: boolean;
   toReview?: boolean; // editing one answer from the summary; 확인 goes back there
+  quick?: boolean; // 빠른 시작: the first screen and the year, then the life begins
+  year?: string; // the year typed or picked in 빠른 시작
 }
 
 const toYmd = (date: string): Ymd => {
@@ -100,9 +107,9 @@ const toYmd = (date: string): Ymd => {
   return { y, m, d };
 };
 
-function remaining(step: number) {
-  const at = MAIN.findIndex((s) => s.id === STEPS[step].id);
-  const secs = MAIN.slice(Math.max(0, at)).reduce((sum, s) => sum + s.secs, 0);
+function remaining(step: number, flow = MAIN) {
+  const at = flow.findIndex((s) => s.id === STEPS[step].id);
+  const secs = flow.slice(Math.max(0, at)).reduce((sum, s) => sum + s.secs, 0);
   return secs < 70 ? L("1분 이내") : L`약 ${Math.round(secs / 60)}분`;
 }
 
@@ -131,6 +138,8 @@ export function Onboarding({
   const [typedError, setTypedError] = useState<string | null>(null);
   const [tried, setTried] = useState(false); // the user pressed 다음 on this step at least once
   const [toReview, setToReview] = useState(initial.toReview ?? false);
+  const [quick, setQuick] = useState(initial.quick ?? false);
+  const [year, setYear] = useState(initial.year ?? "");
   const root = useRef<HTMLDivElement>(null);
 
   // Where they grew up decides the school system, the examples and later the whole life, so the questions follow it.
@@ -138,15 +147,19 @@ export function Onboarding({
   setRegion(country);
 
   const cur = STEPS[step];
+  // The questions on the way to the life: 빠른 시작's two, or the detailed four and the summary.
+  const flow = quick ? QUICK : MAIN;
+  const onPath = (id: StepId) => flow.some((s) => s.id === id);
+  const curMain = onPath(cur.id);
   const age = ageIn(p.birthDate, tp.date);
   const kind = kindDef(tp.kind) ?? kindDef("other")!;
   const birthYear = Number(p.birthDate.slice(0, 4)) || 0;
 
   // Keep answers in the browser (encrypted, see localData.ts) a moment after each change.
   useEffect(() => {
-    const t = setTimeout(() => writeDraft({ step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview } satisfies WizardDraft, remember), 400);
+    const t = setTimeout(() => writeDraft({ step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview, quick, year } satisfies WizardDraft, remember), 400);
     return () => clearTimeout(t);
-  }, [step, p, tp, blanks, mode, free, remember, toReview]);
+  }, [step, p, tp, blanks, mode, free, remember, toReview, quick, year]);
 
   // Each new question takes focus: its first text box if it has one, otherwise the question itself.
   useEffect(() => {
@@ -204,6 +217,20 @@ export function Onboarding({
             return len < MIN_SITUATION ? { id: "tp-situation", text: L`조금만 더 적어 주세요. ${MIN_SITUATION}자 이상이면 돼요 (지금 ${len}자)` } : null;
           })(),
   };
+  // 빠른 시작's year: from the year they turned seven (as the detailed date question) to this year.
+  const minYear = birthYear ? Math.min(birthYear + 7, now.getFullYear()) : 1937;
+  const yearNum = /^\d{4}$/.test(year.trim()) ? Number(year.trim()) : 0;
+  const yearErr = !year.trim()
+    ? tried
+      ? L("돌아가고 싶은 해를 적거나 골라 주세요")
+      : null
+    : !yearNum
+      ? tried || year.trim().length >= 4
+        ? L("네 자리 연도로 적어 주세요. 예: 2005")
+        : null
+      : yearNum < minYear || yearNum > now.getFullYear()
+        ? L`${minYear}년부터 ${now.getFullYear()}년 사이로 골라 주세요`
+        : null;
   // The first screen needs all four answers; each missing one shows its own message once 다음 was pressed.
   const profileErr = {
     name: tried && !p.name.trim() ? L("별명을 정해 주세요. 막막하면 추천을 눌러 보세요") : null,
@@ -223,12 +250,13 @@ export function Onboarding({
   const blockedAt = (id: StepId) => !!moderateAll(typed(id));
   const invalid = (id: StepId) =>
     blockedAt(id) ||
-    id === "birth" ? !p.birthDate || !!typedError || !p.name.trim() || !p.gender || !p.hometown.trim() : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false;
+    (id === "year" ? !yearNum || !!yearErr : id === "birth" ? !p.birthDate || !!typedError || !p.name.trim() || !p.gender || !p.hometown.trim() : id === "date" ? !tp.date || !!typedError : id === "situation" ? (mode === "template" ? !blanks.a.trim() || !blanks.b.trim() : tp.situation.trim().length < MIN_SITUATION) : false);
   const err = errors[cur.id] ?? null;
   // Answered questions get a check on the step bar.
   const answered = (id: StepId) =>
     ({
       birth: !!p.birthDate && !!p.name.trim() && !!p.gender && !!p.hometown.trim(),
+      year: !!yearNum && !yearErr,
       family: !!p.family.trim(),
       personality: !!p.personality.trim(),
       current: !!p.currentLife.trim(),
@@ -246,6 +274,7 @@ export function Onboarding({
     setStep(to);
   };
   const next = () => {
+    if (cur.id === "year" && !invalid("year")) return onDone({ ...p, country }, quickTurningPoint(p.birthDate, p.gender, yearNum, now), remember);
     if (cur.id === "review") {
       const missing = STEPS.findIndex((s) => (s.required && invalid(s.id)) || blockedAt(s.id));
       if (missing >= 0) {
@@ -260,20 +289,31 @@ export function Onboarding({
     }
     if (invalid(cur.id)) {
       setTried(true);
-      const id = errors[cur.id]?.id ?? (cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? "birth" : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
+      const id = errors[cur.id]?.id ?? (cur.id === "year" ? "quick-year" : cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? "birth" : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
       const el = document.getElementById(id);
       (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("button, input"))?.focus();
       return;
     }
+    if (quick) return go(indexOf("year"));
     go(toReview || !cur.main ? REVIEW : step + 1);
+  };
+  // From 빠른 시작 to the detailed questions, keeping the first screen and the year picked so far.
+  const toDetailed = () => {
+    setQuick(false);
+    if (yearNum && !yearErr && !tp.date) {
+      const t = quickTurningPoint(p.birthDate, p.gender, yearNum, now);
+      setTp({ ...tp, date: t.date, kind: tp.kind ?? t.kind });
+      setTpYm(toYmd(t.date));
+    }
+    go(answered("birth") ? indexOf("kind") : 0);
   };
   // An extra question opened from the summary goes back there either way.
   const leave = () => {
-    const d: WizardDraft = { step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview };
+    const d: WizardDraft = { step, at: STEPS[step].id, profile: p, tp, blanks, mode, free, remember, toReview, quick, year };
     writeDraft(d, remember);
     onLeave(d);
   };
-  const back = () => (!cur.main ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
+  const back = () => (cur.id === "year" ? go(0) : !curMain ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
 
   const pick = (k: keyof Profile, v: string) => setP({ ...p, [k]: p[k] === v ? "" : v });
 
@@ -281,7 +321,7 @@ export function Onboarding({
     <div className="space-y-1.5">
       <h1 tabIndex={-1} className="text-[22px] leading-snug font-bold outline-none sm:text-2xl">
         {title}
-        {cur.id !== "review" && cur.id !== "birth" && (cur.required || !cur.main) && <Badge required={!!cur.required} className="ml-2 align-middle" />}
+        {cur.id !== "review" && cur.id !== "birth" && cur.id !== "year" && (cur.required || !cur.main) && <Badge required={!!cur.required} className="ml-2 align-middle" />}
       </h1>
       {hint && <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{hint}</p>}
     </div>
@@ -342,6 +382,55 @@ export function Onboarding({
             </Field>
           </>
         );
+      case "year": {
+        const years = quickYears(p.birthDate, now);
+        const at = yearNum && !yearErr && birthYear ? yearNum - birthYear : null;
+        return (
+          <>
+            {question(L("몇 년도로 돌아갈까요?"), L("해만 정하면 바로 그 시절로 가요. 그때의 학교, 일, 집은 그 시대에 맞춰 채워져요."))}
+            <Field required label={L("돌아갈 해")} error={yearErr ?? undefined} errorId="year-error">
+              <span className="flex items-center gap-2">
+                <Input
+                  id="quick-year"
+                  data-autofocus
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+                  aria-invalid={!!yearErr || undefined}
+                  aria-describedby={yearErr ? "year-error" : "year-age"}
+                  placeholder={L`예: ${birthYear ? Math.min(birthYear + 18, now.getFullYear()) : 2005}`}
+                  maxLength={4}
+                  className="max-w-40 text-lg tabular-nums"
+                />
+                {!isEn() && <span className="text-[15px] font-medium">년</span>}
+              </span>
+            </Field>
+            <p id="year-age" aria-live="polite" className="min-h-6 text-[15px] font-semibold text-indigo-700 dark:text-indigo-300">
+              {at !== null ? L`${yearNum}년, ${at}살이 되는 해예요.` : ""}
+            </p>
+            {years.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-stone-600 dark:text-stone-400">{L("나이로 고르기")}</p>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label={L("나이로 고르기")}>
+                  {years.map((y) => (
+                    <Choice key={y.year} small selected={yearNum === y.year} onClick={() => setYear(String(y.year))}>
+                      <span className="flex flex-col items-center py-1 leading-tight">
+                        <b className="font-semibold">{ageText(y.age, "살")}</b>
+                        <span className="text-xs tabular-nums opacity-75">{y.year}</span>
+                      </span>
+                    </Choice>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50">
+              <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{L("그때의 상황과 실제로 한 선택까지 적으면 이야기가 내 삶처럼 이어져요.")}</p>
+              <SmallButton onClick={toDetailed}>{L("자세히 입력하기로 바꾸기")}</SmallButton>
+            </div>
+          </>
+        );
+      }
       case "family":
         return (
           <>
@@ -590,7 +679,7 @@ export function Onboarding({
           <span aria-hidden>←</span>
           {L("처음으로")}
         </button>
-        <Stepper step={step} done={answered} onPick={(i) => i !== step && go(i)} />
+        <Stepper step={step} flow={flow} done={answered} onPick={(i) => i !== step && go(i)} />
         <div className="lg:hidden">
           <CharacterCard profile={p} tp={tp} now={now} compact />
         </div>
@@ -611,15 +700,15 @@ export function Onboarding({
           {/* Stays at the bottom of a phone screen, so 다음 is never a scroll away. */}
           <div className="sticky bottom-0 z-10 flex gap-2 bg-[var(--background)]/95 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
             <Button type="button" variant="ghost" onClick={back} className="min-h-11">
-              {cur.main ? L("이전") : L("돌아가기")}
+              {curMain ? L("이전") : L("돌아가기")}
             </Button>
-            {cur.main && !cur.required && !isLast && (
+            {cur.main && !quick && !cur.required && !isLast && (
               <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
                 {L("건너뛰기")}
               </Button>
             )}
             <Button type="submit" className="min-h-11 flex-1">
-              {isLast ? L("그날로 돌아가기") : !cur.main ? L("완료") : toReview ? L("확인") : L("다음")}
+              {isLast || cur.id === "year" ? L("그날로 돌아가기") : !curMain ? L("완료") : toReview ? L("확인") : L("다음")}
             </Button>
           </div>
           {!isLast && <p className="hidden text-center text-xs text-stone-500 sm:block dark:text-stone-400">{L("Enter 키를 눌러도 다음으로 넘어가요.")}</p>}
@@ -636,21 +725,23 @@ export function Onboarding({
  * The quick-start steps as the Figma "Progress > Steps" bar: one segment per step, its bar filled once answered,
  * the current one in bold accent. Each segment is a button, so any step opens with a tap besides 이전/다음.
  */
-function Stepper({ step, done, onPick }: { step: number; done: (id: StepId) => boolean; onPick: (i: number) => void }) {
+function Stepper({ step, flow, done, onPick }: { step: number; flow: typeof MAIN; done: (id: StepId) => boolean; onPick: (i: number) => void }) {
   const cur = STEPS[step];
-  const at = cur.main ? cur.id : "review"; // an extra question is opened from the summary
-  const n = MAIN.findIndex((s) => s.id === at) + 1;
+  const main = flow.some((s) => s.id === cur.id);
+  const at = main ? cur.id : "review"; // an extra question is opened from the summary
+  const n = flow.findIndex((s) => s.id === at) + 1;
+  const quick = flow === QUICK;
   return (
     <nav aria-label={L("입력 단계")}>
       <div className="flex items-baseline justify-between text-sm">
-        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{cur.main ? L("빠르게 시작") : L`더 알려주기 · ${cap(cur.short)}`}</span>
+        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{quick ? L("빠른 시작") : main ? L("자세히 시작") : L`더 알려주기 · ${cap(cur.short)}`}</span>
         <span className="text-stone-500 tabular-nums dark:text-stone-400">
-          {n} / {MAIN.length}
-          {cur.main && cur.id !== "review" ? ` · ${L`${remaining(step)} 남음`}` : ""}
+          {n} / {flow.length}
+          {main && cur.id !== "review" ? ` · ${L`${remaining(step, flow)} 남음`}` : ""}
         </span>
       </div>
       <ol className="mt-1.5 flex gap-1">
-        {MAIN.map((s) => {
+        {flow.map((s) => {
           const here = s.id === at;
           const ok = done(s.id);
           const need = s.required && !ok;
