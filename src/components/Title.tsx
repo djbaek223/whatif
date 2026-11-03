@@ -137,22 +137,23 @@ const STOPS = [2009 * 12 + 2, 1998 * 12 + 2, 2014 * 12 + 10, 1988 * 12 + 8];
  * again from this month to the next one. Purely visual; with reduced motion it rests on the first stop.
  */
 function Timecode() {
-  const [now] = useState(() => {
-    const d = new Date();
-    return d.getFullYear() * 12 + d.getMonth();
-  });
+  // This month is read after the first paint: the page is prerendered, and the clock there isn't the visitor's.
+  const [now, setNow] = useState<number | null>(null);
   const [mi, setMi] = useState(STOPS[0]);
   useEffect(() => {
+    const d = new Date();
+    const here = d.getFullYear() * 12 + d.getMonth();
+    setNow(here); // eslint-disable-line react-hooks/set-state-in-effect
     if (reducedMotion()) return;
     let stop = 0;
-    let at = now;
+    let at = here;
     let rest = 0;
     const t = setInterval(() => {
       if (rest > 0) {
         rest--;
         if (!rest) {
           stop = (stop + 1) % STOPS.length;
-          at = now;
+          at = here;
         }
         return;
       }
@@ -161,11 +162,11 @@ function Timecode() {
       if (at === STOPS[stop]) rest = 30; // about two seconds on the year
     }, 60);
     return () => clearInterval(t);
-  }, [now]);
+  }, []);
   const ym = (m: number) => `${Math.floor(m / 12)}.${String((m % 12) + 1).padStart(2, "0")}`;
   return (
-    <p aria-hidden suppressHydrationWarning className="flex items-center gap-2.5 font-mono text-[15px] tracking-[0.06em] text-[#cfc6ff]">
-      <span className="opacity-70" suppressHydrationWarning>{ym(now)}</span>
+    <p aria-hidden className="flex items-center gap-2.5 font-mono text-[15px] tracking-[0.06em] text-[#cfc6ff]">
+      <span className="opacity-70">{now === null ? "\u00a0".repeat(7) : ym(now)}</span>
       <span>◀◀</span>
       <span className="rounded-md bg-white/10 px-2 py-0.5 font-bold tabular-nums text-white">{ym(mi)}</span>
     </p>
