@@ -2,6 +2,7 @@
 // Money is in today's 만원 like the rest of the engine, so a 1998 salary reads in 2026 terms.
 // An American life reads the same things from src/regions/us/catalog.ts (in engine units of $10).
 import { US_ABROAD, US_ABROAD_SCHOOLS, US_AREAS, US_COMPANIES, US_LADDERS, US_MORTGAGE_RATE, US_SALARY, US_TIER_LABEL, US_UNIVERSITIES, usTitle, usTuition } from "../regions/us/catalog";
+import { EN_NAMES } from "../locales/en/names";
 import { isUS } from "./region";
 import type { Rng } from "./rng";
 import type { Degree } from "./types";
@@ -325,7 +326,7 @@ export function guessTier(name: string): CompanyTier {
   if (/공장|생산|현장/.test(name)) return "field";
   if (/삼성|현대|LG|SK|롯데|포스코|한화|GS|CJ|대기업|은행/.test(name)) return "large";
   if (/구글|애플|아마존|마이크로소프트|외국계/.test(name)) return "foreign";
-  if (/중소/.test(name)) return "small";
+  if (/중소|빵집|베이커리|가게|카페|식당|편의점|마트|미용실|공방|치킨|분식|약국|학원|상회|사무소|사무실/.test(name)) return "small";
   return "mid";
 }
 
@@ -428,6 +429,50 @@ export function schoolIn(text: string): string | undefined {
   return Object.values(UNIVERSITIES)
     .flat()
     .find((u) => t.includes(u) || t.includes(u.replace(/학교$/, "")));
+}
+
+// Spoken names for an employer ("엘지전자 다닌다" is LG전자).
+const SPOKEN: [RegExp, string][] = [[/엘지/g, "LG"], [/에스케이/g, "SK"], [/케이티/g, "KT"], [/씨제이/g, "CJ"], [/지에스/g, "GS"]];
+
+/** A known employer named in the player's own words ("LG전자에 다니며" → LG전자), the longest name that fits, with the words that named it. */
+function companyMatch(text: string): { name: string; said: string } | undefined {
+  let t = text;
+  for (const [re, to] of SPOKEN) t = t.replace(re, to);
+  const flat = t.replace(/\s/g, "");
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // A Korean name may run into its particle ("LG전자에"); an English one is a whole word ("Meta", not "metal").
+  const named = (n: string) =>
+    /[가-힣]/.test(n) ? flat.includes(n.replace(/\s/g, "")) : new RegExp(`(^|[^a-z])${esc(n)}($|[^a-z])`, "i").test(t);
+  // A Korean life told in English names its employers in English ("work at LG Electronics").
+  return companies()
+    .flatMap((c) => [c.name.replace(/^the /, ""), ...(!isUS() && EN_NAMES[c.name] ? [EN_NAMES[c.name]] : [])].map((said) => ({ name: c.name, said })))
+    .filter((c) => named(c.said))
+    .sort((a, b) => b.said.length - a.said.length)[0];
+}
+
+export const companyIn = (text: string): string | undefined => companyMatch(text)?.name;
+
+// Words that say the player works at the place just named: "LG전자에 다니며", "카카오 입사", "구글에서 일한다".
+const WORK_AFTER = /^\s?(에서|에|으로|로|에도|에서도)?\s?(계속\s?|다시\s?|바로\s?)?(다니|다닌|다녀|입사|취업|취직|일하|일한|일해|일을|근무|들어가|들어간|들어와|합격|출근|이직|옮기|옮긴|옮겨|정규직|신입|재직|붙)/;
+const WORK_BEFORE = /\b(work(ing|s)?\s+(at|for)|join(ing|s)?|get(ting)?\s+a\s+job\s+(at|with)|hired\s+(at|by)|move\s+to|switch(ing)?\s+to|go(ing)?\s+to\s+work\s+(at|for)|stay(ing)?\s+at|land(ing)?\s+a\s+job\s+at|take\s+the\s+job\s+at|career\s+at)\s+(the\s+)?$/i;
+// A name that is a kind of place, not an employer ("회사에 다닌다" says nothing about which).
+const NOT_EMPLOYER = /^(회사|직장|일터|대기업|중견기업|중소기업|공기업|외국계|스타트업|작은회사|큰회사|다른회사|새회사|새직장|그회사|그곳|거기|여기|학교|대학|대학교|대학원|군대|가게|집|본사|지사|회사원|직장인)$/;
+
+/**
+ * The employer the player says they work at, in their own words: a known one followed (or, in English, preceded)
+ * by a word about working there, or any other name before "에 다닌다" ("동네 빵집에서 일한다" → 빵집).
+ */
+export function employerIn(text: string): string | undefined {
+  let t = text;
+  for (const [re, to] of SPOKEN) t = t.replace(re, to);
+  const known = companyMatch(t);
+  if (known) {
+    const i = t.toLowerCase().indexOf(known.said.toLowerCase());
+    if (i >= 0 && (WORK_AFTER.test(t.slice(i + known.said.length)) || WORK_BEFORE.test(t.slice(0, i)))) return known.name;
+  }
+  const m = t.match(/([가-힣A-Za-z0-9&]{2,15})\s?(에서|에|으로|로)\s?(계속\s?|다시\s?)?(다니|다닌|다녀|입사|취업|취직|일하|일한|일해|근무|들어가|들어간|출근|이직|옮기|옮긴|옮겨|재직)/);
+  // A school is not an employer ("서울대에 들어간다" is enrolling).
+  return m && !NOT_EMPLOYER.test(m[1]) && !schoolIn(m[1]) && !/(대학교?|학교|대학원|고등학교|중학교|학원)$/.test(m[1]) ? m[1] : undefined;
 }
 
 // ── Homes ──────────────────────────────────────────
