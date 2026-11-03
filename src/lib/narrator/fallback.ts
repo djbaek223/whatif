@@ -2,10 +2,10 @@
 import { ageAt } from "../events";
 import { choseCollege } from "../education";
 import { eraHints } from "../era";
-import { formatMi, formatWealth, heuristicInitial, statusLabel, turningPointMi } from "../engine";
+import { formatMi, formatWealth, heuristicInitial, lifeStage, statusLabel, turningPointMi } from "../engine";
 import type { LifeState, Profile, TurningPoint } from "../types";
 import type { EndingResult, OpeningResult } from "./schema";
-import { josa } from "../onboarding";
+import { josa, quickStart } from "../onboarding";
 import { alternativePaths } from "./turningChoices";
 import { inRegion, isEn, langFor } from "../region";
 
@@ -28,16 +28,21 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
   const actual = tp.actualChoice || "익숙한 길";
   const student = age < 20;
   const alternatives = alternativePaths(profile, tp);
+  // 빠른 시작 gives only the year: the opening says who they were then instead of a fork they never named.
+  const quick = quickStart(tp);
+  const stage = lifeStage(age);
   if (isEn()) {
     const who = profile.name || "You";
     return {
       persona: `${who} ${profile.mbti ? `is an ${profile.mbti} type. ` : "is hard to sum up in a sentence. "}${profile.personality}`.trim().slice(0, 300),
       stats: mbtiStats(profile.mbti),
       era: [`${formatMi(mi)}. ${who === "You" ? "You were" : `${who} was`} ${age}.`, hints.length ? hints.join(" ") : "The world was changing a little at a time, the way it always does."].join("\n\n"),
-      situation: `${tp.situation || "That day, you stood at a fork in the road."} Back then you chose "${tp.actualChoice || "the familiar path"}." What will you do this time?`,
+      situation: quick
+        ? `It's ${formatMi(mi)} again, and you're ${age}${stage ? `, ${/^[aeiou]/i.test(stage) ? "an" : "a"} ${stage}` : ""}. Everything you know about the years ahead is still only in your head. How will you live it this time?`
+        : `${tp.situation || "That day, you stood at a fork in the road."} Back then you chose "${tp.actualChoice || "the familiar path"}." What will you do this time?`,
       initial: heuristicInitial(profile, tp),
       choices: [
-        { label: tp.actualChoice || "Make the same choice as before", preset: "original", jobTitle: "", place: "", original: true, education: age >= 17 && student && (profile.university.trim() || choseCollege(tp.actualChoice)) ? "university" : "same" },
+        { label: tp.actualChoice || (quick ? "Keep going the way I was" : "Make the same choice as before"), preset: "original", jobTitle: "", place: "", original: true, education: age >= 17 && student && (profile.university.trim() || choseCollege(tp.actualChoice)) ? "university" : "same" },
         ...alternatives,
       ],
     };
@@ -53,11 +58,13 @@ export function fallbackOpening(profile: Profile, tp: TurningPoint): OpeningResu
       `${formatMi(mi)}, ${name}${josa(name, "는", "은")} ${age}세였다.`,
       hints.length ? hints.join(" ") : "세상은 늘 그렇듯 조금씩 변하고 있었다.",
     ].join("\n\n"),
-    situation: `${tp.situation || "그날, 당신은 갈림길 앞에 서 있었다."} 그때 당신은 "${actual}"${josa(actual, "를", "을")} 택했다. 이번에는 어떻게 하겠는가?`,
+    situation: quick
+      ? `다시 ${formatMi(mi)}, ${age}살${stage ? ` ${stage}` : ""}인 당신으로 돌아왔다. 앞으로 올 날들은 아직 당신의 기억 속에만 있다. 이번에는 어떻게 살아 보겠는가?`
+      : `${tp.situation || "그날, 당신은 갈림길 앞에 서 있었다."} 그때 당신은 "${actual}"${josa(actual, "를", "을")} 택했다. 이번에는 어떻게 하겠는가?`,
     initial: heuristicInitial(profile, tp),
     choices: [
       {
-        label: tp.actualChoice || "원래 했던 선택을 그대로 한다",
+        label: tp.actualChoice || (quick ? "그때 살던 대로 살아간다" : "원래 했던 선택을 그대로 한다"),
         preset: "original",
         jobTitle: "",
         place: "",

@@ -23,7 +23,8 @@
     "check:langs": "tsx scripts/check-langs.ts",
     "check:period": "tsx scripts/check-period.ts",
     "check:play": "tsx scripts/check-play.ts",
-    "test": "npm run -s check:play && npm run -s check:moderation && npm run -s check:i18n && npm run -s check:memory && npm run -s check:budget && npm run -s check:timeline"
+    "check:quick": "tsx scripts/check-quick.ts",
+    "test": "npm run -s check:play && npm run -s check:quick && npm run -s check:moderation && npm run -s check:i18n && npm run -s check:memory && npm run -s check:budget && npm run -s check:timeline"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

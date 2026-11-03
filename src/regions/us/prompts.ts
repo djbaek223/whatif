@@ -3,6 +3,7 @@
 import { lifeStage } from "../../lib/engine";
 import type { NarrateRequest } from "../../lib/narrator/schema";
 import { turningPeriod } from "../../lib/period";
+import { quickStart } from "../../lib/onboarding";
 
 export const US_SYSTEM = `You are the narrator of "What If", a life simulator for American players.
 The player entered facts about their real life and a turning point in their past, and is now living from that point on with different choices, until death.
@@ -48,6 +49,9 @@ export function usPromptFor(req: NarrateRequest): string {
         "If profile.universityYear is set, it is the year they started college. Before September of that year they have not started yet (a gap year, say); within four years after, they are enrolled.",
         "Empty schools, college or MBTI in the profile were not asked. Decide them plausibly from the age, the turning point and how they describe their life now, naming a real school of the time when one is needed.",
         "situation, initial and choices must all be possible at this age. Under 18 they are not a college student or employee, and have no spouse, children or assets. For a 9-year-old, write the worries and choices of a grade-schooler: school, family, friends, after-school activities, play. The college or job in the profile is a future that hasn't come yet.",
+        quickStart(req.turningPoint)
+          ? "Quick start: the player picked only the year to go back to and wrote no situation, actual choice or regret. Start the situation from where someone of this age usually stood that year (school, work, home, the mood of the time), as the scene of getting a second chance at it. Make the actual choice (original) mean 'live it the way I did back then', and the 2 other paths concrete ones really open at that age in that year. Don't invent big events the player didn't mention (a breakup, an accident, an acceptance letter)."
+          : "",
         `Era notes for reference: ${req.eraHints.join(" ") || "none"}`,
         turningPeriod(req.turningPoint) ? `Era: ${turningPeriod(req.turningPoint)}` : "",
         "Set the stats from 0 to 100 based on the temperament and situation given. initial is their schooling, job, relationship, children and assets at the turning point (money in units of $10).",

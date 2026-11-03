@@ -112,6 +112,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const [sceneDone, setSceneDone] = useState<string | null>(null);
   const [presentOpen, setPresentOpen] = useState(false);
   const [draft, setDraft] = useState<WizardDraft | null>(null); // answers restored after a refresh
+  const [quick, setQuick] = useState(false); // 빠른 시작 picked on the first screen
   const personalized = useRef<string | null>(null);
   // The life as last rendered, so an answer that comes back after the choice moved on is dropped, not applied twice.
   const lifeRef = useRef<LifeState | null>(null);
@@ -201,11 +202,9 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
   };
 
-  const startNew = () => {
-    if (draft) return setScreen("profile"); // came back from 처음으로: pick up where they left off
-    startFresh();
-  };
-  const startFresh = () => {
+  const startNew = () => setScreen("profile"); // came back from 처음으로: pick up where they left off
+  const startFresh = (q: boolean) => {
+    setQuick(q);
     setProfile(stored?.profile ?? saved?.profile ?? EMPTY_PROFILE);
     setTp(EMPTY_TP);
     setDraft(null);
@@ -221,7 +220,9 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     return {
       ...EMPTY_DRAFT,
       step: 0,
-      at: screen === "turning" || profile.birthDate ? "kind" : "birth", // a saved profile goes straight to the turning point
+      // A saved profile goes straight to the turning point (빠른 시작: to the year).
+      at: screen === "turning" ? "kind" : profile.birthDate && profile.name && profile.gender && profile.hometown ? (quick ? "year" : "kind") : "birth",
+      quick: quick && screen !== "turning",
       profile,
       tp,
       mode: freeText ? "free" : "template",
@@ -385,7 +386,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   return (
     <main className={`mx-auto flex w-full flex-1 flex-col px-4 ${screen === "profile" || screen === "turning" ? "max-w-2xl lg:max-w-5xl" : screen === "play" ? "max-w-2xl lg:max-w-6xl" : "max-w-2xl"}`}>
       {screen === "intro" && (
-        <div className="relative flex flex-1 flex-col justify-center gap-10 py-16">
+        <div className="relative flex flex-1 flex-col justify-center gap-8 py-12 sm:gap-10 sm:py-16">
           <div role="group" aria-label="Language · 언어" className="fixed right-4 top-4 z-10 flex rounded-full border border-stone-200 bg-[var(--background)] p-0.5 text-sm dark:border-stone-800">
             <span aria-hidden className="flex items-center pl-2.5 pr-1 text-stone-500 dark:text-stone-400">
               <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -420,14 +421,12 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
             </p>
           </div>
           <div className="space-y-3">
-            <Button className="w-full py-4 text-base" onClick={startNew}>
-              {draft ? L("이어서 입력하기") : L("시작하기")}
-            </Button>
             {draft && (
-              <Button variant="ghost" className="w-full" onClick={startFresh}>
-                {L("처음부터 다시 입력")}
+              <Button className="w-full py-4 text-base" onClick={startNew}>
+                {L("이어서 입력하기")}
               </Button>
             )}
+            <ModeCards onPick={startFresh} again={!!draft} />
             {saved?.life && (
               <Button variant="ghost" className="w-full" onClick={resume}>
                 {L("이어하기")}
@@ -545,5 +544,70 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
         />
       )}
     </main>
+  );
+}
+
+/**
+ * The two ways in, side by side on the first screen: 빠른 시작 (the first screen and a year, about 30 seconds) and
+ * 자세히 시작 (the moment itself, what was chosen, and more), with how long each takes and how personal the story gets.
+ */
+function ModeCards({ onPick, again }: { onPick: (quick: boolean) => void; again: boolean }) {
+  const modes = [
+    {
+      quick: true,
+      title: L("빠른 시작"),
+      time: L("약 30초"),
+      asks: L("별명 · 생년월일 · 성별 · 자란 곳 + 돌아갈 해"),
+      text: L("해만 고르면 바로 그 시절로 가요. 학교와 그때의 처지는 시대에 맞춰 채워져요."),
+      level: 1,
+      levelText: L("가볍게 맛보기"),
+    },
+    {
+      quick: false,
+      title: L("자세히 시작"),
+      time: L("약 2분"),
+      asks: L("기본 정보 + 그때의 갈림길 · 상황 · 실제 선택"),
+      text: L("가족, 성격, 지금의 나까지 더할 수 있어요. 적을수록 이야기가 내 삶처럼 이어져요."),
+      level: 3,
+      levelText: L("내 이야기처럼"),
+    },
+  ];
+  return (
+    <section aria-labelledby="mode-title" className="space-y-2.5">
+      <h2 id="mode-title" className="text-sm font-semibold text-stone-600 dark:text-stone-400">
+        {again ? L("새로 시작하기") : L("어떻게 시작할까요?")}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {modes.map((m) => (
+          <button
+            key={m.title}
+            type="button"
+            onClick={() => onPick(m.quick)}
+            className={`group flex flex-col gap-2 rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] ${
+              m.quick
+                ? "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-400 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                : "border-field bg-white hover:border-indigo-400 hover:bg-indigo-50 dark:bg-stone-900 dark:hover:bg-indigo-950"
+            }`}
+          >
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="text-lg font-bold">{m.title}</span>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${m.quick ? "bg-white/20" : "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300"}`}>{m.time}</span>
+            </span>
+            <span className={`text-[13px] font-medium ${m.quick ? "text-indigo-100" : "text-indigo-700 dark:text-indigo-300"}`}>{m.asks}</span>
+            <span className={`text-sm leading-relaxed ${m.quick ? "text-white/90" : "text-stone-600 dark:text-stone-400"}`}>{m.text}</span>
+            <span className="mt-auto flex items-center gap-2 pt-1 text-xs font-medium">
+              <span className={m.quick ? "text-indigo-100" : "text-stone-500 dark:text-stone-400"}>{L("개인화")}</span>
+              <span aria-hidden className="flex gap-1">
+                {[1, 2, 3].map((i) => (
+                  <span key={i} className={`h-1.5 w-5 rounded-full ${i <= m.level ? (m.quick ? "bg-white" : "bg-indigo-600 dark:bg-indigo-400") : m.quick ? "bg-white/30" : "bg-stone-200 dark:bg-stone-700"}`} />
+                ))}
+              </span>
+              <span className="sr-only">{L`3단계 중 ${m.level}단계`}</span>
+              <span>{m.levelText}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

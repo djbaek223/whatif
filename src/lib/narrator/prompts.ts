@@ -3,6 +3,7 @@ import { lifeStage } from "../engine";
 import { isEn, isUS } from "../region";
 import { englishSchema, koreanSchema, US_SYSTEM, usPromptFor } from "../../regions/us/prompts";
 import { turningPeriod } from "../period";
+import { quickStart } from "../onboarding";
 import { ClassifySchema, EndingSchema, MomentSchema, OpeningSchema, SceneSchema, SlotMomentSchema, withEpisodes, type NarrateRequest } from "./schema";
 
 export const SYSTEM = `당신은 "What If"라는 한국어 인생 시뮬레이터의 내레이터입니다.
@@ -73,6 +74,9 @@ function koreanPromptFor(req: NarrateRequest): { schema: z.ZodType; prompt: stri
           "profile.universityYear가 있으면 대학 입학년도입니다. 변곡점이 그 해 3월 전이면 아직 입학 전(재수 등), 4년 안이면 재학 중으로 봅니다.",
           "프로필의 학교·대학·MBTI가 비어 있으면 묻지 않은 것입니다. 나이, 변곡점, 지금의 나 설명으로 그럴듯하게 정하고, 학교가 필요하면 그 시절 실제 학교 이름을 정하세요.",
           `situation, initial, choices는 모두 이 나이에 실제로 가능한 것이어야 합니다. 18세 미만은 대학생·직장인이 아니고, 결혼·자녀·자산이 없습니다. 예: 9세라면 초등학생으로서 학교, 가족, 친구, 학원, 놀이 같은 그 나이의 고민과 선택을 씁니다. 프로필의 대학이나 현재 직업은 아직 오지 않은 미래입니다.`,
+          quickStart(req.turningPoint)
+            ? "빠른 시작: 사용자는 돌아갈 해만 골랐고 상황, 실제 선택, 아쉬움은 적지 않았습니다. situation은 그 나이와 그 해에 이 사람이 흔히 서 있었을 자리(학교, 일, 집, 그 시절의 분위기)에서 시작해, 다시 살아 볼 기회를 얻은 장면으로 쓰세요. 실제 선택(original)은 '그때 살던 대로' 같은 뜻으로, 다른 길 2개는 그 나이에 그 해 실제로 고를 수 있었던 구체적인 길로 쓰세요. 사용자가 말하지 않은 큰 사건(이별, 사고, 합격 발표)을 지어내지 마세요."
+            : "",
           `참고할 시대 메모: ${req.eraHints.join(" ") || "없음"}`,
           turningPeriod(req.turningPoint) ? `시대: ${turningPeriod(req.turningPoint)}` : "",
           "능력치는 입력된 성향과 상황을 근거로 0~100 사이로 정하세요. initial은 변곡점 시점의 학업, 직업, 연애, 자녀, 자산 상태입니다.",
