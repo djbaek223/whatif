@@ -121,6 +121,10 @@ export const ClassifySchema = z.object({
   change: z.enum(CHANGES).describe("사용자의 글이 말하는 큰 상태 변화. allowed_changes 안에서만 고르고, 큰 변화가 없으면 none"),
   jobTitle: z.string().describe("change가 startBusiness면 새 직업 이름 (예: 카페 사장), 아니면 빈 문자열"),
   place: z.string().describe("사용자가 말한 회사·가게·학교 이름 (예: '삼성전자', '서울대', '미국 대학원'). change와 상관없이 글에 있으면 적고, 없으면 빈 문자열"),
+  unsafe: z
+    .boolean()
+    .describe("글이 사람을 해치는 폭력(살인, 폭행, 고문, 납치, 방화), 자해·자살, 또는 성적인 행위를 하려는 내용이면 true. 군대, 운동, 격투기, 수술, 말다툼, 연애, 결혼, 출산, 성교육, 비유 표현('시간을 죽인다')은 false")
+    .catch(false), // a reply without it still reads the choice
 });
 export type ClassifyResult = z.infer<typeof ClassifySchema>;
 

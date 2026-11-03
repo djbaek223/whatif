@@ -4,10 +4,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Consequence, signed, spanName, stepLabel } from "@/lib/playUi";
 import type { PendingChoice, StatKey } from "@/lib/types";
 import { SCENE_LATE_MS, SceneWait } from "./Waiting";
-import { Button, FieldError, Spinner, STAT_COLORS, Switch, Textarea } from "./ui";
+import { blockedMessage, Button, FieldError, Spinner, STAT_COLORS, Switch, Textarea } from "./ui";
+import { moderate } from "@/lib/moderation";
 import { L } from "@/lib/i18n";
 
-export type FreeResult = "ok" | "failed" | "stale";
+// blocked: the words describe violence or sex; the choice is not made and the words stay to be changed.
+export type FreeResult = "ok" | "failed" | "stale" | "blocked";
 
 /** Milliseconds since `active` turned on, ticking twice a second; 0 while off. */
 export function useElapsed(active: boolean): number {
@@ -157,6 +159,7 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [failed, setFailed] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [touched, setTouched] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -175,11 +178,14 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
   const submit = async (force = false) => {
     setTouched(true);
     if (short || busy || sending.current) return;
+    // Violence or sex is turned back here, before the narrator sees it; the turn is not used up.
+    if (moderate(text)) return setBlocked(true);
     sending.current = true; // a double tap sends once
     setFailed(false);
     const r = await onSubmit(text.trim(), force);
     sending.current = false;
     if (r === "failed") setFailed(true);
+    if (r === "blocked") setBlocked(true);
   };
 
   if (!open)
@@ -210,6 +216,7 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
         onChange={(e) => {
           setText(e.target.value);
           setFailed(false);
+          setBlocked(false);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -224,8 +231,8 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
         onFocus={() => setTimeout(() => box.current?.scrollIntoView({ block: "nearest" }), 300)}
         placeholder={L("예: 퇴근 후 대학 입시를 다시 준비한다...")}
         aria-label={L("나라면 이렇게 할래요")}
-        aria-describedby={`${hintId}${failed ? ` ${errorId}` : ""}`}
-        aria-invalid={touched && short ? true : undefined}
+        aria-describedby={`${hintId}${failed || blocked ? ` ${errorId}` : ""}`}
+        aria-invalid={(touched && short) || blocked ? true : undefined}
         maxLength={FREE_MAX}
         readOnly={busy}
         autoFocus
@@ -236,7 +243,8 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
           {text.length}/{FREE_MAX}
         </span>
       </p>
-      {failed && (
+      {blocked && <FieldError id={errorId}>{blockedMessage()}</FieldError>}
+      {failed && !blocked && (
         <div className="space-y-2">
           <FieldError id={errorId}>{L("지금은 이 선택을 읽지 못했어요. 쓴 내용은 그대로 있어요.")}</FieldError>
           <button type="button" onClick={() => submit(true)} className="min-h-11 text-sm font-semibold text-indigo-700 underline underline-offset-2 dark:text-indigo-300">
@@ -256,7 +264,7 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
         >
           {L("취소")}
         </Button>
-        <Button type="button" className="flex flex-1 items-center justify-center gap-2" disabled={busy || (touched && short)} aria-disabled={short || undefined} onClick={() => submit()}>
+        <Button type="button" className="flex flex-1 items-center justify-center gap-2" disabled={busy || (touched && short) || blocked} aria-disabled={short || blocked || undefined} onClick={() => submit()}>
           {busy && <Spinner />}
           {busy ? L("선택을 읽는 중") : failed ? L("다시 시도") : L("이 선택으로 진행 →")}
         </Button>

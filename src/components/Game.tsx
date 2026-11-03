@@ -37,6 +37,7 @@ import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
 import { PlayView, type FreeResult } from "./Play";
+import { moderate } from "@/lib/moderation";
 import { stopsProgress } from "@/lib/playUi";
 import { Button } from "./ui";
 import { OpeningWait, REWIND_MS, reducedMotion } from "./Waiting";
@@ -310,6 +311,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   // If it can't be reached the words are kept and the player can try again, or go on with the engine reading them alone.
   async function chooseFree(text: string, force = false): Promise<FreeResult> {
     if (!life?.pending || busy) return "stale";
+    if (moderate(text)) return "blocked"; // violence or sex never reaches the narrator or the story
     const key = pendingKeyOf(life);
     let res: ClassifyResult | null = null;
     if (!force) {
@@ -317,6 +319,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       res = await narrate<ClassifyResult>({ kind: "classify", text, options: life.pending.options.map(({ id, label }) => ({ id, label })), allowed: allowedChanges(life) });
       setBusy(false);
       if (!res) return "failed";
+      if (res.unsafe) return "blocked"; // the narrator caught what the word list missed
     }
     // Another answer already settled this choice while the narrator was reading (a second tap, a reload): drop this one.
     const cur = lifeRef.current;
