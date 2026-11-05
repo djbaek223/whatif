@@ -16,7 +16,7 @@ import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "
 import { LifeHud, useCompactHud } from "./LifeHud";
 import { LifeScene } from "./LifeScene";
 import { MilestoneDialog } from "./Milestones";
-import { Button, Card, DeltaChips, Spinner, StatBars } from "./ui";
+import { Button, Card, DeltaChips, Spinner, StatBars, Timecode } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 
@@ -242,11 +242,12 @@ export function PlayView({
           ref={hud}
           aria-label={L("지금의 삶")}
           data-compact={compact || undefined}
-          className={`fixed inset-x-0 top-0 z-20 mx-auto max-w-2xl border-b border-stone-200 bg-[var(--background)]/95 px-4 pt-[var(--hud-pad-top)] backdrop-blur transition-[padding] duration-200 motion-reduce:transition-none dark:border-stone-800 lg:relative lg:inset-auto lg:z-20 lg:mx-0 lg:max-w-none lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none ${compact ? "pb-2" : "pb-3"}`}
+          className={`vhs-panel fixed inset-x-0 top-0 z-20 mx-auto max-w-2xl rounded-b-3xl px-4 pt-[var(--hud-pad-top)] shadow-[0_8px_24px_rgb(13_10_28/0.25)] transition-[padding] duration-200 motion-reduce:transition-none lg:relative lg:inset-auto lg:z-20 lg:mx-0 lg:max-w-none lg:rounded-2xl lg:p-4 lg:shadow-none ${compact ? "pb-2.5" : "pb-3.5"}`}
         >
           <LifeHud
             life={life}
             compact={compact}
+            osd={mode === "progressing" ? "play" : mode === "ending" ? "stop" : "pause"}
             menu={menu}
             flash={fx.swing}
             flashKey={fx.swingKey}
@@ -276,10 +277,13 @@ export function PlayView({
                   onClick={() => setCollapsedKey(null)}
                   {...pillDrag}
                   aria-expanded={false}
-                  className="flex min-h-12 w-full items-center justify-between gap-3 rounded-full bg-indigo-600 px-5 py-3.5 text-left text-[15px] font-semibold text-white shadow-lg hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 dark:bg-indigo-500"
+                  className="vhs-panel vhs-glow flex min-h-12 w-full items-center justify-between gap-3 rounded-full px-5 py-3.5 text-left text-[15px] font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
                 >
-                  <span className="min-w-0 truncate">{sceneLoading ? L("다음 장면이 펼쳐지고 있어요") : L`선택의 순간 · ${pending.title}`}</span>
-                  <span className="flex shrink-0 items-center gap-1 text-sm">
+                  <span aria-hidden className="vhs-osd shrink-0 font-mono text-xs">
+                    ❚❚
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{sceneLoading ? L("다음 장면이 펼쳐지고 있어요") : L`선택의 순간 · ${pending.title}`}</span>
+                  <span className="flex shrink-0 items-center gap-1 text-sm text-[#cfc6ff]">
                     {L("펼치기")}
                     <Chevron up />
                   </span>
@@ -361,14 +365,15 @@ function BigMomentIntro({ pending, showTitle, onDone }: { pending: PendingChoice
     <div aria-hidden onClick={onDone} className="fixed inset-0 z-40 flex items-center justify-center bg-stone-950/45 p-6 [animation:fadein_.2s_ease-out]">
       <div className="rise-in w-full max-w-sm">
         <div
-          className={`rounded-3xl px-6 py-8 text-center shadow-2xl ${pending.rare ? "border-2 border-amber-400 bg-amber-50 dark:border-amber-500 dark:bg-amber-950" : "bg-white dark:bg-stone-900"}`}
+          className={`vhs-panel rounded-3xl px-6 py-8 text-center shadow-2xl ${pending.rare ? "border-2 border-amber-400" : "border border-white/20"}`}
         >
+          <p className="vhs-osd mb-3 font-mono text-xs tracking-[0.12em]">❚❚ PAUSE</p>
           {/* While the scene is being written its title stays hidden too, so the card names only the kind of moment. */}
-          <p className={`font-semibold ${showTitle ? "text-xs tracking-widest" : "text-2xl"} ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-400"}`}>
+          <p className={`font-semibold ${showTitle ? "text-xs tracking-widest" : "text-2xl"} ${pending.rare ? "text-amber-300" : "text-[#cfc6ff]"}`}>
             {pending.rare ? L("✦ 희귀한 순간") : L("인생의 갈림길")}
           </p>
           {showTitle && <p className="mt-2 text-2xl font-bold text-balance">{pending.title}</p>}
-          <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">{L("탭하면 바로 고를 수 있어요")}</p>
+          <p className="mt-4 text-xs text-[#b3aadb]">{L("탭하면 바로 고를 수 있어요")}</p>
         </div>
       </div>
     </div>
@@ -431,7 +436,7 @@ function PlayMenu({
       close();
     } else if (e.key === "Tab") setOpen(false);
   };
-  const item = "flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm hover:bg-stone-100 focus-visible:bg-stone-100 focus-visible:outline-none dark:hover:bg-stone-800 dark:focus-visible:bg-stone-800";
+  const item = "flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm hover:bg-white/10 focus-visible:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70";
   return (
     <div ref={box} className="relative">
       <button
@@ -441,7 +446,7 @@ function PlayMenu({
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={L("메뉴")}
-        className="-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-stone-400 dark:hover:bg-stone-800"
+        className={`-mr-2 flex h-11 w-11 items-center justify-center rounded-full text-[#e4defc] hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${open ? "bg-white/15" : ""}`}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <circle cx="5" cy="12" r="1.8" />
@@ -450,12 +455,15 @@ function PlayMenu({
         </svg>
       </button>
       {open && (
-        <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} className="absolute top-11 right-0 z-30 w-48 overflow-hidden rounded-xl border border-stone-200 bg-white py-1 shadow-lg dark:border-stone-800 dark:bg-stone-900">
+        <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} className="vhs-panel absolute top-11 right-0 z-30 w-52 overflow-hidden rounded-xl border border-white/20 py-1 shadow-[0_16px_40px_rgb(0_0_0/0.45)]">
+          <p aria-hidden className="vhs-osd px-4 pt-2 pb-1 font-mono text-[11px] tracking-[0.12em]">
+            ❚❚ MENU
+          </p>
           <button
             type="button"
             role="menuitem"
             aria-haspopup="dialog"
-            className={`${item} border-b border-stone-100 font-semibold dark:border-stone-800`}
+            className={`${item} border-b border-white/10 font-semibold`}
             onClick={() => {
               setOpen(false);
               onPath();
@@ -484,8 +492,8 @@ function PlayMenu({
             </svg>
             {sound ? L("효과음 끄기") : L("효과음 켜기")}
           </button>
-          <div role="group" aria-label={L("세상 뉴스")} className="border-y border-stone-100 py-1 dark:border-stone-800">
-            <p className="px-4 pt-1.5 pb-0.5 text-xs font-semibold text-stone-500 dark:text-stone-400">{L("세상 뉴스")}</p>
+          <div role="group" aria-label={L("세상 뉴스")} className="border-y border-white/10 py-1">
+            <p className="px-4 pt-1.5 pb-0.5 text-xs font-semibold text-[#b3aadb]">{L("세상 뉴스")}</p>
             {NEWS_MODES.map((m) => (
               <button
                 key={m.value}
@@ -498,7 +506,7 @@ function PlayMenu({
                   close();
                 }}
               >
-                <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${news === m.value ? "" : "invisible"}`}>
+                <span aria-hidden className={`w-[18px] text-center text-[#cfc6ff] ${news === m.value ? "" : "invisible"}`}>
                   ✓
                 </span>
                 {m.label}
@@ -509,13 +517,13 @@ function PlayMenu({
             type="button"
             role="menuitemcheckbox"
             aria-checked={keys}
-            className={`${item} border-b border-stone-100 dark:border-stone-800`}
+            className={`${item} border-b border-white/10`}
             onClick={() => {
               onKeys();
               close();
             }}
           >
-            <span aria-hidden className={`w-[18px] text-center text-indigo-600 dark:text-indigo-400 ${keys ? "" : "invisible"}`}>
+            <span aria-hidden className={`w-[18px] text-center text-[#cfc6ff] ${keys ? "" : "invisible"}`}>
               ✓
             </span>
             {L("키보드 단축키")}
@@ -573,7 +581,7 @@ function PlayMenu({
             </svg>
             {L("저장하고 나가기")}
           </button>
-          <p className="border-t border-stone-100 px-4 pt-2 pb-1.5 text-[11px] text-stone-500 tabular-nums dark:border-stone-800 dark:text-stone-400">What If {versionLabel}</p>
+          <p className="border-t border-white/10 px-4 pt-2 pb-1.5 font-mono text-[11px] text-[#b3aadb] tabular-nums">What If {versionLabel}</p>
         </div>
       )}
       <AboutDialog
@@ -953,9 +961,7 @@ function Feed({ feed, news, chapters }: { feed: LogEntry[]; news: NewsMode; chap
           case "date":
             return (
               <li key={i} id={markerId(it.mi)} data-mi={it.mi} className={`-ml-6 scroll-mt-4 ${i === 0 ? "" : "pt-3"}`}>
-                <span className="relative inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 tabular-nums dark:bg-indigo-950 dark:text-indigo-300">
-                  {formatMi(it.mi)}
-                </span>
+                <Timecode mi={it.mi} />
               </li>
             );
           case "world":

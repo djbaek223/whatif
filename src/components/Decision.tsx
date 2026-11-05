@@ -81,6 +81,11 @@ export function DecisionPanel({
       </p>
       <div>
         <p className={`text-xs font-semibold tracking-wide ${pending.rare ? "text-amber-700 dark:text-amber-300" : "text-indigo-700 dark:text-indigo-300"}`}>
+          {!pending.rare && (
+            <span aria-hidden className="mr-1">
+              ◆
+            </span>
+          )}
           {kind} <span className="font-normal text-stone-600 tabular-nums dark:text-stone-400">· {when}</span>
         </p>
         {skipped > 0 && <p className="mt-1 text-xs text-stone-600 dark:text-stone-400">{L`${spanName(skipped)}이 흘렀어요.`}</p>}
@@ -133,7 +138,7 @@ function ChoiceCard({ index, label, detail, keys, disabled, onClick }: { index: 
     <Button variant="choice" disabled={disabled} onClick={onClick} aria-keyshortcuts={keys && index < 9 ? String(index + 1) : undefined} className="group flex min-h-14 items-center gap-3">
       <span
         aria-hidden
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-field text-xs font-semibold text-stone-600 tabular-nums group-hover:border-indigo-500 group-hover:text-indigo-700 dark:text-stone-300 dark:group-hover:text-indigo-300"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#ece9ff] font-mono text-sm font-bold text-[#3f33c4] tabular-nums transition group-hover:bg-[#5b4cf0] group-hover:text-white dark:bg-[#2b2160] dark:text-[#e4defc] dark:group-hover:bg-[#5b4cf0]"
       >
         {index + 1}
       </span>
@@ -141,8 +146,8 @@ function ChoiceCard({ index, label, detail, keys, disabled, onClick }: { index: 
         <span className="block font-semibold">{label}</span>
         {detail && <span className="mt-0.5 block text-[13px] font-normal text-stone-600 dark:text-stone-400">{detail}</span>}
       </span>
-      <span aria-hidden className="shrink-0 text-stone-400 group-hover:text-indigo-500">
-        →
+      <span aria-hidden className="shrink-0 text-lg text-stone-500 group-hover:text-[#5b4cf0] dark:text-stone-400 dark:group-hover:text-[#cfc6ff]">
+        ›
       </span>
     </Button>
   );
@@ -352,7 +357,7 @@ export function ConsequenceView({ c, when, onDone }: { c: Consequence; when: str
 
       {quiet && <p className="text-sm text-stone-600 dark:text-stone-400">{L("큰 변화 없이 하루가 지나갔어요.")}</p>}
 
-      <Button data-focus="consequence-done" className="flex w-full items-center justify-center gap-1.5" onClick={onDone}>
+      <Button data-focus="consequence-done" variant="tape" className="flex w-full items-center justify-center gap-1.5" onClick={onDone}>
         {L("계속 살아가기")}
         <span aria-hidden>→</span>
       </Button>
@@ -400,7 +405,7 @@ export function TimelineDock({ months, keys, onStep, onProgress }: { months: num
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[1.15fr_1fr] gap-2">
-        <Button className="flex min-h-12 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap" onClick={onStep} aria-keyshortcuts={keys ? "Space" : undefined} data-focus="controls">
+        <Button variant="tape" className="vhs-glow flex min-h-12 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap" onClick={onStep} aria-keyshortcuts={keys ? "Space" : undefined} data-focus="controls">
           {stepLabel(months)}
           <span aria-hidden>→</span>
         </Button>
@@ -422,20 +427,31 @@ export function TimelineDock({ months, keys, onStep, onProgress }: { months: num
 export function ProgressDock({ when, autoDecide, keys, onStop, onToggleAutoDecide }: { when: string; autoDecide: boolean; keys: boolean; onStop: () => void; onToggleAutoDecide: () => void }) {
   return (
     <div className="space-y-2.5">
+      <div className="vhs-panel vhs-glow space-y-2.5 rounded-2xl p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold">{L("삶을 이어가고 있어요")}</p>
-          <p className="truncate text-xs text-stone-600 dark:text-stone-400">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <span aria-hidden className="vhs-osd font-mono text-xs">
+              ▶▶
+            </span>
+            {L("삶을 이어가고 있어요")}
+          </p>
+          <p className="truncate text-xs text-[#c9c1ee]">
             {autoDecide ? L("다음 큰 갈림길까지 진행 중") : L("다음 중요한 선택까지 진행 중")} · <span className="tabular-nums">{when}</span>
           </p>
         </div>
-        <Button data-focus="controls" className="flex min-h-12 shrink-0 items-center gap-2" onClick={onStop} aria-keyshortcuts={keys ? "A" : undefined}>
+        <Button
+          data-focus="controls"
+          variant="onTape"
+          className="flex min-h-12 shrink-0 items-center gap-2"
+          onClick={onStop} aria-keyshortcuts={keys ? "A" : undefined}>
           <span aria-hidden>■</span>
           {L("멈추기")}
         </Button>
       </div>
-      <div aria-hidden className="indeterminate h-1 overflow-hidden rounded-full bg-indigo-100 dark:bg-indigo-950">
-        <span className="block h-full w-1/3 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+      <div aria-hidden className="indeterminate h-1 overflow-hidden rounded-full bg-white/15">
+        <span className="block h-full w-1/3 rounded-full bg-[#cfc6ff]" />
+      </div>
       </div>
       <Switch checked={autoDecide} onChange={onToggleAutoDecide}>
         {L("작은 선택은 맡기기")}

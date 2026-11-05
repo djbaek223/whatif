@@ -504,7 +504,8 @@ body {
     transform: translateY(100svh);
   }
 }
-.title-osd {
+.title-osd,
+.vhs-osd {
   color: #cfc6ff;
   text-shadow: 1px 0 #ff5c8a, -1px 0 #5ee7ff;
 }
@@ -525,4 +526,24 @@ body {
   .title-start {
     animation: none;
   }
+}
+
+/* ── Play screen: the same tape ──────────────────────────
+   The Life HUD (and the menu, the progress card and the big-moment card) is a piece of the title screen's
+   dark VHS picture in both themes; the story and the choices below follow the theme, so long reading stays easy.
+   The scanlines are a background layer, never drawn over the text. */
+
+.vhs-panel {
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 0%, #2b2160 0%, #16122b 62%, #0d0a1c 100%);
+  color: #efeaff;
+  /* Gauge colours one step lighter, so the bars hold 3:1 against the dark panel. */
+  --stat-health: #4f97f0;
+  --stat-happiness: #ff7a45;
+  --stat-knowledge: #2fc48c;
+  --stat-relationships: #f0a81a;
+}
+.vhs-glow {
+  box-shadow: 0 0 0 3px rgba(109, 92, 255, 0.35), 0 10px 26px rgba(22, 18, 43, 0.3);
 }
