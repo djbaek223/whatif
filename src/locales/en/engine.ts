@@ -20,6 +20,8 @@ export const ENGINE: Record<string, string> = {
   "사표를 내고 내 일을 시작했다.": "Quit the job and started something of my own.",
   "내 일을 시작했다.": "Started something of my own.",
   "창업 자금": "Startup money",
+  "의사가 되려면 의대를 나와야 했다.": "Becoming a doctor took medical school.",
+  "{0} 채용은 {1} 이상만 받아 원서를 낼 수 없었다.": "{0} only hired people with at least {1}, so the application never went in.",
   "큰 모험을 시작했다.": "Set out on a big gamble.",
   "초기 자금": "Seed money",
   "모험이 성공으로 이어졌다. 월수입이 {0}이 되었다.": "The gamble paid off. Monthly income is now {0}.",

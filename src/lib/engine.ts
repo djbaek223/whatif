@@ -5,6 +5,7 @@ import {
   betterTier,
   DEGREE_RANK,
   degreePay,
+  employerIn,
   fitTier,
   guessTier,
   isMedical,
@@ -20,6 +21,7 @@ import {
   tierOf,
   titleFor,
   tuitionFor,
+  TIER_NEEDS,
   type CompanyTier,
 } from "./catalog";
 import { adultAge, costBreakdown, costChange, costTotal, monthlyCosts, tuitionOnly } from "./budget";
@@ -968,11 +970,60 @@ export function intentFromText(text: string, s: LifeState): Intent | null {
   const t = text.trim();
   if (!t || negated(t)) return null;
   const allowed = new Set(allowedChanges(s));
+  // "LG전자에 다니며 인생을 이어간다": working at a named employer is taking a job there (or moving there from another).
+  // Closing a shop, opening one or retiring is read first; quitting to join another company is a move.
+  const at = employerIn(t);
   for (const [change, re] of INTENT_WORDS) {
+    if (at && (change === "quitJob" || change === "switchJob" || change === "hire")) {
+      if (at === s.flags.company) return null; // staying where they already work
+      const move = fitChange("hire", s);
+      if (allowed.has(move)) return { change: move, place: at };
+    }
     if (!re.test(t) || !allowed.has(change)) continue;
-    return change === "startBusiness" ? { change, title: businessTitle(t) } : { change };
+    if (change === "startBusiness") return { change, title: businessTitle(t) };
+    return { change };
+  }
+  // "서울대에 입학한다": a university named with a word about going there.
+  if (schoolIn(t) && ENROLL_AT.test(t)) {
+    const level: CustomChange = /대학원|석사|박사|\b(grad|graduate|master|PhD)/i.test(t) ? "enrollGraduate" : "enrollUniversity";
+    if (allowed.has(level)) return { change: level };
   }
   return null;
+}
+
+const ENROLL_AT = /입학|진학|편입|들어가|들어간|합격|다니|다닌|\b(enroll|go to|get into|attend|transfer to|study at)\b/i;
+
+/** A job change in the terms that fit this life: "취업한다" for someone already at a company is a move, and a move for someone without one is a first job. */
+function fitChange(c: CustomChange, s: LifeState): CustomChange {
+  if (c === "hire" && employee(s.flags)) return "switchJob";
+  if (c === "switchJob" && !s.flags.employed) return "hire";
+  return c;
+}
+
+// Words of trying ("공채에 도전한다", "apply to Google"): the gamble stays. Words of doing ("LG전자에 다닌다") make it so.
+const ATTEMPT = /도전|지원|노려|노린|노리|준비|시험|알아보|알아본|원서|면접|응시|붙으면|되면|해\s?보|해\s?본|\b(try|tries|trying|apply|applies|applying|prepare|aim|interview|hope|if)\b/i;
+const DECLARED: CustomChange[] = ["hire", "switchJob", "enrollUniversity", "enrollGraduate"];
+
+/** The option's gamble, settled the way the player wrote it: "LG전자에 다닌다" is hired, not rolled for and maybe still job-hunting. */
+function declared(effect: Effect, change: CustomChange, s: LifeState): Effect {
+  if (!effect.risk || changesOf({ ...effect, risk: undefined }, s).has(change) || !changesOf(effect, s).has(change)) return effect;
+  return { ...effect, risk: { ...effect.risk, chance: () => 1 } };
+}
+
+/** A line before the outcome: why the employer the player named didn't take them ("LG전자 채용은 대졸 이상만 받았다."). */
+function gateLine(s: LifeState, named: string | undefined): string {
+  if (!named) return "";
+  const tier = tierOf(named) ?? guessTier(named);
+  if (reachable(s, tier) === tier) return "";
+  if (tier === "doctor") return L("의사가 되려면 의대를 나와야 했다.");
+  return L`${V(named)} 채용은 ${DEGREE_LABELS[TIER_NEEDS[tier]]} 이상만 받아 원서를 낼 수 없었다.`;
+}
+
+/** An effect with a line told before its own. */
+function lead(effect: Effect, line: string): Effect {
+  if (!line) return effect;
+  const own = effect.text;
+  return { ...effect, text: (st: LifeState) => [line, typeof own === "function" ? own(st) : own].filter(Boolean).join(" ") };
 }
 
 const withSaid = (i: Intent | null, place?: string): Intent | null => (i && place?.trim() ? { ...i, place: place.trim() } : i);
@@ -1035,13 +1086,20 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
   // The player's own words win over the nearest listed option: writing "카페를 차린다" opens a cafe,
   // even if the closest option was about staying at the company.
   let wish = inPeriodIntent(freeText?.trim() ? (intent?.change && intent.change !== "none" ? intent : withSaid(intentFromText(freeText, s), intent?.place)) : null, Math.floor(s.mi / 12));
+  // The narrator may say "hire" for someone already at a company (or "switchJob" for someone without one): the same wish.
+  if (wish) wish = { ...wish, change: fitChange(wish.change, s) };
+  // A place the words name, when the narrator didn't give one ("LG전자에 다니며…" read by the engine).
+  if (wish && !wish.place && freeText && (wish.change === "hire" || wish.change === "switchJob")) wish = withSaid(wish, employerIn(freeText));
   // Buying Bitcoin or shares is not opening a business, whatever the narrator read; only words about a business are.
   const bet = freeText?.trim() ? betIn(freeText, s) : null;
   if (bet && wish?.change === "startBusiness" && intentFromText(freeText!, s)?.change !== "startBusiness") wish = null;
   const wished = !!wish && allowedChanges(s).includes(wish.change);
   if (wish && wished && !changesOf(effect, s).has(wish.change)) {
     const text = wish.change === "startBusiness" && employee(s.flags) ? L("사표를 냈다.") : (INTENT_TEXT[wish.change] ?? "");
-    effect = { text, stats: { happiness: 3 }, ...changeEffect(wish.change, wish) };
+    // Finishing school the option made ("졸업 후의 길") still happens, whatever the player does next.
+    const done = effect?.flags?.education === "done" && !wish.change.startsWith("enroll") ? { education: "done" as const } : undefined;
+    const change = changeEffect(wish.change, wish);
+    effect = { text, stats: { happiness: 3 }, ...change, ...(done ? { flags: { ...change.flags, ...done } } : {}) };
     if (wish.change === "startBusiness") effect = { ...effect, wealth: -Math.max(1000, Math.min(4000, Math.round(s.wealth * 0.4))), note: L("창업 자금") };
     plan = undefined;
   }
@@ -1051,8 +1109,13 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
     effect = investEffect(bet, s, freeText!, pending.scene);
     plan = undefined;
   }
+  // Said as done, not as tried: "LG전자에 다니며" is working there, so the option's gamble can't leave them still job-hunting.
+  if (wish && wished && effect && DECLARED.includes(wish.change) && !ATTEMPT.test(freeText ?? "")) effect = declared(effect, wish.change, s);
   // Where it happens is the player's too: "미국 대학 석사" studies in the US, not at the school the nearest option named.
-  const own = freeText?.trim() && effect ? ownPlan(freeText, effect, s, rng, intent?.place) : undefined;
+  const said = intent?.place?.trim() || wish?.place;
+  const own = freeText?.trim() && effect ? ownPlan(freeText, effect, s, rng, said) : undefined;
+  // An employer the degree doesn't reach is said so, instead of quietly becoming another company.
+  if (!own && effect && wish && wished && (wish.change === "hire" || wish.change === "switchJob") && existedIn(said, Math.floor(s.mi / 12))) effect = lead(effect, gateLine(s, said));
   if (own) {
     if (plan?.place) effect = unnamed(effect!, plan.place);
     plan = own;
