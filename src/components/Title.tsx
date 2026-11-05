@@ -16,15 +16,15 @@ export function TitleScreen({
   lang,
   onLang,
   onPick,
-  slot,
+  slots,
   footer,
 }: {
   langs: { id: Lang; name: string }[];
   lang: Lang;
   onLang: (l: Lang) => void;
   onPick: (quick: boolean) => void;
-  /** A game or unfinished questions to go back to, shown like a save slot under the two buttons. */
-  slot?: { label: string; detail?: string; onClick: () => void } | null;
+  /** A game and/or unfinished questions to go back to, each shown like a save slot under the two buttons. */
+  slots: { label: string; detail?: string; onClick: () => void }[];
   footer: ReactNode;
 }) {
   return (
@@ -76,8 +76,9 @@ export function TitleScreen({
             onClick={() => onPick(true)}
           />
           <StartButton icon={<ForkIcon />} title={L("내 인생 되돌리기")} text={L("내 갈림길과 선택으로")} time={L("2분")} onClick={() => onPick(false)} />
-          {slot && (
+          {slots.map((slot) => (
             <button
+              key={slot.label}
               type="button"
               onClick={slot.onClick}
               className="mx-auto flex min-h-11 items-center gap-2 rounded-lg px-3 text-[15px] font-medium text-[#e4defc] underline decoration-white/40 underline-offset-4 hover:decoration-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
@@ -86,7 +87,7 @@ export function TitleScreen({
               {slot.label}
               {slot.detail && <span className="text-[#c9c1ee]">· {slot.detail}</span>}
             </button>
-          )}
+          ))}
         </div>
       </div>
 

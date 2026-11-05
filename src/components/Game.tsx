@@ -159,23 +159,29 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       setStored(sp);
       setRemember(!!sp);
     });
-    readProgress<Saved>().then((s) => {
-      if (s?.life || s?.profile.birthDate) setSaved(s);
-    });
-    // A refresh in the middle of the questions goes straight back to the same question.
-    readDraft<WizardDraft>().then((d) => {
-      if (!d?.profile) return;
-      setDraft(d);
-      setRemember(d.remember);
-      setScreen((s) => (s === "intro" ? "profile" : s));
-    });
+    // The kept game is read first, so a refresh in the middle of the questions can't save over it before it is known.
+    readProgress<Saved>()
+      .then((s) => {
+        if (s?.life || s?.profile.birthDate) setSaved(s);
+      })
+      .then(() => readDraft<WizardDraft>())
+      .then((d) => {
+        // A refresh in the middle of the questions goes straight back to the same question.
+        if (!d?.profile) return;
+        setDraft(d);
+        setRemember(d.remember);
+        setScreen((s) => (s === "intro" ? "profile" : s));
+      });
     aiAvailable().then(setAi);
   }, [initialLang, guessed]);
 
   useEffect(() => {
     if (screen === "intro" || screen === "loading") return;
+    // While new questions are being answered, a life kept to go back to stays saved; it is replaced only once
+    // the new life actually begins (the questions themselves live in the draft).
+    if ((screen === "profile" || screen === "turning") && !life && saved?.life) return;
     writeProgress({ screen, profile, tp, life, ending, memoir } satisfies Saved, remember);
-  }, [screen, profile, tp, life, ending, memoir, remember]);
+  }, [screen, profile, tp, life, ending, memoir, remember, saved]);
 
   const eraseDevice = async () => {
     if (!confirm(L("이 기기에 저장된 기본정보와 진행 중인 게임을 모두 지울까요? 되돌릴 수 없어요."))) return;
@@ -393,19 +399,20 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
             lang={lang}
             onLang={pickLang}
             onPick={startFresh}
-            slot={
-              draft
-                ? { label: L("이어서 입력하기"), onClick: startNew }
-                : saved?.life
-                  ? {
+            slots={[
+              ...(saved?.life
+                ? [
+                    {
                       label: L("이어하기"),
                       detail: saved.life.dead
                         ? L`${saved.life.deathAge ?? ageAt(saved.life.profile.birthDate, saved.life.mi)}세에 끝난 인생`
                         : `${ymText(`${Math.floor(saved.life.mi / 12)}-${(saved.life.mi % 12) + 1}`)}, ${ageText(ageAt(saved.life.profile.birthDate, saved.life.mi), "살")}`,
                       onClick: resume,
-                    }
-                  : null
-            }
+                    },
+                  ]
+                : []),
+              ...(draft ? [{ label: L("이어서 입력하기"), onClick: startNew }] : []),
+            ]}
             footer={
               <>
                 {stored && (
@@ -512,6 +519,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
           onSkipMemoir={() => setMemoir("skip")}
           onReplay={() => startOpening(profile, tp)}
           onNewTurningPoint={() => {
+            setSaved({ screen, profile, tp, life, ending, memoir }); // stays to go back to until the new life begins
             setLife(null);
             setEnding(null);
             setScreen("turning");
