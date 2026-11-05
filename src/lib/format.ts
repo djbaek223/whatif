@@ -28,6 +28,9 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 export const ageText = (age: number | string, unit: "세" | "살" = "세") => (isEn() ? `age ${age}` : `${age}${unit}`);
 
 /** A YYYY-MM month on screen: "2019년 3월" or "Mar 2019". */
+/** A month as the tape's timecode, `2010.04`, the same in every language (mi = year * 12 + month - 1). */
+export const timecode = (mi: number) => `${Math.floor(mi / 12)}.${String((mi % 12) + 1).padStart(2, "0")}`;
+
 export function ymText(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
   if (!y) return ym;

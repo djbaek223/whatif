@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatMi } from "@/lib/engine";
 import { MILESTONE_ICON, milestonesOf, type Milestone } from "@/lib/playUi";
 import type { LifeState } from "@/lib/types";
-import { Button } from "./ui";
+import { Button, Timecode } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 
@@ -38,6 +37,9 @@ export function MilestoneDialog({ open, life, onClose, onPick }: { open: boolean
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="milestones-title" className="text-lg font-bold">
+              <span aria-hidden className="mr-1.5 font-mono text-[#5b4cf0] dark:text-[#cfc6ff]">
+                ◀◀
+              </span>
               {L("지나온 길")}
             </h2>
             <p className="text-sm text-stone-600 dark:text-stone-300">{L("누르면 그 시점의 이야기로 이동해요.")}</p>
@@ -76,8 +78,9 @@ export function MilestoneDialog({ open, life, onClose, onPick }: { open: boolean
                     {MILESTONE_ICON[m.kind]}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-xs text-stone-600 tabular-nums dark:text-stone-400">
-                      {ageText(m.age)} · {formatMi(m.mi)}
+                    <span className="flex items-center gap-1.5 text-xs text-stone-600 tabular-nums dark:text-stone-400">
+                      <Timecode mi={m.mi} tone={now ? "now" : "tape"} />
+                      {ageText(m.age)}
                     </span>
                     <span className={`block text-sm ${now ? "font-bold" : "font-medium"}`}>{m.text}</span>
                   </span>

@@ -7,6 +7,7 @@ import { formatMi, formatWealth, payLabel, statusLabel } from "@/lib/engine";
 import { degreeLine } from "@/lib/playUi";
 import { STAT_LABELS, type LifeState, type StatKey } from "@/lib/types";
 import { STAT_COLORS, StatBars } from "./ui";
+import { timecode } from "@/lib/format";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 
@@ -14,6 +15,8 @@ import { ageText } from "@/lib/format";
  * The Life HUD: who (name, age, what they do, 학력), when (year and month) and money on one row, the Life Scene in
  * the middle and the four gauges below. Scrolled down the timeline it turns compact: one row of who and when, the
  * scene as a slim strip and the gauges as numbers, so the story gets the room.
+ * It sits on the dark VHS panel of the title screen (.vhs-panel): the month is the tape's timecode, with
+ * ▶ PLAY while time runs on its own and ❚❚ PAUSE while it waits for the player.
  */
 export function LifeHud({
   life,
@@ -22,6 +25,7 @@ export function LifeHud({
   menu,
   flash,
   flashKey,
+  osd,
 }: {
   life: LifeState;
   compact: boolean;
@@ -29,6 +33,8 @@ export function LifeHud({
   menu: ReactNode;
   flash?: Partial<Record<StatKey, "up" | "down">>;
   flashKey?: number;
+  /** What the tape is doing, shown beside the timecode (decoration only; the page already says it in words). */
+  osd?: "play" | "pause" | "stop";
 }) {
   const age = ageOf(life);
   const status = statusLabel(life);
@@ -44,21 +50,42 @@ export function LifeHud({
             <span className="shrink-0 whitespace-pre"> · {ageText(age)}</span>
           </h1>
           {/* Long job titles end in "…" on screen; the whole text stays in the page for screen readers and on hover. */}
-          <p className={`truncate text-xs text-stone-600 dark:text-stone-400 ${compact ? "max-lg:sr-only" : ""}`} title={status}>
+          <p className={`truncate text-xs text-[#c9c1ee] ${compact ? "max-lg:sr-only" : ""}`} title={status}>
             {status}
           </p>
-          {degree && <p className={`truncate text-[11px] text-stone-500 dark:text-stone-400 ${compact ? "max-lg:hidden" : ""}`}>{degree}</p>}
+          {degree && <p className={`truncate text-[11px] text-[#b3aadb] ${compact ? "max-lg:hidden" : ""}`}>{degree}</p>}
         </div>
         <div className="flex shrink-0 items-start gap-1">
-          <div className="text-right">
-            <p className="text-sm font-semibold tabular-nums">{formatMi(life.mi)}</p>
+          <div className="flex flex-col items-end">
+            <p className="flex items-center gap-2">
+              <span className={`rounded-md bg-white/10 px-1.5 font-mono font-bold tracking-[0.06em] tabular-nums ${compact ? "text-sm" : "text-base"}`}>
+                <span aria-hidden>{timecode(life.mi)}</span>
+                <span className="sr-only">{formatMi(life.mi)}</span>
+              </span>
+            </p>
             <MoneyLine life={life} pay={payLabel(life)} />
           </div>
           {menu}
         </div>
       </div>
-      <div className={compact ? "mt-1.5" : "mt-2"}>{scene}</div>
-      <div className={compact ? "mt-1.5" : "mt-2.5"}>{compact ? <StatMini life={life} /> : <StatBars stats={life.stats} compact flash={flash} flashKey={flashKey} />}</div>
+      <div className={`relative ${compact ? "mt-1.5" : "mt-2"}`}>
+        {scene}
+        {/* The tape's on-screen display, in the picture's corner like a VCR's. */}
+        {osd && (
+          <span aria-hidden className="vhs-osd pointer-events-none absolute right-2 bottom-1.5 z-10 rounded bg-[#0d0a1c]/70 px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.1em]">
+            {osd === "play" ? (
+              <>
+                <span className="motion-safe:animate-[vhs-blink_1s_steps(2)_infinite]">▶</span> PLAY
+              </>
+            ) : osd === "pause" ? (
+              "❚❚ PAUSE"
+            ) : (
+              "■ STOP"
+            )}
+          </span>
+        )}
+      </div>
+      <div className={compact ? "mt-1.5" : "mt-2.5"}>{compact ? <StatMini life={life} /> : <StatBars stats={life.stats} compact onDark flash={flash} flashKey={flashKey} />}</div>
     </>
   );
 }
@@ -70,10 +97,10 @@ function StatMini({ life }: { life: LifeState }) {
       {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
         <li key={k} className="min-w-0">
           <span className="flex items-baseline justify-between gap-1">
-            <span className="truncate text-stone-600 dark:text-stone-400">{STAT_LABELS[k]}</span>
+            <span className="truncate text-[#c9c1ee]">{STAT_LABELS[k]}</span>
             <span className="font-semibold tabular-nums">{life.stats[k]}</span>
           </span>
-          <span aria-hidden className="mt-0.5 block h-0.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+          <span aria-hidden className="mt-0.5 block h-0.5 overflow-hidden rounded-full bg-white/15">
             <span className="block h-full" style={{ width: `${life.stats[k]}%`, background: STAT_COLORS[k] }} />
           </span>
         </li>
@@ -138,18 +165,18 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
         }}
         aria-expanded={open}
         aria-controls="money-detail"
-        className={`-mr-0.5 inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 py-0.5 pr-1 pl-2 text-right text-xs text-stone-700 tabular-nums hover:border-indigo-300 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-950 ${open ? "border-indigo-300 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950" : ""}`}
+        className={`-mr-0.5 inline-flex items-center gap-1 rounded-lg border py-0.5 pr-1 pl-2 text-right text-xs text-[#e4defc] tabular-nums hover:border-white/50 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${open ? "border-white/50 bg-white/15" : "border-white/25 bg-white/[0.07]"}`}
       >
         <span className="block">
           {/* A negative balance is spelled with a minus, so it does not rest on colour alone. */}
-          <span className={`block whitespace-nowrap ${life.wealth < 0 ? "text-amber-800 dark:text-amber-300" : ""}`}>
+          <span className={`block whitespace-nowrap ${life.wealth < 0 ? "text-amber-300" : ""}`}>
             {L("자산")} {formatWealth(life.wealth)}
             {pay && <span className="hidden sm:inline lg:hidden"> · {pay}</span>}
           </span>
           {pay && <span className="block whitespace-nowrap sm:hidden lg:block">{pay}</span>}
           {total > 0 && <span className="hidden lg:block">{L("고정지출 월")} {formatWealth(total)}</span>}
         </span>
-        <svg aria-hidden viewBox="0 0 16 16" className={`h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform motion-reduce:transition-none dark:text-stone-500 ${open ? "rotate-90" : ""}`}>
+        <svg aria-hidden viewBox="0 0 16 16" className={`h-3.5 w-3.5 shrink-0 text-[#b3aadb] transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`}>
           <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         <span className="sr-only">{L(", 월 고정지출 자세히 보기")}</span>
@@ -164,7 +191,7 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
         </div>
       )}
       {open && (
-        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs shadow-lg dark:border-stone-800 dark:bg-stone-900">
+        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs text-[var(--foreground)] shadow-lg dark:border-stone-800 dark:bg-stone-900">
           <p className="font-semibold text-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
           <dl className="mt-2 space-y-1 tabular-nums">
             <div className="flex justify-between gap-2">

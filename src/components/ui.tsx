@@ -1,15 +1,20 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
-import { formatWealth } from "@/lib/format";
+import { formatWealth, timecode } from "@/lib/format";
+import { formatMi } from "@/lib/engine";
 import { STAT_LABELS, type StatKey, type Stats } from "@/lib/types";
 import { L } from "@/lib/i18n";
 import { isEn } from "@/lib/region";
 
 // Matches the Figma components (Button/Primary, Button/Disabled, Button/Ghost, Choice): a disabled primary button turns flat grey instead of fading.
-export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" }) {
+export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" | "tape" | "onTape" }) {
   const styles = {
     primary:
       "bg-stone-900 text-stone-50 hover:bg-stone-700 disabled:bg-stone-200 disabled:text-stone-500 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-400",
     ghost: "border border-stone-300 hover:bg-stone-100 disabled:opacity-40 dark:border-stone-700 dark:hover:bg-stone-800",
+    // The play screen's main button: the title screen's navy, violet in dark mode so it still stands out.
+    tape: "bg-[#16122b] text-white hover:bg-[#2b2160] disabled:opacity-40 dark:bg-[#5b4cf0] dark:hover:bg-[#6d5fff]",
+    // A light button on the dark VHS panel.
+    onTape: "bg-white text-[#16122b] hover:bg-[#f3f1ff] disabled:opacity-40",
     choice:
       "w-full text-left border border-field bg-white hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-40 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
   }[variant];
@@ -152,9 +157,12 @@ export function StatBars({
   flash,
   flashKey = 0,
   notes,
+  onDark = false,
 }: {
   stats: Stats;
   compact?: boolean;
+  /** On the dark VHS panel (the play HUD): light labels and a light track. */
+  onDark?: boolean;
   notes?: Partial<Record<StatKey, string>>; // a short word beside the label, e.g. the degree beside 교육
   flash?: Partial<Record<StatKey, "up" | "down">>; // gauges that just jumped or dropped a lot
   flashKey?: number; // changes with every new swing so the glow plays again
@@ -164,14 +172,14 @@ export function StatBars({
       {(Object.keys(STAT_LABELS) as StatKey[]).map((k) => (
         <div key={k} className="min-w-0">
           <div className="flex items-baseline justify-between text-xs">
-            <span className="truncate text-stone-600 dark:text-stone-400">
+            <span className={`truncate ${onDark ? "text-[#c9c1ee]" : "text-stone-600 dark:text-stone-400"}`}>
               {STAT_LABELS[k]}
-              {notes?.[k] && <span className="ml-1 text-[10px] text-stone-500 dark:text-stone-400">{notes[k]}</span>}
+              {notes?.[k] && <span className={`ml-1 text-[10px] ${onDark ? "text-[#b3aadb]" : "text-stone-500 dark:text-stone-400"}`}>{notes[k]}</span>}
             </span>
             <span className="font-semibold tabular-nums">{stats[k]}</span>
           </div>
           <div className="relative mt-1">
-            <div className="h-1.5 overflow-hidden rounded-full bg-stone-200 dark:bg-stone-800">
+            <div className={`h-1.5 overflow-hidden rounded-full ${onDark ? "bg-white/15" : "bg-stone-200 dark:bg-stone-800"}`}>
               <div className="h-full transition-[width] duration-500" style={{ width: `${stats[k]}%`, background: STAT_COLORS[k] }} />
             </div>
             {flash?.[k] && <span key={flashKey} aria-hidden className={`pointer-events-none absolute inset-0 rounded-full stat-flash-${flash[k]}`} />}
@@ -179,6 +187,23 @@ export function StatBars({
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * A month as the tape's timecode chip, `2010.04`. Screen readers hear the month in words ("2010년 4월").
+ * `tone` "tape" is the navy chip of the feed and 지나온 길; "now" is the lighter one for where the life is now.
+ */
+export function Timecode({ mi, tone = "tape", className = "" }: { mi: number; tone?: "tape" | "now"; className?: string }) {
+  return (
+    <span
+      className={`relative inline-block rounded-md px-2 py-0.5 font-mono text-xs font-bold tracking-[0.06em] tabular-nums ${
+        tone === "now" ? "bg-[#ece9ff] text-[#3f33c4] dark:bg-[#2b2160] dark:text-[#e4defc]" : "bg-[#16122b] text-[#efeaff] dark:bg-[#2b2160]"
+      } ${className}`}
+    >
+      <span aria-hidden>{timecode(mi)}</span>
+      <span className="sr-only">{formatMi(mi)}</span>
+    </span>
   );
 }
 
