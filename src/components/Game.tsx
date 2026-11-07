@@ -147,6 +147,23 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     window.history.replaceState(null, "", l === "en" ? "/en" : "/");
   };
 
+  function resumeFrom(saved: Saved, ai: boolean) {
+    // A profile saved before the hometown question asked for the country takes the country picked on the first screen then.
+    setProfile(saved.region && !saved.profile.country ? { ...saved.profile, country: saved.region } : saved.profile);
+    setTp(saved.tp);
+    // Lives saved before AI-written moments existed pick them up when AI is on.
+    setLife(saved.life ? { ...saved.life, ai } : null);
+    setEnding(saved.ending);
+    // A memoir still being written when the page closed is asked about again rather than left waiting.
+    setMemoir(saved.ending ? (saved.memoir ?? "write") : saved.memoir === "skip" ? "skip" : null);
+    setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
+  }
+
+  // Going back to a life on load steps aside if the player already left the title screen meanwhile.
+  const autoResume = useEffectEvent((s: Saved, on: boolean) => {
+    if (screen === "intro") resumeFrom(s, on);
+  });
+
   // Restore the saved profile and game, and check whether the server has an AI key.
   useEffect(() => {
     // A pick from before the cookie existed lives only in storage: honor it and copy it to the cookie.
@@ -156,24 +173,31 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       if (!document.cookie.includes(`${LANG_COOKIE}=`)) keepLangCookie(kept);
     } else if (!initialLang) setLangState(fromTag(navigator.languages?.[0] ?? navigator.language ?? ""));
     dropLegacySaves();
-    loadProfile().then((sp) => {
+    const profileRead = loadProfile().then((sp) => {
       setStored(sp);
       setRemember(!!sp);
     });
+    const aiRead = aiAvailable();
+    aiRead.then(setAi);
     // The kept game is read first, so a refresh in the middle of the questions can't save over it before it is known.
-    readProgress<Saved>()
-      .then((s) => {
-        if (s?.life || s?.profile.birthDate) setSaved(s);
-      })
+    const progressRead = readProgress<Saved>().then((s) => {
+      if (s?.life || s?.profile.birthDate) setSaved(s);
+      return s;
+    });
+    progressRead
       .then(() => readDraft<WizardDraft>())
       .then((d) => {
-        // A refresh in the middle of the questions goes straight back to the same question.
+        // Answers typed so far wait behind 이어서 입력하기 on the title screen; reopening never jumps into the questions.
         if (!d?.profile) return;
         setDraft(d);
         setRemember(d.remember);
-        setScreen((s) => (s === "intro" ? "profile" : s));
       });
-    aiAvailable().then(setAi);
+    // A life still being lived when the page closed goes straight back to it (ahead of any unfinished questions).
+    // An ended life, or only unfinished questions, shows the title screen with 이어하기 / 이어서 입력하기.
+    // It waits for the AI check and the saved-profile check, so the life keeps its AI and stays kept on the device.
+    Promise.all([progressRead, aiRead, profileRead]).then(([s, on]) => {
+      if (s?.life && !s.life.dead) autoResume(s, on);
+    });
   }, [initialLang, guessed]);
 
   useEffect(() => {
@@ -197,18 +221,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     setEnding(null);
   };
 
-  const resume = () => {
-    if (!saved) return;
-    // A profile saved before the hometown question asked for the country takes the country picked on the first screen then.
-    setProfile(saved.region && !saved.profile.country ? { ...saved.profile, country: saved.region } : saved.profile);
-    setTp(saved.tp);
-    // Lives saved before AI-written moments existed pick them up when AI is on.
-    setLife(saved.life ? { ...saved.life, ai } : null);
-    setEnding(saved.ending);
-    // A memoir still being written when the page closed is asked about again rather than left waiting.
-    setMemoir(saved.ending ? (saved.memoir ?? "write") : saved.memoir === "skip" ? "skip" : null);
-    setScreen(saved.life ? (saved.life.dead ? "ending" : "play") : saved.screen === "turning" ? "turning" : "profile");
-  };
+  const resume = () => saved && resumeFrom(saved, ai);
 
   const startNew = () => setScreen("profile"); // came back from 처음으로: pick up where they left off
   const startFresh = (q: boolean) => {
