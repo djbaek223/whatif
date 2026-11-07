@@ -25,6 +25,7 @@
     "check:period": "tsx scripts/check-period.ts",
     "check:play": "tsx scripts/check-play.ts",
     "check:quick": "tsx scripts/check-quick.ts",
+    "measure:pace": "tsx scripts/measure-pace.ts",
     "test": "npm run -s check:play && npm run -s check:quick && npm run -s check:moderation && npm run -s check:i18n && npm run -s check:memory && npm run -s check:budget && npm run -s check:timeline"
   },
   "dependencies": {

@@ -24,7 +24,7 @@ export interface ModeInput {
   presentOpen: boolean;
   consequence: boolean; // a choice the player made has resolved and its result is not yet dismissed
   pending: boolean;
-  big: boolean; // the pending choice is a big fork (engine isBigChoice)
+  asks: boolean; // the pending choice is always the player's (engine asksPlayer: big forks, rare and personal moments)
   busy: boolean; // the player's own words are being read
   auto: boolean;
   autoDecide: boolean;
@@ -37,15 +37,29 @@ export function playMode(m: ModeInput): LifeUiMode {
   if (m.pending) {
     if (m.busy) return "submitting-choice";
     // With 선택도 맡기기 on, a small choice is picked for the player on the next tick: time keeps running.
-    if (m.auto && m.autoDecide && !m.big) return "progressing";
+    if (m.auto && m.autoDecide && !m.asks) return "progressing";
     return "decision";
   }
   return m.auto ? "progressing" : "timeline";
 }
 
 /** Whether auto progress should stop at this choice and hand it to the player. */
-export function stopsProgress(autoDecide: boolean, big: boolean): boolean {
-  return !autoDecide || big;
+export function stopsProgress(autoDecide: boolean, asks: boolean): boolean {
+  return !autoDecide || asks;
+}
+
+/**
+ * Marks the choice just resolved as picked for the player (작은 선택은 맡기기), so the feed can show it as 맡긴 선택,
+ * a quiet line instead of a fork card, and keep it apart from what the player chose.
+ */
+export function markAutoPicked(before: LifeState, after: LifeState): LifeState {
+  const i = after.log.findLastIndex((e, j) => j >= before.log.length && e.kind === "choice");
+  if (i < 0) return after;
+  const log = after.log.slice();
+  log[i] = { ...log[i], auto: true };
+  const choices = after.choices.slice();
+  if (choices.length > before.choices.length) choices[choices.length - 1] = { ...choices[choices.length - 1], auto: true };
+  return { ...after, log, choices };
 }
 
 /** The step button: "다음 달로", "3개월 뒤로", "1년 뒤로". */

@@ -2,9 +2,9 @@
 // the mode for every combination the screen can be in, a consequence read from real lives, milestones with and
 // without the chapters older saves lack, the share card leaving out what is unticked, and the stat names.
 // Run: npm run check:play
-import { advanceUntilStop, autoPick, createLife, isBigChoice, resolveChoice } from "../src/lib/engine";
+import { advanceUntilStop, asksPlayer, autoPick, createLife, isBigChoice, resolveChoice } from "../src/lib/engine";
 import { fallbackOpening } from "../src/lib/narrator/fallback";
-import { consequenceOf, DEFAULT_SHARE, degreeLine, keyMilestones, markerFor, milestonesOf, playMode, shareText, stepLabel, stopsProgress, summaryOf, type ModeInput } from "../src/lib/playUi";
+import { consequenceOf, DEFAULT_SHARE, degreeLine, keyMilestones, markAutoPicked, markerFor, milestonesOf, playMode, shareText, stepLabel, stopsProgress, summaryOf, type ModeInput } from "../src/lib/playUi";
 import { STAT_LABELS, type LifeState, type Profile, type TurningPoint } from "../src/lib/types";
 
 const failures: string[] = [];
@@ -13,14 +13,17 @@ const check = (ok: unknown, msg: string) => {
 };
 
 // ── Modes ──
-const base: ModeInput = { dead: false, presentOpen: false, consequence: false, pending: false, big: false, busy: false, auto: false, autoDecide: false };
+const base: ModeInput = { dead: false, presentOpen: false, consequence: false, pending: false, asks: false, busy: false, auto: false, autoDecide: false };
 const mode = (m: Partial<ModeInput>) => playMode({ ...base, ...m });
 check(mode({}) === "timeline", "idle is timeline");
 check(mode({ auto: true }) === "progressing", "auto is progressing");
 check(mode({ pending: true }) === "decision", "a choice is decision");
 check(mode({ pending: true, auto: true }) === "decision", "progress without 맡기기 hands the choice over");
 check(mode({ pending: true, auto: true, autoDecide: true }) === "progressing", "a small choice under 맡기기 keeps progressing");
-check(mode({ pending: true, auto: true, autoDecide: true, big: true }) === "decision", "a big fork always stops");
+check(mode({ pending: true, auto: true, autoDecide: true, asks: true }) === "decision", "a big fork or personal moment always stops");
+check(asksPlayer({ eventId: "personal", title: "", scene: "", options: [], freeText: true }), "a personal moment is always the player's");
+check(asksPlayer({ eventId: "marriage", title: "", scene: "", options: [], freeText: true }), "a big fork is always the player's");
+check(!asksPlayer({ eventId: "hobby", title: "", scene: "", options: [], freeText: true }), "a mid fork can be left to 맡기기");
 check(mode({ pending: true, busy: true }) === "submitting-choice", "reading own words is submitting");
 check(mode({ consequence: true, pending: true }) === "consequence", "the result shows before a follow-up choice");
 check(mode({ presentOpen: true, pending: true }) === "present", "the present card comes first");
@@ -58,6 +61,11 @@ for (let n = 0; n < 30; n++) {
         check(s.to === life.stats[s.key] && s.from === before.stats[s.key] && s.to - s.from === s.diff, `stat ${s.key} ${s.from}→${s.to} matches the life`);
       }
       check(c.picked === life.choices.at(-1)!.picked, "picked is the recorded choice");
+      if (!big) {
+        const marked = markAutoPicked(before, life);
+        check(marked.log.filter((e) => e.auto).length === before.log.filter((e) => e.auto).length + 1 && marked.log.findLast((e) => e.kind === "choice")?.auto, "an auto-picked choice is marked once in the log");
+        check(marked.choices.at(-1)?.auto, "and in the choices");
+      }
       if (big) check(c.title === life.choices.at(-1)!.title, "title is the recorded title");
       continue;
     }

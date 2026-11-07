@@ -1023,8 +1023,9 @@ export const CORE_EVENTS: EventDef[] = [
     get title() { return L("나만의 갈림길"); },
     minAge: 15,
     maxAge: 95,
-    perYear: 0.3,
-    cooldown: 20,
+    // About one every six or seven years: each one stops the player, so they stay special (was 0.3 a year, 20-month cooldown).
+    perYear: 0.15,
+    cooldown: 36,
     repeatable: true, // each one is written fresh
     when: (s) => !!s.ai,
     intro: "",

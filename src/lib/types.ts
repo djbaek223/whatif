@@ -246,6 +246,7 @@ export interface LogEntry {
   rare?: boolean; // a rare moment, shown on a special card
   reaction?: string; // news only: how the headline touched this life, drawn as the player's own line
   facts?: string[]; // turn only: job and pay, drawn as chips before the text
+  auto?: boolean; // choice only: picked for the player by temperament (작은 선택은 맡기기)
 }
 
 /** Lasting changes made at one moment: the month, the log index the change came with, and what changed. */
@@ -261,6 +262,7 @@ export interface ChoiceRecord {
   age: number;
   title: string;
   picked: string;
+  auto?: boolean; // picked for the player (작은 선택은 맡기기)
 }
 
 export interface LifeState {

@@ -1805,6 +1805,14 @@ export function isBigChoice(p: PendingChoice): boolean {
   return !!p.rare || p.eventId === TURNING_POINT_ID || BIG_EVENTS.has(p.eventId);
 }
 
+/**
+ * A choice the player always makes, even with 작은 선택은 맡기기 on: the big forks, rare moments and the turning point,
+ * and the moments the narrator writes for this life alone (나만의 갈림길), which are the most personal scenes in the game.
+ */
+export function asksPlayer(p: PendingChoice): boolean {
+  return isBigChoice(p) || p.eventId === "personal";
+}
+
 /** Picks an option for auto-decide mode: weighted toward the first listed choices and toward what this person leans to. */
 function autoPickHere(s: LifeState): string | null {
   if (!s.pending || s.pending.options.length === 0) return null;

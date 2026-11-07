@@ -3,7 +3,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TouchEvent as ReactTouchEvent, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { costBreakdown, costTotal, monthlyCosts } from "@/lib/budget";
 import { ageOf } from "@/lib/events";
-import { formatMi, formatWealth, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
+import { formatMi, formatWealth, asksPlayer, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
 import { consequenceOf, degreeLine, markerFor, markerId, playMode, type Milestone } from "@/lib/playUi";
 import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
@@ -74,13 +74,15 @@ export function PlayView({
 
   const pending = life.pending;
   const big = !!pending && isBigChoice(pending);
+  const asks = !!pending && asksPlayer(pending);
 
   // The life just before the player's own choice, so the result step can show what it changed. Cleared when
-  // the player carries on. A choice picked for them during progress is not theirs, so it shows no result step.
+  // the player carries on. A choice picked for them during progress is not theirs, so it shows no result step, and
+  // only a big fork gets one: the result of any other choice is in the feed, and the story goes straight on.
   const [chosenFrom, setChosenFrom] = useState<LifeState | null>(null);
   const consequence = useMemo(() => (chosenFrom ? consequenceOf(chosenFrom, life) : null), [chosenFrom, life]);
 
-  const mode = playMode({ dead: life.dead, presentOpen, consequence: !!consequence, pending: !!pending, big, busy, auto, autoDecide });
+  const mode = playMode({ dead: life.dead, presentOpen, consequence: !!consequence, pending: !!pending, asks, busy, auto, autoDecide });
   const choosing = mode === "decision" || mode === "submitting-choice";
   // The engine logs a choice event's title as it stops; the choice sheet already shows it, so drop that line from the feed.
   const last = life.log.at(-1);
@@ -116,14 +118,15 @@ export function PlayView({
     choose: (id: string) => {
       if (mode !== "decision") return; // one answer per choice, even with a double tap or a key held down
       setSkipFrom(null);
-      setChosenFrom(life);
+      if (big) setChosenFrom(life);
       handlers.onChoose(id);
     },
     chooseFree: async (text: string, force?: boolean) => {
       setSkipFrom(null);
       const from = life;
+      const wasBig = big;
       const r = await handlers.onChooseFree(text, force);
-      if (r === "ok") setChosenFrom(from);
+      if (r === "ok" && wasBig) setChosenFrom(from);
       return r;
     },
     carryOn: () => setChosenFrom(null),
@@ -902,7 +905,7 @@ type FeedItem =
   | { type: "date"; mi: number }
   | { type: "world"; items: LogEntry[] }
   | { type: "reaction"; entry: LogEntry; headline: string }
-  | { type: "choice"; title: string; picked: string; outcome?: LogEntry; changes: string[] }
+  | { type: "choice"; title: string; picked: string; outcome?: LogEntry; changes: string[]; auto?: boolean }
   | { type: "line"; entry: LogEntry };
 
 /** "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가…" → its first sentence. */
@@ -940,7 +943,7 @@ function feedItems(feed: LogEntry[], chapters: LifeChapter[] = []): FeedItem[] {
       const title = titled ? e.text : c.text.split(": ")[0];
       const picked = c.text.slice(title.length + 2) || c.text;
       const outcome = feed[i + 1]?.kind === "outcome" && feed[i + 1].mi === c.mi ? feed[++i] : undefined;
-      out.push({ type: "choice", title, picked, outcome, changes: outcome ? (changesAt.get(i) ?? []) : [] });
+      out.push({ type: "choice", title, picked, outcome, changes: outcome ? (changesAt.get(i) ?? []) : [], auto: !!c.auto });
       continue;
     }
     out.push({ type: "line", entry: e });
@@ -977,7 +980,7 @@ function Feed({ feed, news, chapters }: { feed: LogEntry[]; news: NewsMode; chap
               </Spine>
             );
           case "choice":
-            return <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} changes={it.changes} />;
+            return it.auto ? <AutoChoiceLine key={i} title={it.title} picked={it.picked} outcome={it.outcome} /> : <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} changes={it.changes} />;
           case "line":
             return <LogLine key={i} entry={it.entry} />;
         }
@@ -1061,6 +1064,18 @@ function ChoiceCard({ title, picked, outcome, changes }: { title: string; picked
           </p>
         )}
       </div>
+    </Spine>
+  );
+}
+
+/** A small choice picked for the player (작은 선택은 맡기기): one quiet line, so the forks the player made stand out. */
+function AutoChoiceLine({ title, picked, outcome }: { title: string; picked: string; outcome?: LogEntry }) {
+  return (
+    <Spine className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
+      <span className="mr-1 inline-block rounded-full border border-stone-300 px-2 py-px text-[11px] font-semibold text-stone-600 dark:border-stone-700 dark:text-stone-400">{L("맡긴 선택")}</span>
+      <span className="font-medium">{title}</span> · {picked}
+      {outcome?.text && <span className="mt-0.5 block whitespace-pre-line">{outcome.text}</span>}
+      <DeltaChips delta={outcome?.delta} money={outcome?.money} />
     </Spine>
   );
 }
