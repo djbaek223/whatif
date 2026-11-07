@@ -12,7 +12,7 @@ import {
   dropPending,
   fillMoment,
   fillScene,
-  isBigChoice,
+  asksPlayer,
   loveFromText,
   loveOf,
   lifeSummary,
@@ -39,7 +39,7 @@ import { BoardPreview } from "./BoardPreview";
 import { TitleScreen } from "./Title";
 import { PlayView, type FreeResult } from "./Play";
 import { moderate } from "@/lib/moderation";
-import { stopsProgress } from "@/lib/playUi";
+import { markAutoPicked, stopsProgress } from "@/lib/playUi";
 import { OpeningWait, REWIND_MS, reducedMotion } from "./Waiting";
 import { L } from "@/lib/i18n";
 import { ageText, ymText } from "@/lib/format";
@@ -108,7 +108,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const [stored, setStored] = useState<StoredProfile | null>(null);
   const [remember, setRemember] = useState(false);
   const [auto, setAuto] = useState(false);
-  const [autoDecide, setAutoDecide] = useState(false);
+  // 작은 선택은 맡기기 is on from the start: a life had about 86 stops before, 16 with it (only the big forks, rare and personal moments).
+  const [autoDecide, setAutoDecide] = useState(true);
   const [busy, setBusy] = useState(false);
   const [sceneDone, setSceneDone] = useState<string | null>(null);
   const [presentOpen, setPresentOpen] = useState(false);
@@ -297,7 +298,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       setPresentOpen(true);
       setAuto(false);
     }
-    if (stop === "choice" && next.pending && stopsProgress(autoDecide, isBigChoice(next.pending))) setAuto(false);
+    if (stop === "choice" && next.pending && stopsProgress(autoDecide, asksPlayer(next.pending))) setAuto(false);
     if (stop === "death") {
       setAuto(false);
       finish();
@@ -307,7 +308,19 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const step = () => {
     if (!life) return;
     const r = advanceTurn(life);
+    // 다음 달로 with 작은 선택은 맡기기: a small choice that came up is picked at once, as it would be while progressing.
+    const p = r.state.pending;
+    if (r.stop === "choice" && p && !stopsProgress(autoDecide, asksPlayer(p))) {
+      const id = autoPick(r.state);
+      if (id) return afterAdvance(life, markAutoPicked(r.state, resolveChoice(r.state, id)), null);
+    }
     afterAdvance(life, r.state, r.stop);
+  };
+
+  /** A small choice picked for the player while time runs on. */
+  const chooseForPlayer = (id: string) => {
+    if (!life?.pending) return;
+    setLife(withBadges(markAutoPicked(life, resolveChoice(life, id))));
   };
 
   const choose = (optionId: string, freeText?: string, intent?: Intent | null) => {
@@ -344,10 +357,10 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     if (!life || life.dead) return setAuto(false);
     if (presentOpen) return setAuto(false);
     if (life.pending) {
-      if (stopsProgress(autoDecide, isBigChoice(life.pending))) return setAuto(false);
+      if (stopsProgress(autoDecide, asksPlayer(life.pending))) return setAuto(false);
       if (sceneLoading) return; // a moment that is still being written
       const id = autoPick(life);
-      if (id) choose(id);
+      if (id) chooseForPlayer(id);
       return;
     }
     step();
@@ -364,7 +377,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const pendingKey = life ? pendingKeyOf(life) : null;
   // A rare moment the pool rolled has nothing to show until it is written (or falls back to the pool's outcome).
   const isMoment = life?.pending?.eventId === "personal" || (!!life?.pending?.slot && life.pending.options.length === 0);
-  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(auto && autoDecide && !isBigChoice(life.pending)));
+  const wantsScene = ai && !!life?.pending && life.pending.eventId !== TURNING_POINT_ID && (isMoment || !(autoDecide && !asksPlayer(life.pending)));
   const sceneLoading = wantsScene && sceneDone !== pendingKey;
 
   const personalize = useEffectEvent(async (key: string) => {

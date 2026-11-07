@@ -405,6 +405,7 @@ export const UI_EN: Record<string, string> = {
   "다음 큰 갈림길까지 진행 중": "Playing on to the next big fork",
   "다음 중요한 선택까지 진행 중": "Playing on to the next choice",
   "작은 선택은 맡기기": "Let it make small choices",
+  "맡긴 선택": "Picked for you",
   "다른 삶 살아보기": "Live another life",
   "같은 변곡점에서 다시 시작해요": "Start again from the same turning point",
   "내 인생 공유하기": "Share my life",
