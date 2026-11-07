@@ -6,6 +6,8 @@ import {
   DEGREE_RANK,
   degreePay,
   employerIn,
+  isGroup,
+  joinsGroup,
   fitTier,
   guessTier,
   isMedical,
@@ -1090,6 +1092,8 @@ function resolveChoiceHere(state: LifeState, optionId: string, freeText?: string
   if (wish) wish = { ...wish, change: fitChange(wish.change, s) };
   // A place the words name, when the narrator didn't give one ("LG전자에 다니며…" read by the engine).
   if (wish && !wish.place && freeText && (wish.change === "hire" || wish.change === "switchJob")) wish = withSaid(wish, employerIn(freeText));
+  // Joining a club ("영어학술동아리에 들어간다") is not a job, whatever the narrator read: a student stays a student.
+  if (wish && (wish.change === "hire" || wish.change === "switchJob") && freeText && (isGroup(wish.place) || joinsGroup(freeText))) wish = null;
   // Buying Bitcoin or shares is not opening a business, whatever the narrator read; only words about a business are.
   const bet = freeText?.trim() ? betIn(freeText, s) : null;
   if (bet && wish?.change === "startBusiness" && intentFromText(freeText!, s)?.change !== "startBusiness") wish = null;

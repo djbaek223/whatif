@@ -16,6 +16,7 @@
     "check:budget": "tsx scripts/check-budget.ts",
     "check:freetext": "tsx scripts/check-freetext.ts",
     "check:typed": "tsx scripts/check-typed.ts",
+    "check:club": "tsx scripts/check-club.ts",
     "check:moderation": "tsx scripts/check-moderation.ts",
     "check:invest": "tsx scripts/check-invest.ts",
     "check:same": "tsx scripts/check-same.ts",

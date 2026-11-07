@@ -458,6 +458,16 @@ const WORK_BEFORE = /\b(work(ing|s)?\s+(at|for)|join(ing|s)?|get(ting)?\s+a\s+jo
 // A name that is a kind of place, not an employer ("회사에 다닌다" says nothing about which).
 const NOT_EMPLOYER = /^(회사|직장|일터|대기업|중견기업|중소기업|공기업|외국계|스타트업|작은회사|큰회사|다른회사|새회사|새직장|그회사|그곳|거기|여기|학교|대학|대학교|대학원|군대|가게|집|본사|지사|회사원|직장인)$/;
 
+// A club, circle or class is joined, not worked at ("영어학술동아리에 들어간다" is a student joining a club).
+const GROUP = /(동아리|학회|소모임|모임|스터디|동호회|봉사단|봉사회|봉사동아리|학생회|총학생회|서클|써클|클럽|동문회|향우회|합창단|응원단|밴드|연합회|연구회|독서회|교회|성당|기숙사|학과|수업|강의|과목|교양|\bclub|\bsociety|\bteam|\bclass|\bchoir|\bband|\bchurch|\bfraternity|\bsorority)$/i;
+/** A club, circle, class or other group the player joins, not an employer ("영어학술동아리"). */
+export const isGroup = (name: string | undefined): boolean => !!name && GROUP.test(name.trim());
+const GROUP_JOIN = /(동아리|학회|소모임|스터디|동호회|봉사단|학생회|서클|써클|합창단|응원단|밴드|연구회|독서회)[을를에]?\s?(으로|로|에서)?\s?(들어|가입|활동|참여|나가|나간|들어가|지원)|\bjoin(ing|s)?\s+(the\s+|a\s+|an\s+)?[\w\s]{0,30}\b(club|society|circle|choir|band|team)\b/i;
+// Words that are plainly about a paid job, which a club can't be ("동아리 선배 회사에 입사한다").
+const PAID_WORK = /입사|취업|취직|출근|근무|정규직|연봉|월급|알바|아르바이트|인턴|\b(job|hired|salary|intern)\b/i;
+/** Joining a club or circle, not taking a job: "영어학술동아리에 들어간다". */
+export const joinsGroup = (text: string): boolean => GROUP_JOIN.test(text) && !PAID_WORK.test(text);
+
 /**
  * The employer the player says they work at, in their own words: a known one followed (or, in English, preceded)
  * by a word about working there, or any other name before "에 다닌다" ("동네 빵집에서 일한다" → 빵집).
@@ -472,7 +482,7 @@ export function employerIn(text: string): string | undefined {
   }
   const m = t.match(/([가-힣A-Za-z0-9&]{2,15})\s?(에서|에|으로|로)\s?(계속\s?|다시\s?)?(다니|다닌|다녀|입사|취업|취직|일하|일한|일해|근무|들어가|들어간|출근|이직|옮기|옮긴|옮겨|재직)/);
   // A school is not an employer ("서울대에 들어간다" is enrolling).
-  return m && !NOT_EMPLOYER.test(m[1]) && !schoolIn(m[1]) && !/(대학교?|학교|대학원|고등학교|중학교|학원)$/.test(m[1]) ? m[1] : undefined;
+  return m && !NOT_EMPLOYER.test(m[1]) && !isGroup(m[1]) && !schoolIn(m[1]) && !/(대학교?|학교|대학원|고등학교|중학교|학원)$/.test(m[1]) ? m[1] : undefined;
 }
 
 // ── Homes ──────────────────────────────────────────
