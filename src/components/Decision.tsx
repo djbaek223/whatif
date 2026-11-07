@@ -426,7 +426,7 @@ export function TimelineDock({ months, keys, onStep, onProgress }: { months: num
 /** Progressing mode: what is happening and until when, the month it has reached, and one way to stop. */
 export function ProgressDock({ when, autoDecide, keys, onStop, onToggleAutoDecide }: { when: string; autoDecide: boolean; keys: boolean; onStop: () => void; onToggleAutoDecide: () => void }) {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-1">
       <div className="vhs-panel vhs-glow space-y-2.5 rounded-2xl p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">

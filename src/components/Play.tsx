@@ -325,7 +325,7 @@ export function PlayView({
             </section>
           </>
         ) : mode === "present" ? null : (
-          <div className="sticky bottom-0 z-10 order-3 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-[var(--dock-pad-bottom)] backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:rounded-2xl lg:border lg:bg-white lg:p-4 lg:backdrop-blur-none dark:lg:bg-stone-900">
+          <div className="sticky bottom-0 z-10 order-3 -mx-4 border-t border-stone-200 bg-[var(--background)]/95 px-4 pt-3 pb-[var(--controls-pad-bottom)] backdrop-blur dark:border-stone-800 lg:static lg:order-none lg:mx-0 lg:rounded-2xl lg:border lg:bg-white lg:p-4 lg:backdrop-blur-none dark:lg:bg-stone-900">
             {!following && <CurrentPositionButton onClick={jumpToLatest} className="absolute -top-14 left-1/2 -translate-x-1/2 lg:hidden" />}
             {mode === "ending" ? (
               <p className="flex items-center justify-center gap-2 text-center text-stone-600 dark:text-stone-400" role="status">
