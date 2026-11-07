@@ -426,7 +426,9 @@ body {
   --hud-scene: 104px;
   --hud-scene-slim: 52px;
   --sheet-max: 85dvh;
-  --dock-pad-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  /* Sheets keep a little room under their last option; the controls dock sits nearly on the bottom edge. */
+  --dock-pad-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  --controls-pad-bottom: max(0.5rem, env(safe-area-inset-bottom));
   --hud-pad-top: max(0.75rem, env(safe-area-inset-top));
 }
 
