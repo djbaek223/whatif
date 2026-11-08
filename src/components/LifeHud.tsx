@@ -1,14 +1,14 @@
 "use client";
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { costTotal, monthlyCosts } from "@/lib/budget";
+import { assetBreakdown, costTotal, monthlyCosts } from "@/lib/budget";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, payLabel, statusLabel } from "@/lib/engine";
 import { degreeLine } from "@/lib/playUi";
 import { STAT_LABELS, type LifeState, type StatKey } from "@/lib/types";
 import { STAT_COLORS, StatBars } from "./ui";
 import { timecode } from "@/lib/format";
-import { L } from "@/lib/i18n";
+import { L, V } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 
 /**
@@ -128,8 +128,9 @@ function markHintSeen() {
 }
 
 /**
- * Wealth and pay in the HUD, drawn as a chip with a chevron so it reads as something to press; a press opens this
- * month's fixed costs, item by item, and what is left over. The first time, a small bubble says so.
+ * Wealth and pay in the HUD, drawn as a chip with a chevron so it reads as something to press; a press opens what
+ * 자산 is made of (cash, the home less its loan, an investment at this month's value) and this month's fixed costs,
+ * item by item, and what is left over. The first time, a small bubble says so.
  */
 function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
   const [open, setOpen] = useState(false);
@@ -138,6 +139,7 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
   const items = monthlyCosts(life);
   const total = costTotal(items);
   const left = life.income - total;
+  const assets = assetBreakdown(life);
   const dismissHint = () => {
     setHint(false);
     markHintSeen();
@@ -179,20 +181,21 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
         <svg aria-hidden viewBox="0 0 16 16" className={`h-3.5 w-3.5 shrink-0 text-[#b3aadb] transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`}>
           <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="sr-only">{L(", 월 고정지출 자세히 보기")}</span>
+        <span className="sr-only">{L(", 자산과 월 수입·지출 자세히 보기")}</span>
       </button>
       {hint && !open && (
         <div role="note" className="absolute top-full right-0 z-30 mt-1.5 flex w-max max-w-[13rem] items-start gap-1 rounded-lg bg-indigo-600 py-1.5 pr-1 pl-2.5 text-left text-xs leading-snug text-white shadow-lg dark:bg-indigo-500">
           <span aria-hidden className="absolute -top-1 right-3 h-2 w-2 rotate-45 bg-indigo-600 dark:bg-indigo-500" />
-          <span>{L("눌러서 이번 달 수입·지출 보기")}</span>
+          <span>{L("눌러서 자산과 이번 달 수입·지출 보기")}</span>
           <button type="button" onClick={dismissHint} aria-label={L("안내 닫기")} className="-my-0.5 shrink-0 rounded px-1 text-white/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
             ×
           </button>
         </div>
       )}
       {open && (
-        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 w-64 rounded-xl border border-stone-200 bg-white p-3 text-left text-xs text-[var(--foreground)] shadow-lg dark:border-stone-800 dark:bg-stone-900">
-          <p className="font-semibold text-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
+        <div id="money-detail" className="absolute top-full right-0 z-30 mt-1 max-h-[70vh] w-64 overflow-y-auto overscroll-contain rounded-xl border border-stone-200 bg-white p-3 text-left text-xs text-[var(--foreground)] shadow-lg dark:border-stone-800 dark:bg-stone-900">
+          <AssetList assets={assets} />
+          <p className="mt-3 border-t border-stone-200 pt-3 font-semibold text-stone-700 dark:border-stone-700 dark:text-stone-200">{L("매달 들어오고 나가는 돈")}</p>
           <dl className="mt-2 space-y-1 tabular-nums">
             <div className="flex justify-between gap-2">
               <dt className="text-stone-600 dark:text-stone-400">{L("월 수입")}</dt>
@@ -217,6 +220,67 @@ function MoneyLine({ life, pay }: { life: LifeState; pay: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What 자산 is made of, in the money popover: cash (or debt), the home at its price and the loan on it, an investment
+ * at this month's value with what went in, and the total, which is the 자산 on the chip.
+ */
+function AssetList({ assets }: { assets: ReturnType<typeof assetBreakdown> }) {
+  const { cash, home, loan, holding, total } = assets;
+  const row = "flex justify-between gap-2";
+  const label = "text-stone-600 dark:text-stone-400";
+  const gain = holding && holding.cost > 0 ? Math.round(((holding.value - holding.cost) / holding.cost) * 100) : 0;
+  return (
+    <>
+      <p className="font-semibold text-stone-700 dark:text-stone-200">{L("지금 가진 것")}</p>
+      <dl className="mt-2 space-y-1 tabular-nums">
+        <div className={row}>
+          <dt className={label}>{cash < 0 ? L("빚 (현금 부족)") : L("현금·예금")}</dt>
+          <dd className={cash < 0 ? "text-amber-700 dark:text-amber-300" : ""}>{formatWealth(cash)}</dd>
+        </div>
+        {home && (
+          <div className={row}>
+            <dt className={`min-w-0 ${label}`}>
+              {L("내 집")}
+              {home.area && <span className="text-stone-500 dark:text-stone-400"> · {home.area}</span>}
+            </dt>
+            <dd className="shrink-0">{formatWealth(home.value)}</dd>
+          </div>
+        )}
+        {loan > 0 && (
+          <div className={row}>
+            <dt className={label}>{L("주택 대출")}</dt>
+            <dd>-{formatWealth(loan)}</dd>
+          </div>
+        )}
+        {holding && (
+          <div>
+            <div className={row}>
+              <dt className={`min-w-0 ${label}`}>
+                {V(holding.name)} <span className="text-stone-500 dark:text-stone-400">{L("(평가액)")}</span>
+              </dt>
+              <dd className="shrink-0">{formatWealth(holding.value)}</dd>
+            </div>
+            <p className="text-[11px] text-stone-500 dark:text-stone-400">
+              {L("넣은 돈")} {formatWealth(holding.cost)}
+              {holding.cost > 0 && (
+                <span className={gain >= 0 ? "text-sky-700 dark:text-sky-300" : "text-amber-700 dark:text-amber-300"}>
+                  {" "}
+                  · {gain > 0 ? "+" : ""}
+                  {gain}%
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+        <div className="flex justify-between gap-2 border-t border-stone-200 pt-1 font-semibold dark:border-stone-700">
+          <dt>{L("자산 합계")}</dt>
+          <dd className={total < 0 ? "text-amber-700 dark:text-amber-300" : "text-sky-700 dark:text-sky-300"}>{formatWealth(total)}</dd>
+        </div>
+      </dl>
+    </>
   );
 }
 

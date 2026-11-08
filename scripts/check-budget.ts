@@ -2,7 +2,7 @@
 // nobody works where their degree doesn't reach (대기업 needs a degree, a research institute a master's, a professorship a PhD,
 // a hospital a medical degree), degrees are earned only by finishing a course, and adults pay fixed costs that the feed reports.
 // Run: npm run check:budget
-import { costTotal, monthlyCosts } from "../src/lib/budget";
+import { assetBreakdown, costTotal, monthlyCosts } from "../src/lib/budget";
 import { DEGREE_RANK, TIER_NEEDS, guessTier, isMedical, tierOf } from "../src/lib/catalog";
 import { degreeOf } from "../src/lib/education";
 import { advanceUntilStop, autoPick, createLife, formatMi, lifeFacts, resolveChoice } from "../src/lib/engine";
@@ -108,6 +108,18 @@ if (wealthAt50.length) console.log(`wealth at 50 (만원): p25 ${wealthAt50[Math
 if (!jobs.doctor) fail("no medical student ever became a doctor");
 if (!jobs.professor) fail("nobody ever became a professor");
 if (adultLines < lives * 0.5) fail(`only ${adultLines} of ${lives} lives were told they now pay their own costs`);
+
+// The money popover's asset list adds up to the 자산 on the chip: cash + home − loan + investment.
+{
+  const t: TurningPoint = { date: "2012-05", situation: "이직을 고민했다.", actualChoice: "남았다", regret: "", kind: "취업" };
+  const seed = createLife(base, t, fallbackOpening(base, t));
+  const life: LifeState = { ...seed, wealth: 52000, flags: { ...seed.flags, homeOwner: true, homeArea: "서울 마포구", homeValue: 80000, mortgage: 40000, holding: { asset: "crypto", name: "비트코인", cost: 1000, units: 1, mark: 3000, since: seed.mi, seed: 1 } } };
+  const a = assetBreakdown(life);
+  if (a.cash !== 9000 || a.home?.value !== 80000 || a.loan !== 40000 || a.holding?.value !== 3000 || a.total !== 52000) fail(`asset breakdown: ${JSON.stringify(a)}`);
+  if (a.cash + (a.home?.value ?? 0) - a.loan + (a.holding?.value ?? 0) !== a.total) fail("asset breakdown does not add up to 자산");
+  const renter = assetBreakdown({ ...seed, wealth: -300, flags: { ...seed.flags, homeOwner: false, homeValue: undefined, mortgage: undefined, holding: undefined } });
+  if (renter.cash !== -300 || renter.home || renter.loan || renter.holding) fail(`renter asset breakdown: ${JSON.stringify(renter)}`);
+}
 
 if (failures.length) {
   console.error(`\n${failures.length} problem(s):\n- ${failures.join("\n- ")}`);

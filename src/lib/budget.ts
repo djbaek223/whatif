@@ -117,3 +117,27 @@ export function costChange(before: Record<string, number> | undefined, items: Ex
   const facts = [isEn() ? `Monthly costs ${formatWealth(a)} → ${formatWealth(b)}` : `월 지출 ${a.toLocaleString()} → ${b.toLocaleString()}만원`, ...moved.map(({ l, d }) => `${l} ${d > 0 ? "+" : ""}${isEn() ? formatWealth(d) : d.toLocaleString()}`)];
   return { text, facts };
 }
+
+/** What 자산 is made of: cash (or debt), the home at its price, the loan on it, an investment at this month's value. */
+export interface Assets {
+  cash: number;
+  home?: { value: number; area?: string };
+  loan: number;
+  holding?: { name: string; value: number; cost: number };
+  total: number;
+}
+
+/**
+ * 자산 split into what it holds. The engine keeps one number (wealth = cash + home − loan + investment at its last
+ * valuation, see markToMarket), so cash is what is left once the home and the investment are taken out.
+ * A home saved without a price is left inside cash, as before.
+ */
+export function assetBreakdown(s: LifeState): Assets {
+  const f = s.flags;
+  const home = f.homeOwner && f.homeValue ? { value: f.homeValue, area: f.homeArea || undefined } : undefined;
+  const loan = home ? (f.mortgage ?? 0) : 0;
+  const h = f.holding;
+  const holding = h ? { name: h.name, value: Math.round(h.mark ?? h.cost), cost: Math.round(h.cost) } : undefined;
+  const cash = s.wealth - (home?.value ?? 0) + loan - (holding?.value ?? 0);
+  return { cash: Math.round(cash), home, loan, holding, total: s.wealth };
+}
