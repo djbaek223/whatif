@@ -2,8 +2,8 @@ import { adsenseClient } from "@/lib/ads";
 
 /**
  * /ads.txt: the list of who may sell this site's ad space. Google AdSense asks for the line
- * `google.com, pub-<id>, DIRECT, f08c47fec0942fa0` once the account exists. Set NEXT_PUBLIC_ADSENSE_CLIENT
- * (ca-pub-<id>) in the Vercel project's environment and redeploy; until then the file only says it is empty.
+ * `google.com, pub-<id>, DIRECT, f08c47fec0942fa0`.
+ * The id comes from adsenseClient() (src/lib/ads.ts).
  */
 export function GET() {
   const client = adsenseClient();

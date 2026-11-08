@@ -16,12 +16,15 @@ export function isPhone(): boolean {
   return typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches;
 }
 
+/** The site's AdSense publisher id. It is public (ads.txt and the page source show it), so it lives in the code. */
+const ADSENSE_CLIENT = "ca-pub-2732165732113122";
+
 /**
- * The AdSense publisher id ("ca-pub-1234567890123456") from the NEXT_PUBLIC_ADSENSE_CLIENT environment variable, or
- * "" until the account exists. It is read at build time, so changing it needs a redeploy. The layout adds AdSense's
- * verification meta tag and loader script when it is set, and /ads.txt lists it.
+ * The AdSense publisher id ("ca-pub-…"): NEXT_PUBLIC_ADSENSE_CLIENT when it is set (read at build time; set it to
+ * something else to switch accounts), else the site's own id above. The layout adds AdSense's verification meta tag
+ * and loader script, and /ads.txt lists it.
  */
 export function adsenseClient(): string {
-  const id = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "").trim();
+  const id = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "").trim() || ADSENSE_CLIENT;
   return /^ca-pub-\d{10,20}$/.test(id) ? id : "";
 }
