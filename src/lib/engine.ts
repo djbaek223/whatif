@@ -62,7 +62,7 @@ import { kindDef, schoolYears } from "./onboarding";
 import { ROUTINE, seasonMore, workLines } from "./routine";
 import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
-import { buy, holdingFact, investIn, saleText, stakeFor, tradable, worth, type Bet } from "./invest";
+import { buy, holdingFact, investIn, markToMarket, saleText, stakeFor, tradable, worth, type Bet } from "./invest";
 import { L, T, V } from "./i18n";
 
 export { formatWealth };
@@ -567,23 +567,24 @@ function betIn(text: string | undefined, s: LifeState): Bet | null {
 }
 
 /**
- * Buys into the investment. The money stays in the savings at what was paid, as the asset's book value,
- * and the gain or loss lands when it is sold (doCashOut, at the invest-check fork). Another asset sells the old one first.
+ * Buys into the investment. The money moves from cash into the asset, so net worth doesn't change at the buy;
+ * from then on the holding counts at its monthly price (markToMarket in drift). Another asset sells the old one first.
  */
 function doInvest(s: LifeState, spec: NonNullable<Effect["invest"]>, rng: Rng, out: Applied) {
   if (s.flags.holding && s.flags.holding.name !== spec.name) doCashOut(s, out);
+  else markToMarket(s);
   s.flags = { ...s.flags, holding: buy(s.flags.holding, spec, spec.stake, s.mi, Math.floor(rng.next() * 2 ** 30) + 1) };
   out.texts.push(L`${V(spec.name)}에 ${won(spec.stake)}을 넣었다.`);
 }
 
-/** Sells the investment held at this month's price: the gain or loss goes into the savings, and into the life's memory. */
+/** Sells the investment held at this month's price: net worth already counts it at that price, so selling only turns it into cash. */
 function doCashOut(s: LifeState, out: Applied) {
+  if (!s.flags.holding) return;
+  markToMarket(s);
   const h = s.flags.holding;
-  if (!h) return;
   const value = worth(h, s.mi);
   const r = value / h.cost;
   out.texts.push(saleText(h, s.mi));
-  s.wealth += value - h.cost;
   const mood = r >= 3 ? 12 : r >= 1.3 ? 6 : r < 0.5 ? -10 : r < 0.9 ? -5 : 0;
   if (mood) {
     const before = s.stats.happiness;
@@ -1463,6 +1464,8 @@ function drift(s: LifeState, months: number) {
     s.wealth += Math.round((s.income - costTotal(monthlyCosts(s))) * months);
     // Repaying principal moves cash into the home, so net worth doesn't change; only the loan shrinks.
     if (f.mortgage) f.mortgage = Math.max(0, Math.round(f.mortgage - Math.max(30, f.mortgage / 240) * months));
+    // An investment still held counts at this month's price.
+    markToMarket(s);
   } else s.wealth -= tuitionOnly(s) * months; // an early entrant still pays tuition
   // A finished course is a degree; the tuition stops.
   creditDegree(s);

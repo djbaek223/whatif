@@ -3,7 +3,7 @@
 // what Bitcoin was worth then. A loss is never more than the stake. A path about Bitcoin the player wrote about stays in 2013.
 // Run: npx tsx scripts/check-invest.ts
 import { eventById } from "../src/lib/events";
-import { createLife, lifeFacts, pendingFor, resolveChoice } from "../src/lib/engine";
+import { advanceTurn, createLife, lifeFacts, pendingFor, resolveChoice } from "../src/lib/engine";
 import { fallbackOpening } from "../src/lib/narrator/fallback";
 import { amountIn, investIn, worth } from "../src/lib/invest";
 import type { LifeState, Profile, TurningPoint } from "../src/lib/types";
@@ -87,6 +87,35 @@ for (const nearest of ["0", "2"]) {
   if (sold.flags.holding) fail("still holding after selling");
   if (sold.wealth !== after.wealth - 1000 + value) fail(`sale wealth ${sold.wealth}, want ${after.wealth - 1000 + value}`);
   if (sold.wealth < 0) fail(`wealth below zero after selling: ${sold.wealth}`);
+}
+
+// 4a. While held, 자산 counts the holding at each month's price, so selling only turns it into cash.
+{
+  const life = atTurningPoint();
+  let s = resolveChoice(life, "1", "비트코인에 투자한다", { change: "none" });
+  for (let i = 0; i < 40 && s.mi < life.mi + 18 && !s.dead; i++) {
+    s = advanceTurn({ ...s, pending: null }).state;
+    const h = s.flags.holding;
+    if (!h) break;
+    if (h.mark !== worth(h, s.mi)) fail(`holding counted at ${h.mark}, worth ${worth(h, s.mi)} in month ${s.mi}`);
+  }
+  const h = s.flags.holding;
+  if (!h || (h.mark ?? 0) < 5000) fail(`2014 Bitcoin not counted at its price in 자산: ${JSON.stringify(h)}`);
+  console.log(`held 1y+ → 자산 ${s.wealth} (비트코인 평가액 ${h?.mark})`);
+  const ev = eventById("invest-check")!;
+  const sold = resolveChoice({ ...s, pending: pendingFor(ev, s) }, "sell");
+  if (sold.wealth !== s.wealth) fail(`selling changed 자산 ${s.wealth} → ${sold.wealth}; it was already counted`);
+}
+
+// 4c. The 2021 home-price boom raises the home's price, and 자산 by that much, not every won the life has.
+{
+  const life = atTurningPoint();
+  const s0: LifeState = { ...life, pending: null, mi: 2021 * 12 + 4, wealth: 10000, flags: { ...life.flags, homeOwner: true, homeArea: "서울", homeValue: 50000, mortgage: 20000 } };
+  const s1 = advanceTurn(s0).state;
+  if (s1.log.some((l) => /집값과 코인/.test(l.text))) {
+    if (s1.flags.homeValue !== 57500) fail(`home after the 2021 boom ${s1.flags.homeValue}, want 57500`);
+    console.log(`2021 boom → 집 시세 ${s1.flags.homeValue}, 자산 ${s0.wealth} → ${s1.wealth}`);
+  } else fail("2021 boom news didn't show");
 }
 
 // 4b. The narrator reading it as a business doesn't open one.

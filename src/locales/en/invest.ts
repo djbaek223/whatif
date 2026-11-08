@@ -4,8 +4,8 @@ export const INVEST_EN: Record<string, string> = {
   "투자": "investing",
   "수익": "returns",
   "{0}에 {1}을 넣었다.": "Put {1} into {0}.",
-  "{0} 보유 중 ({1} 전부터 {2} 투자, 지금 평가액 약 {3}). 아직 팔지 않았으므로 번 돈이나 잃은 돈은 순자산에 들어가지 않았음":
-    "Holds {0} (put {2} in {1} ago, now worth about {3}). Not sold yet, so the gain or loss is not in net worth",
+  "{0} 보유 중 ({1} 전부터 {2} 투자, 지금 평가액 약 {3}). 아직 팔지 않았지만 순자산에는 지금 평가액으로 들어가 있음":
+    "Holds {0} (put {2} in {1} ago, now worth about {3}). Not sold yet, but net worth already counts it at that worth",
   "거래하던 거래소가 해킹을 당해 {0} 대부분이 사라졌다. 남은 것을 모두 팔았다.": "The exchange holding your {0} was hacked, and most of it was gone. You sold what was left.",
   "{0} 모두 팔았다. 믿기지 않는 숫자였다.": "You sold all your {0}. The number was hard to believe.",
   "{0} 모두 팔아 수익을 냈다.": "You sold all your {0} at a profit.",

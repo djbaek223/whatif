@@ -227,7 +227,19 @@ export const hacked = (h: Holding, mi: number) => {
 /** Buys into a holding (or adds to the same one). Returns the new holding. */
 export function buy(prev: Holding | undefined, bet: Bet, stake: number, mi: number, seed: number): Holding {
   const base: Holding = prev && prev.name === bet.name ? prev : { asset: bet.asset, name: bet.name, ...(bet.ticker ? { ticker: bet.ticker } : {}), cost: 0, units: 0, since: mi, seed: seed || 1 };
-  return { ...base, cost: base.cost + stake, units: base.units + stake / Math.exp(price(base, mi)) };
+  return { ...base, cost: base.cost + stake, units: base.units + stake / Math.exp(price(base, mi)), mark: (base.mark ?? base.cost) + stake };
+}
+
+/**
+ * Counts the holding at this month's price in the life's net worth: the change since it was last valued goes into wealth.
+ * Run every turn (engine drift) and before buying more or selling, so 자산 shows what the holding is worth now.
+ */
+export function markToMarket(s: { wealth: number; mi: number; flags: { holding?: Holding } }): void {
+  const h = s.flags.holding;
+  if (!h) return;
+  const v = worth(h, s.mi);
+  s.wealth += v - (h.mark ?? h.cost);
+  s.flags.holding = { ...h, mark: v };
 }
 
 const won = (v: number) => formatWealth(Math.round(v));
@@ -249,7 +261,7 @@ function heldFor(months: number): string {
 
 /** The holding as the narrator reads it in the facts. */
 export function holdingFact(h: Holding, mi: number): string {
-  return L`${V(h.name)} 보유 중 (${heldFor(mi - h.since)} 전부터 ${won(h.cost)} 투자, 지금 평가액 약 ${won(worth(h, mi))}). 아직 팔지 않았으므로 번 돈이나 잃은 돈은 순자산에 들어가지 않았음`;
+  return L`${V(h.name)} 보유 중 (${heldFor(mi - h.since)} 전부터 ${won(h.cost)} 투자, 지금 평가액 약 ${won(worth(h, mi))}). 아직 팔지 않았지만 순자산에는 지금 평가액으로 들어가 있음`;
 }
 
 /** What selling it says, with the gain or loss. */

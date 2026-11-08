@@ -64,7 +64,7 @@ const pandemic = (s: LifeState): Effect | null => {
 
 const assetBoom = (s: LifeState): Effect | null => {
   if (!adult(s, 25)) return null;
-  if (s.flags.homeOwner) return { text: L("집값이 크게 올라 자산이 불었다."), wealthPct: 0.15, stats: { happiness: 2 } };
+  if (s.flags.homeOwner) return { text: L("집값이 크게 올라 자산이 불었다."), homeValuePct: 0.15, stats: { happiness: 2 } };
   return { text: L("치솟는 집값에 '벼락거지'라는 말이 남 일 같지 않았다."), stats: { happiness: -4 } };
 };
 

@@ -102,6 +102,7 @@ export interface Holding {
   ticker?: string; // a listed company priced from its own table (invest.ts TICKERS)
   cost: number; // engine units put in
   units: number; // cost over the price when bought
+  mark?: number; // what this holding counts for in wealth now (its last valued worth); cost until first valued
   since: number; // month index of the first buy
   seed: number; // this holding's own luck (one company's shares, an exchange hack)
 }
