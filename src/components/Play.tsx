@@ -416,6 +416,27 @@ function PlayMenu({
     setOpen(false);
     trigger.current?.focus();
   };
+  // The menu is fixed to the viewport under ⋯ and scrolls inside itself, so no item is ever out of reach:
+  // absolute inside the desktop side column it was clipped by that column's scroll box, and inside the
+  // fixed mobile HUD the bottom items fell below a short screen with no way to scroll to them.
+  const [place, setPlace] = useState<{ top: number; right: number; maxHeight: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const put = () => {
+      const r = trigger.current?.getBoundingClientRect();
+      if (!r) return;
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      const top = r.bottom + 4;
+      setPlace({ top, right: Math.max(8, document.documentElement.clientWidth - r.right), maxHeight: Math.max(160, vh - top - 8) });
+    };
+    put();
+    window.addEventListener("resize", put);
+    window.visualViewport?.addEventListener("resize", put);
+    return () => {
+      window.removeEventListener("resize", put);
+      window.visualViewport?.removeEventListener("resize", put);
+    };
+  }, [open]);
   // Opening moves focus to the first item; a press outside closes it.
   useEffect(() => {
     if (!open) return;
@@ -458,7 +479,7 @@ function PlayMenu({
         </svg>
       </button>
       {open && (
-        <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} className="vhs-panel absolute top-11 right-0 z-30 w-52 overflow-hidden rounded-xl border border-white/20 py-1 shadow-[0_16px_40px_rgb(0_0_0/0.45)]">
+        <div ref={menu} role="menu" aria-label={L("메뉴")} onKeyDown={onMenuKey} style={place ?? undefined} className="vhs-panel fixed z-30 w-52 overflow-y-auto overscroll-contain rounded-xl border border-white/20 py-1 shadow-[0_16px_40px_rgb(0_0_0/0.45)]">
           <p aria-hidden className="vhs-osd px-4 pt-2 pb-1 font-mono text-[11px] tracking-[0.12em]">
             ❚❚ MENU
           </p>
