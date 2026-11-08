@@ -9,6 +9,7 @@ import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
 import type { LifeChapter, LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
 import { AboutDialog, versionLabel } from "./About";
+import { AdSlot, useAdsOn } from "./AdSlot";
 import { BoardDialog } from "./Board";
 import { ConsequenceView, DecisionPanel, type FreeResult, ProgressDock, TimelineDock } from "./Decision";
 import { FeedbackDialog } from "./Feedback";
@@ -339,6 +340,7 @@ export function PlayView({
             )}
           </div>
         )}
+        <AdSlot spot="side" className="max-lg:hidden lg:[@media(max-height:819px)]:hidden" />
       </aside>
 
       {/* While the sheet leads, the story behind it steps back; folding the sheet brings it forward again. */}
@@ -927,7 +929,8 @@ type FeedItem =
   | { type: "world"; items: LogEntry[] }
   | { type: "reaction"; entry: LogEntry; headline: string }
   | { type: "choice"; title: string; picked: string; outcome?: LogEntry; changes: string[]; auto?: boolean }
-  | { type: "line"; entry: LogEntry };
+  | { type: "line"; entry: LogEntry }
+  | { type: "ad" };
 
 /** "한일 월드컵에서 대표팀이 4강에 올랐다. 거리가…" → its first sentence. */
 function headlineOf(text: string): string {
@@ -939,12 +942,24 @@ function headlineOf(text: string): string {
  * how a headline touched this life as the player's own line, and each choice (title, answer, result, what changed)
  * as one card. A choice's lasting changes are the ones the engine recorded with its result (LifeChapter.at).
  */
-function feedItems(feed: LogEntry[], chapters: LifeChapter[] = []): FeedItem[] {
+function feedItems(feed: LogEntry[], chapters: LifeChapter[] = [], ads = false): FeedItem[] {
   const changesAt = new Map(chapters.map((c) => [c.at, c.items]));
   const out: FeedItem[] = [];
+  // An ad spot goes in once three choices the player made have passed (and at least 20 lines since the last spot), in
+  // front of the next date, so it is always behind the newest line and never beside a rare moment.
+  let choices = 0;
+  let calm = true;
+  let lastAd = 0;
   for (let i = 0; i < feed.length; i++) {
     const e = feed[i];
-    if (i === 0 || feed[i - 1].mi !== e.mi) out.push({ type: "date", mi: e.mi });
+    if (i === 0 || feed[i - 1].mi !== e.mi) {
+      if (ads && choices >= 3 && calm && i - lastAd >= 20) {
+        out.push({ type: "ad" });
+        choices = 0;
+        lastAd = i;
+      }
+      out.push({ type: "date", mi: e.mi });
+    }
     if (e.kind === "news") {
       const items: LogEntry[] = [];
       while (i < feed.length && feed[i].kind === "news" && feed[i].mi === e.mi) items.push(feed[i++]);
@@ -965,6 +980,8 @@ function feedItems(feed: LogEntry[], chapters: LifeChapter[] = []): FeedItem[] {
       const picked = c.text.slice(title.length + 2) || c.text;
       const outcome = feed[i + 1]?.kind === "outcome" && feed[i + 1].mi === c.mi ? feed[++i] : undefined;
       out.push({ type: "choice", title, picked, outcome, changes: outcome ? (changesAt.get(i) ?? []) : [], auto: !!c.auto });
+      if (!c.auto) choices++;
+      calm = !(e.rare || c.rare || outcome?.rare);
       continue;
     }
     out.push({ type: "line", entry: e });
@@ -977,7 +994,8 @@ function feedItems(feed: LogEntry[], chapters: LifeChapter[] = []): FeedItem[] {
  * bold line with a filled node, and everyday notes are plain lines with a hollow one. The world sits off the line.
  */
 function Feed({ feed, news, chapters }: { feed: LogEntry[]; news: NewsMode; chapters?: LifeChapter[] }) {
-  const items = useMemo(() => feedItems(feed, chapters), [feed, chapters]);
+  const ads = useAdsOn();
+  const items = useMemo(() => feedItems(feed, chapters, ads), [feed, chapters, ads]);
   return (
     <ol className="relative space-y-2.5 pl-6 before:absolute before:top-3 before:bottom-2 before:left-[7px] before:w-0.5 before:rounded-full before:bg-indigo-100 dark:before:bg-indigo-950">
       {items.map((it, i) => {
@@ -1004,6 +1022,12 @@ function Feed({ feed, news, chapters }: { feed: LogEntry[]; news: NewsMode; chap
             return it.auto ? <AutoChoiceLine key={i} title={it.title} picked={it.picked} outcome={it.outcome} /> : <ChoiceCard key={i} title={it.title} picked={it.picked} outcome={it.outcome} changes={it.changes} />;
           case "line":
             return <LogLine key={i} entry={it.entry} />;
+          case "ad":
+            return (
+              <li key={i} className="-ml-6 py-2">
+                <AdSlot spot="feed" />
+              </li>
+            );
         }
       })}
     </ol>
