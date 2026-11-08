@@ -126,7 +126,8 @@ export function Onboarding({
   onLeave: (draft: WizardDraft) => void;
 }) {
   const [now] = useState(() => new Date());
-  const [step, setStep] = useState(() => startStep(initial));
+  // 돌아갈 해 belongs to 빠른 시작 only; a detailed draft saved there (an old bug) opens at the turning point instead.
+  const [step, setStep] = useState(() => (!initial.quick && STEPS[startStep(initial)].id === "year" ? indexOf("kind") : startStep(initial)));
   const [p, setP] = useState<Profile>(initial.profile);
   const [tp, setTp] = useState<TurningPoint>(initial.tp);
   const [blanks, setBlanks] = useState<TpBlanks>(initial.blanks);
@@ -138,7 +139,7 @@ export function Onboarding({
   const [typedError, setTypedError] = useState<string | null>(null);
   const [tried, setTried] = useState(false); // the user pressed 다음 on this step at least once
   const [toReview, setToReview] = useState(initial.toReview ?? false);
-  const [quick, setQuick] = useState(initial.quick ?? false);
+  const [quick] = useState(initial.quick ?? false);
   const [year, setYear] = useState(initial.year ?? "");
   const root = useRef<HTMLDivElement>(null);
 
@@ -267,6 +268,13 @@ export function Onboarding({
       review: false,
     })[id];
 
+  // Where the current question sits on the way to the life, and the questions before and after it there.
+  const pos = flow.findIndex((s) => s.id === cur.id);
+  const isLast = curMain && pos === flow.length - 1;
+  // The last step starts the life, so its button opens only once every required answer on the way is in.
+  const missing = flow.filter((s) => (s.required && invalid(s.id)) || blockedAt(s.id));
+  const ready = missing.length === 0;
+
   const go = (to: number, review = false) => {
     setTried(false);
     setTypedError(null);
@@ -274,14 +282,13 @@ export function Onboarding({
     setStep(to);
   };
   const next = () => {
-    if (cur.id === "year" && !invalid("year")) return onDone({ ...p, country }, quickTurningPoint(p.birthDate, p.gender, yearNum, now), remember);
-    if (cur.id === "review") {
-      const missing = STEPS.findIndex((s) => (s.required && invalid(s.id)) || blockedAt(s.id));
-      if (missing >= 0) {
-        go(missing, true);
+    if (isLast) {
+      if (!ready) {
+        // The button is disabled then; Enter in the year box lands here, so show what is missing.
+        if (missing[0].id !== cur.id) go(indexOf(missing[0].id), !quick);
         return setTried(true);
       }
-      return onDone({ ...p, country }, tp, remember);
+      return onDone({ ...p, country }, quick ? quickTurningPoint(p.birthDate, p.gender, yearNum, now) : tp, remember);
     }
     if (blockedAt(cur.id)) {
       setTried(true);
@@ -294,18 +301,8 @@ export function Onboarding({
       (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("button, input"))?.focus();
       return;
     }
-    if (quick) return go(indexOf("year"));
-    go(toReview || !cur.main ? REVIEW : step + 1);
-  };
-  // From 빠른 시작 to the detailed questions, keeping the first screen and the year picked so far.
-  const toDetailed = () => {
-    setQuick(false);
-    if (yearNum && !yearErr && !tp.date) {
-      const t = quickTurningPoint(p.birthDate, p.gender, yearNum, now);
-      setTp({ ...tp, date: t.date, kind: tp.kind ?? t.kind });
-      setTpYm(toYmd(t.date));
-    }
-    go(answered("birth") ? indexOf("kind") : 0);
+    // The next question on this flow (STEPS also holds 빠른 시작's year between 기본 정보 and 갈림길).
+    go(toReview || !curMain ? REVIEW : indexOf(flow[pos + 1].id));
   };
   // An extra question opened from the summary goes back there either way.
   const leave = () => {
@@ -313,7 +310,7 @@ export function Onboarding({
     writeDraft(d, remember);
     onLeave(d);
   };
-  const back = () => (cur.id === "year" ? go(0) : !curMain ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
+  const back = () => (!curMain ? go(REVIEW) : pos === 0 ? onExit() : go(indexOf(flow[pos - 1].id)));
 
   const pick = (k: keyof Profile, v: string) => setP({ ...p, [k]: p[k] === v ? "" : v });
 
@@ -424,10 +421,6 @@ export function Onboarding({
                 </div>
               </div>
             )}
-            <div className="space-y-2 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50">
-              <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{L("그때의 상황과 실제로 한 선택까지 적으면 이야기가 내 삶처럼 이어져요.")}</p>
-              <SmallButton onClick={toDetailed}>{L("내 이야기로 시작하기")}</SmallButton>
-            </div>
           </>
         );
       }
@@ -667,7 +660,6 @@ export function Onboarding({
     }
   })();
 
-  const isLast = cur.id === "review";
   return (
     <div ref={root} className="lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-8">
       <div className="space-y-4">
@@ -698,18 +690,41 @@ export function Onboarding({
             </div>
           </Card>
           {/* Stays at the bottom of a phone screen, so 다음 is never a scroll away. */}
-          <div className="sticky bottom-0 z-10 flex gap-2 bg-[var(--background)]/95 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
-            <Button type="button" variant="ghost" onClick={back} className="min-h-11">
-              {curMain ? L("이전") : L("돌아가기")}
-            </Button>
-            {cur.main && !quick && !cur.required && !isLast && (
-              <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
-                {L("건너뛰기")}
+          <div className="sticky bottom-0 z-10 space-y-2 bg-[var(--background)]/95 py-3 backdrop-blur-sm sm:static sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={back} className="min-h-11">
+                {curMain ? L("이전") : L("돌아가기")}
               </Button>
+              {cur.main && !quick && !cur.required && !isLast && (
+                <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : indexOf(flow[pos + 1].id))} className="min-h-11 text-stone-600 dark:text-stone-300">
+                  {L("건너뛰기")}
+                </Button>
+              )}
+              <Button type="submit" disabled={isLast && !ready} aria-describedby={isLast && !ready ? "start-missing" : undefined} className="min-h-11 flex-1">
+                {isLast ? L("그날로 돌아가기") : !curMain ? L("완료") : toReview ? L("확인") : L("다음")}
+              </Button>
+            </div>
+            {isLast && !ready && (
+              <p id="start-missing" className="text-center text-sm text-stone-600 dark:text-stone-400">
+                {missing.some((s) => s.id !== cur.id) ? (
+                  <>
+                    {L("아직 입력하지 않은 단계:")}{" "}
+                    {missing
+                      .filter((s) => s.id !== cur.id)
+                      .map((s, i) => (
+                        <span key={s.id}>
+                          {i > 0 && ", "}
+                          <button type="button" onClick={() => go(indexOf(s.id), !quick)} className="font-semibold text-indigo-700 underline underline-offset-2 dark:text-indigo-300">
+                            {cap(s.short)}
+                          </button>
+                        </span>
+                      ))}
+                  </>
+                ) : (
+                  L("모두 입력하면 그날로 돌아갈 수 있어요.")
+                )}
+              </p>
             )}
-            <Button type="submit" className="min-h-11 flex-1">
-              {isLast || cur.id === "year" ? L("그날로 돌아가기") : !curMain ? L("완료") : toReview ? L("확인") : L("다음")}
-            </Button>
           </div>
           {!isLast && <p className="hidden text-center text-xs text-stone-500 sm:block dark:text-stone-400">{L("Enter 키를 눌러도 다음으로 넘어가요.")}</p>}
         </form>
