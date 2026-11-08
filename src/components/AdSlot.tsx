@@ -3,11 +3,10 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Where ads go. Until an ad network is connected, a spot shows a labelled placeholder box, and only when the address
- * carries ?ads=preview (kept for the tab afterwards), so visitors never see it. The preview works in both languages so
- * the layout can be checked in each; real ad units are for the English edition only (the Korean edition gets none), so
- * connecting a network means drawing its unit inside AdSlot for English and leaving the preview box as the only thing
- * Korean ever shows.
+ * Where ads go, in both the Korean and the English edition. Until an ad network is connected, a spot shows a
+ * labelled placeholder box, and only when the address carries ?ads=preview (kept for the tab afterwards), so visitors
+ * never see it. Connecting a network means drawing its unit inside AdSlot instead of the placeholder; nothing here
+ * depends on the language, so the same spots serve both editions.
  *
  * Sizes are fixed per spot so the page never shifts when an ad arrives:
  *   side  the desktop column under the choice panel, 300x250
