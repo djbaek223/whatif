@@ -214,7 +214,6 @@ export const UI_EN: Record<string, string> = {
   "돌아가고 싶은 순간은 어떤 갈림길이었나요?": "What kind of fork was the moment you want to go back to?",
   "가장 가까운 것을 골라 주세요. 다음 질문이 그에 맞게 바뀌어요.": "Pick the closest one. The next questions adjust to it.",
   "변곡점 유형": "Kind of turning point",
-  "이 나이에 많이들 겪는 순간": "Moments many people face at this age",
   "그때가 언제였나요?": "When was it?",
   "그때 {0}살이었어요.": "You were {0}.",
   "{0}년(일곱 살)부터 고를 수 있어요.": "You can pick from {0} (age seven) on.",
