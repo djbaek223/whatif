@@ -1,12 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { lang } from "@/lib/region";
 
 /**
- * Where ads go. The English edition only (the Korean edition shows none). Until an ad network is connected, a spot
- * shows a labelled placeholder box, and only when the address carries ?ads=preview (kept for the tab afterwards), so
- * visitors never see it. Connecting a network means drawing its unit inside AdBox instead of the placeholder.
+ * Where ads go, in both the Korean and the English edition. Until an ad network is connected, a spot shows a
+ * labelled placeholder box, and only when the address carries ?ads=preview (kept for the tab afterwards), so visitors
+ * never see it. Connecting a network means drawing its unit inside AdSlot instead of the placeholder; nothing here
+ * depends on the language, so the same spots serve both editions.
  *
  * Sizes are fixed per spot so the page never shifts when an ad arrives:
  *   side  the desktop column under the choice panel, 300x250
@@ -33,14 +33,13 @@ function previewOn(): boolean {
   }
 }
 
-/** Whether ad spots are drawn at all: the English edition, with the preview switch on for now. */
+/** Whether ad spots are drawn at all: for now only with the preview switch on, in either language. */
 export function useAdsOn(): boolean {
-  const preview = useSyncExternalStore(
+  return useSyncExternalStore(
     () => () => {},
     previewOn,
     () => false,
   );
-  return preview && lang() === "en";
 }
 
 export function AdSlot({
