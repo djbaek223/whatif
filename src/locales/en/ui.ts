@@ -139,7 +139,8 @@ export const UI_EN: Record<string, string> = {
   // The title screen's two ways in (Title.tsx) and the questions' header
   "바로 되돌리기": "Rewind now",
   "내 이야기로 시작": "Start from my story",
-  "내 이야기로 시작하기": "Switch to Start from my story",
+  "아직 입력하지 않은 단계:": "Still to fill in:",
+  "모두 입력하면 그날로 돌아갈 수 있어요.": "Fill in every step to go back to that day.",
   "기본 정보만 넣고 바로 그날로 돌아가요": "Just the basics, then straight back to that day",
   "내 환경과 성격까지 넣고 그때의 나로 다시 살아봐요": "Add your world and personality, then live again as you were",
   "30초": "30s",
@@ -159,7 +160,6 @@ export const UI_EN: Record<string, string> = {
   "예: {0}": "e.g. {0}",
   "{0}년, {1}살이 되는 해예요.": "In {0}, you turn {1}.",
   "나이로 고르기": "Pick by age",
-  "그때의 상황과 실제로 한 선택까지 적으면 이야기가 내 삶처럼 이어져요.": "Tell us what was going on and what you actually chose, and the story plays out like your own life.",
   "어떻게 시작할까요?": "How do you want to start?",
   "돌아가기": "Back",
   "나머지는 모두 선택이에요. 더 알려줄수록 이야기가 나다워져요.": "Everything else is optional. The more you share, the more the story feels like you.",

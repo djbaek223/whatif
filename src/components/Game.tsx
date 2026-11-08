@@ -242,7 +242,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       ...EMPTY_DRAFT,
       step: 0,
       // A saved profile goes straight to the turning point (빠른 시작: to the year).
-      at: screen === "turning" ? "kind" : profile.birthDate && profile.name && profile.gender && profile.hometown ? (quick ? "year" : "kind") : "birth",
+      at: screen === "turning" ? "date" : profile.birthDate && profile.name && profile.gender && profile.hometown ? (quick ? "year" : "date") : "birth",
       quick: quick && screen !== "turning",
       profile,
       tp,
