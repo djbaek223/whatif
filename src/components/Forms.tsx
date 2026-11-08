@@ -16,6 +16,7 @@ import {
   tpKinds,
   type TpBlanks,
 } from "@/lib/onboarding";
+import { canAutoFocusText } from "@/lib/keyboard";
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
@@ -163,9 +164,11 @@ export function Onboarding({
     return () => clearTimeout(t);
   }, [step, p, tp, blanks, mode, free, remember, toReview, quick, year]);
 
-  // Each new question takes focus: its first text box if it has one, otherwise the question itself.
+  // Each new question takes focus. On a phone that is the question itself, so the keyboard doesn't open
+  // over the screen until a box is tapped; with a mouse and keyboard it is the first text box.
   useEffect(() => {
-    const el = root.current?.querySelector<HTMLElement>("[data-autofocus]") ?? root.current?.querySelector<HTMLElement>("h1");
+    const box = canAutoFocusText() ? root.current?.querySelector<HTMLElement>("[data-autofocus]") : null;
+    const el = box ?? root.current?.querySelector<HTMLElement>("h1");
     el?.focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
   }, [step]);

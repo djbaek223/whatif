@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, ComponentProps } from "react";
 import { formatWealth, timecode } from "@/lib/format";
 import { formatMi } from "@/lib/engine";
 import { STAT_LABELS, type StatKey, type Stats } from "@/lib/types";
@@ -112,7 +112,7 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputClass} />;
 }
 
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea(props: ComponentProps<"textarea">) {
   return <textarea rows={4} {...props} className={`${inputClass} resize-y leading-relaxed`} />;
 }
 
