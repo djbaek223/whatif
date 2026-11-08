@@ -94,7 +94,7 @@ for (const nearest of ["0", "2"]) {
   const life = atTurningPoint();
   let s = resolveChoice(life, "1", "비트코인에 투자한다", { change: "none" });
   for (let i = 0; i < 40 && s.mi < life.mi + 18 && !s.dead; i++) {
-    s = advanceTurn({ ...s, pending: undefined }).state;
+    s = advanceTurn({ ...s, pending: null }).state;
     const h = s.flags.holding;
     if (!h) break;
     if (h.mark !== worth(h, s.mi)) fail(`holding counted at ${h.mark}, worth ${worth(h, s.mi)} in month ${s.mi}`);
@@ -110,7 +110,7 @@ for (const nearest of ["0", "2"]) {
 // 4c. The 2021 home-price boom raises the home's price, and 자산 by that much, not every won the life has.
 {
   const life = atTurningPoint();
-  const s0: LifeState = { ...life, pending: undefined, mi: 2021 * 12 + 4, wealth: 10000, flags: { ...life.flags, homeOwner: true, homeArea: "서울", homeValue: 50000, mortgage: 20000 } };
+  const s0: LifeState = { ...life, pending: null, mi: 2021 * 12 + 4, wealth: 10000, flags: { ...life.flags, homeOwner: true, homeArea: "서울", homeValue: 50000, mortgage: 20000 } };
   const s1 = advanceTurn(s0).state;
   if (s1.log.some((l) => /집값과 코인/.test(l.text))) {
     if (s1.flags.homeValue !== 57500) fail(`home after the 2021 boom ${s1.flags.homeValue}, want 57500`);
