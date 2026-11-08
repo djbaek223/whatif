@@ -52,8 +52,9 @@ const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main
   // The first screen asks the birth date (required) with the nickname, gender and hometown (optional), as in Figma frame A.
   { id: "birth", get short() { return L("기본 정보"); }, secs: 25, required: true, main: true },
   { id: "year", get short() { return L("돌아갈 해"); }, secs: 8, required: true, quick: true },
-  { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
+  // The time first, so the kinds of fork offered fit the age gone back to (2026-11-08).
   { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
+  { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
   { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
   { id: "review", get short() { return L("시작"); }, secs: 5, main: true },
   { id: "family", get short() { return L("가족"); }, secs: 18 },
@@ -127,7 +128,7 @@ export function Onboarding({
 }) {
   const [now] = useState(() => new Date());
   // 돌아갈 해 belongs to 빠른 시작 only; a detailed draft saved there (an old bug) opens at the turning point instead.
-  const [step, setStep] = useState(() => (!initial.quick && STEPS[startStep(initial)].id === "year" ? indexOf("kind") : startStep(initial)));
+  const [step, setStep] = useState(() => (!initial.quick && STEPS[startStep(initial)].id === "year" ? indexOf("date") : startStep(initial)));
   const [p, setP] = useState<Profile>(initial.profile);
   const [tp, setTp] = useState<TurningPoint>(initial.tp);
   const [blanks, setBlanks] = useState<TpBlanks>(initial.blanks);
@@ -153,7 +154,7 @@ export function Onboarding({
   const onPath = (id: StepId) => flow.some((s) => s.id === id);
   const curMain = onPath(cur.id);
   const age = ageIn(p.birthDate, tp.date);
-  const kind = kindDef(tp.kind) ?? kindDef("other")!;
+  const kind = kindDef(tp.kind, age) ?? kindDef("other", age)!;
   const birthYear = Number(p.birthDate.slice(0, 4)) || 0;
 
   // Keep answers in the browser (encrypted, see localData.ts) a moment after each change.
@@ -178,7 +179,10 @@ export function Onboarding({
   const setDate = (v: Ymd) => {
     setTpYm(v);
     const date = v.y && v.m ? `${v.y}-${pad(v.m)}` : "";
-    setTp((t) => ({ ...t, date, situation: mode === "template" ? fillTemplate(ageIn(p.birthDate, date), blanks) : t.situation }));
+    const at = ageIn(p.birthDate, date);
+    // A kind picked for another age (입시 picked, then the year moved to 9) is dropped, so the blanks fit the new age.
+    const fits = (k?: string) => !k || at === null || tpKinds(at).some((d) => d.label === k);
+    setTp((t) => ({ ...t, date, kind: fits(t.kind) ? t.kind : undefined, situation: mode === "template" ? fillTemplate(at, blanks) : t.situation }));
   };
   const setBlank = (next: TpBlanks) => {
     setBlanks(next);
@@ -301,7 +305,7 @@ export function Onboarding({
       (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("button, input"))?.focus();
       return;
     }
-    // The next question on this flow (STEPS also holds 빠른 시작's year between 기본 정보 and 갈림길).
+    // The next question on this flow (STEPS also holds 빠른 시작's year right after 기본 정보).
     go(toReview || !curMain ? REVIEW : indexOf(flow[pos + 1].id));
   };
   // An extra question opened from the summary goes back there either way.
@@ -496,14 +500,13 @@ export function Onboarding({
             />
           </>
         );
-      case "kind": {
-        const recs = suggestions(p.birthDate, p.gender, now);
+      case "kind":
         return (
           <>
             {question(L("돌아가고 싶은 순간은 어떤 갈림길이었나요?"), L("가장 가까운 것을 골라 주세요. 다음 질문이 그에 맞게 바뀌어요."))}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label={L("변곡점 유형")}>
-              {tpKinds().map((k) => (
-                <Choice key={k.id} selected={tp.kind === k.label} onClick={() => setTp({ ...tp, kind: tp.kind === k.label ? undefined : k.label })}>
+              {tpKinds(age).map((k) => (
+                <Choice key={k.label} selected={tp.kind === k.label} onClick={() => setTp({ ...tp, kind: tp.kind === k.label ? undefined : k.label })}>
                   <span aria-hidden className="mr-1">
                     {k.icon}
                   </span>
@@ -511,21 +514,8 @@ export function Onboarding({
                 </Choice>
               ))}
             </div>
-            {recs.length > 0 && (
-              <Suggestions
-                title={L("이 나이에 많이들 겪는 순간")}
-                items={recs}
-                current={tp.date}
-                onPick={(s) => {
-                  setTp({ ...tp, kind: kindDef(s.kind)!.label, date: s.date, situation: mode === "template" ? fillTemplate(ageIn(p.birthDate, s.date), blanks) : tp.situation });
-                  setTpYm(toYmd(s.date));
-                  go(indexOf("date"), toReview);
-                }}
-              />
-            )}
           </>
         );
-      }
       case "date": {
         const recs = suggestions(p.birthDate, p.gender, now, tp.kind && kind.id);
         return (
@@ -547,8 +537,6 @@ export function Onboarding({
                 items={recs}
                 current={tp.date}
                 onPick={(s) => {
-                  // A skipped kind step takes the picked moment's kind, so the next step's blanks fit it.
-                  if (!tp.kind) setTp((t) => ({ ...t, kind: kindDef(s.kind)!.label }));
                   setDate(toYmd(s.date));
                 }}
               />
@@ -870,8 +858,8 @@ function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: Tur
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : "", true],
     ["birth", L("성별"), gender, true],
     ["birth", L("자란 곳"), p.hometown.trim() ? [countryName(country), p.hometown].join(" · ") : "", true],
-    ["kind", L("갈림길"), tp.kind ?? "", false],
     ["date", L("그때"), tp.date ? ymText(tp.date) : "", true],
+    ["kind", L("갈림길"), tp.kind ?? "", false],
     ["situation", L("상황"), tp.situation, true],
     ["situation", L("실제 선택"), tp.actualChoice, false],
   ];
