@@ -8,7 +8,7 @@ import { reducedMotion } from "./Waiting";
 /**
  * The first screen as a game's title screen: a dark VHS picture (the same tape as the rewind before a life begins),
  * a big WHAT IF, a timecode that keeps rewinding from this month into the past, one question, and two ways in:
- * 바로 되돌리기 (the basics and a year) and 내 인생 되돌리기 (the moment itself, what was chosen, and more).
+ * 바로 되돌리기 (the basics and a year) and 내 이야기로 시작 (the moment itself, what was chosen, and more).
  * The picture stays dark in light mode too; what is below it follows the theme.
  */
 export function TitleScreen({
@@ -71,11 +71,17 @@ export function TitleScreen({
             primary
             icon={<RewindIcon />}
             title={L("바로 되돌리기")}
-            text={L("해만 고르면 출발")}
+            text={L("기본 정보만 넣고 바로 그날로 돌아가요")}
             time={L("30초")}
             onClick={() => onPick(true)}
           />
-          <StartButton icon={<ForkIcon />} title={L("내 인생 되돌리기")} text={L("내 갈림길과 선택으로")} time={L("2분")} onClick={() => onPick(false)} />
+          <StartButton
+            icon={<ForkIcon />}
+            title={L("내 이야기로 시작")}
+            text={L("내 환경과 성격까지 넣고 그때의 나로 다시 살아봐요")}
+            time={L("2분")}
+            onClick={() => onPick(false)}
+          />
           {slots.map((slot) => (
             <button
               key={slot.label}

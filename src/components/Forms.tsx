@@ -426,7 +426,7 @@ export function Onboarding({
             )}
             <div className="space-y-2 rounded-2xl bg-stone-50 p-4 dark:bg-stone-800/50">
               <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{L("그때의 상황과 실제로 한 선택까지 적으면 이야기가 내 삶처럼 이어져요.")}</p>
-              <SmallButton onClick={toDetailed}>{L("내 인생 되돌리기로 바꾸기")}</SmallButton>
+              <SmallButton onClick={toDetailed}>{L("내 이야기로 시작하기")}</SmallButton>
             </div>
           </>
         );
@@ -734,7 +734,7 @@ function Stepper({ step, flow, done, onPick }: { step: number; flow: typeof MAIN
   return (
     <nav aria-label={L("입력 단계")}>
       <div className="flex items-baseline justify-between text-sm">
-        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{quick ? L("바로 되돌리기") : main ? L("내 인생 되돌리기") : L`더 알려주기 · ${cap(cur.short)}`}</span>
+        <span className="font-semibold text-indigo-700 dark:text-indigo-300">{quick ? L("바로 되돌리기") : main ? L("내 이야기로 시작") : L`더 알려주기 · ${cap(cur.short)}`}</span>
         <span className="text-stone-500 tabular-nums dark:text-stone-400">
           {n} / {flow.length}
           {main && cur.id !== "review" ? ` · ${L`${remaining(step, flow)} 남음`}` : ""}
