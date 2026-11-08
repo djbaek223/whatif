@@ -62,8 +62,8 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
 const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
   title: { ko: "개인정보 처리방침", en: "Privacy policy" },
   lead: {
-    ko: "What If(whatif.damoai.net)는 로그인이 없고, 입력한 정보를 최대한 이 기기에만 두도록 만들었어요. 어떤 정보가 어디에 어떻게 쓰이는지 아래에 적었어요.",
-    en: "What If (whatif.damoai.net) has no sign-in and is built to keep what you enter on your own device as far as possible. This page lists what is kept where, and how it is used.",
+    ko: "What If(whatif.host)는 로그인이 없고, 입력한 정보를 최대한 이 기기에만 두도록 만들었어요. 어떤 정보가 어디에 어떻게 쓰이는지 아래에 적었어요.",
+    en: "What If (whatif.host) has no sign-in and is built to keep what you enter on your own device as far as possible. This page lists what is kept where, and how it is used.",
   },
   sections: [
     {

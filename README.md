@@ -2,7 +2,7 @@
 
 AI 인생 시뮬레이터. 과거의 한 변곡점으로 돌아가 다른 선택을 했다면 내 인생이 어떻게 흘러갔을지 사망까지 살아봅니다.
 
-서비스 주소(예정): https://whatif.damoai.net · 기획서: [What If 인생 시뮬레이터 기획서](https://claude.ai/code/artifact/aa7b9cf1-ec73-437f-a78f-31b39db0f41b)
+서비스 주소: https://whatif.host · 기획서: [What If 인생 시뮬레이터 기획서](https://claude.ai/code/artifact/aa7b9cf1-ec73-437f-a78f-31b39db0f41b)
 
 ## 실행
 

@@ -87,7 +87,7 @@ for (let n = 0; n < 30; n++) {
   const sum = summaryOf(life);
   check(sum.bornYear === 1991 && sum.age === life.deathAge, "summary years and age");
   // The share card leaves out the name and wealth unless ticked, and always masks nothing it was not given.
-  const text = shareText(life, "한 줄", DEFAULT_SHARE, "https://whatif.damoai.net");
+  const text = shareText(life, "한 줄", DEFAULT_SHARE, "https://whatif.host");
   check(!text.includes("홍길동"), "name left out by default");
   check(!text.includes("남긴 자산"), "wealth left out by default");
   check(shareText(life, "한 줄", { ...DEFAULT_SHARE, name: true }, "x").includes("홍길동"), "name in when ticked");

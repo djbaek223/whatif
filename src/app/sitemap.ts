@@ -2,8 +2,9 @@ import type { MetadataRoute } from "next";
 import { cachedList } from "@/lib/boardCache";
 import { boardConfigured, type Memoir } from "@/lib/memoirs";
 import type { Region } from "@/lib/region";
+import { SITE_URL } from "@/lib/site";
 
-const site = "https://whatif.damoai.net";
+const site = SITE_URL;
 const languages = { ko: `${site}/`, en: `${site}/en`, "x-default": `${site}/` };
 const boards = { ko: `${site}/board`, en: `${site}/en/board` };
 

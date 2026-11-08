@@ -7,6 +7,7 @@ import { masked } from "./Board";
 import { Button, StatBars } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
+import { SITE_URL } from "@/lib/site";
 
 /**
  * Life Summary: the life looked back on as a story, not a score. Who, from when to when, the work and the family
@@ -107,7 +108,8 @@ export function ShareDialog({ open, life, line, onClose }: { open: boolean; life
     if (open && !d.open) d.showModal();
     else if (!open && d.open) d.close();
   }, [open]);
-  const url = typeof window === "undefined" ? "https://whatif.damoai.net" : window.location.origin;
+  // Always the production address, so a share from a preview or the old domain still points to the live site.
+  const url = SITE_URL;
   const text = masked(shareText(life, line, parts, url), parts.name ? { ...life, profile: { ...life.profile, name: "" } } : life);
 
   const share = async () => {
