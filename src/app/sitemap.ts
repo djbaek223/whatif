@@ -32,6 +32,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: boards.en, changeFrequency: "daily", priority: 0.7, alternates: { languages: boards } },
     { url: `${site}/board/hall`, changeFrequency: "daily", priority: 0.7, alternates: { languages: { ko: `${site}/board/hall`, en: `${site}/en/board/hall` } } },
     { url: `${site}/en/board/hall`, changeFrequency: "daily", priority: 0.6, alternates: { languages: { ko: `${site}/board/hall`, en: `${site}/en/board/hall` } } },
+    ...(["about", "privacy"] as const).flatMap((page) => [
+      { url: `${site}/${page}`, changeFrequency: "yearly" as const, priority: 0.4, alternates: { languages: { ko: `${site}/${page}`, en: `${site}/en/${page}` } } },
+      { url: `${site}/en/${page}`, changeFrequency: "yearly" as const, priority: 0.3, alternates: { languages: { ko: `${site}/${page}`, en: `${site}/en/${page}` } } },
+    ]),
     ...kr.map((m) => post("/board", m)),
     ...us.map((m) => post("/en/board", m)),
   ];

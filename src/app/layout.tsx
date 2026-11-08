@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
+import { adsenseClient } from "@/lib/ads";
 import "./globals.css";
 
 const title = "What If · 그때 다른 선택을 했다면";
@@ -13,6 +15,8 @@ export const metadata: Metadata = {
   openGraph: { type: "website", locale: "ko_KR", siteName: "What If", title, description, url: "/" },
   twitter: { card: "summary_large_image", title, description },
   verification: { google: "lQZdZvhIVht6gTeFwjJheeCwHDfX3Mj1tkHPcYQs_Fk" },
+  // AdSense's site check looks for this tag; present only once NEXT_PUBLIC_ADSENSE_CLIENT is set.
+  other: adsenseClient() ? { "google-adsense-account": adsenseClient() } : undefined,
 };
 
 export const viewport: Viewport = {
@@ -25,11 +29,13 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const adsense = adsenseClient();
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         {children}
         <Analytics />
+        {adsense && <Script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsense}`} crossOrigin="anonymous" strategy="afterInteractive" />}
       </body>
     </html>
   );
