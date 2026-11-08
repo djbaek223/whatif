@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Button, Input, Spinner, Textarea } from "./ui";
 import { L } from "@/lib/i18n";
+import { canAutoFocusText } from "@/lib/keyboard";
 
 const FEEDBACK_TO = "dj.baek223@gmail.com";
 
@@ -20,6 +21,8 @@ type Status = "idle" | "sending" | "sent" | "no-key" | "rate-limited" | "error";
  */
 export function FeedbackDialog({ open, where, onClose }: { open: boolean; where: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
   const [message, setMessage] = useState("");
   const [contact, setContact] = useState("");
   const [status, setStatus] = useState<Status>("idle");
@@ -31,6 +34,8 @@ export function FeedbackDialog({ open, where, onClose }: { open: boolean; where:
     if (open && !d.open) {
       setStatus((s) => (s === "sent" ? "idle" : s));
       d.showModal();
+      // The box takes focus only with a mouse and keyboard; on a phone the title does, so the keyboard waits for a tap.
+      (canAutoFocusText() ? box.current : title.current)?.focus();
     } else if (!open && d.open) d.close();
   }, [open]);
 
@@ -83,14 +88,14 @@ export function FeedbackDialog({ open, where, onClose }: { open: boolean; where:
       ) : (
         <form onSubmit={send} className="space-y-4 p-6">
           <div className="space-y-1">
-            <h2 id="feedback-title" className="text-lg font-bold">
+            <h2 ref={title} tabIndex={-1} id="feedback-title" className="text-lg font-bold outline-none">
               {L("의견 보내기")}
             </h2>
             <p className="text-sm text-stone-600 dark:text-stone-300">{L("불편했던 점, 이상한 이야기, 바라는 기능 무엇이든 좋아요.")}</p>
           </div>
           <label className="block space-y-1.5">
             <span className="text-sm font-semibold">{L("내용")}</span>
-            <Textarea autoFocus rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} placeholder={L("예: 군대 다녀온 뒤에 대학 이야기가 갑자기 사라졌어요.")} />
+            <Textarea ref={box} rows={5} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} placeholder={L("예: 군대 다녀온 뒤에 대학 이야기가 갑자기 사라졌어요.")} />
           </label>
           <label className="block space-y-1.5">
             <span className="text-sm font-semibold">{L("답장 받을 연락처")}</span>
