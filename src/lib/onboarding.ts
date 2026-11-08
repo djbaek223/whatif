@@ -106,10 +106,143 @@ const US_TP_KINDS_KO: TpKindDef[] = [
   { id: "other", label: "기타", icon: "✏️", a: "첫 번째 길", b: "두 번째 길", why: "가장 걸렸던 것", example: { a: "고등학교 졸업 후 바로 입대", b: "대학 먼저 가기", why: "친구들과 멀어지는 것" } },
 ];
 
-/** The kinds of turning point for the current region, in the display language. */
-export const tpKinds = () => (isUS() ? (isEn() ? US_TP_KINDS : US_TP_KINDS_KO) : isEn() ? TP_KINDS_EN : TP_KINDS);
+// ── Kinds for a child or a teenager ─────────────────
+// Going back to 9 offers school, friends and hobbies, not exams, jobs and marriage (2026-11-08).
+// Labels shared with the adult lists keep the same id, so kindDef() reads them the same way everywhere.
+type Set4 = { krKo: TpKindDef[]; krEn: TpKindDef[]; usEn: TpKindDef[]; usKo: TpKindDef[] };
 
-export const kindDef = (labelOrId?: string) => tpKinds().find((k) => k.label === labelOrId || k.id === labelOrId);
+const k = (id: TpKind, label: string, icon: string, a: string, b: string, why: string, ex: [string, string, string]): TpKindDef => ({
+  id,
+  label,
+  icon,
+  a,
+  b,
+  why,
+  example: { a: ex[0], b: ex[1], why: ex[2] },
+});
+
+// 초등학생 (만 7-12).
+const CHILD: Set4 = {
+  krKo: [
+    k("exam", "공부·학원", "📚", "학원 더 다니기", "마음껏 놀기", "부모님의 기대", ["영재원 시험 준비", "친구들과 놀이터에서 놀기", "엄마 아빠가 실망하실지도 모른다는 걱정"]),
+    k("other", "친구", "🤝", "새 친구들과 어울리기", "단짝 곁에 남기", "혼자 남는 것", ["새로 온 친구 편들어 주기", "반 아이들 따라 모른 척하기", "나도 따돌림당할지 모른다는 불안"]),
+    k("other", "취미·특기", "🎹", "피아노 계속 치기", "그만두기", "연습이 지겨웠던 것", ["태권도 선수반 들어가기", "그만두고 공부하기", "관장님의 기대"]),
+    k("move", "전학·이사", "🏫", "전학 가기", "지금 학교에 남기", "친구들과 헤어지는 것", ["아빠 따라 지방으로 전학", "할머니 댁에 남아 지금 학교 다니기", "정든 친구들"]),
+    k("other", "도전", "🙋", "반장 선거에 나가기", "조용히 지내기", "친구들 앞에 서는 게 떨렸던 것", ["반장 선거에 나가기", "친구 추천을 거절하기", "떨어지면 창피할 것 같았던 것"]),
+    k("other", "기타", "✏️", "첫 번째 길", "두 번째 길", "가장 걸렸던 것", ["먼저 사과하기", "모른 척 넘어가기", "친구를 잃는 것"]),
+  ],
+  krEn: [
+    k("exam", "School & cram school", "📚", "more cram school", "playing as much as I liked", "my parents' hopes", ["preparing for the gifted-program test", "playing with friends at the playground", "letting Mom and Dad down"]),
+    k("other", "Friends", "🤝", "making new friends", "sticking with my best friend", "being left alone", ["standing up for the new kid", "looking away like everyone else", "being left out myself"]),
+    k("other", "Hobbies", "🎹", "keeping up piano", "quitting", "how boring practice was", ["joining the taekwondo team", "quitting to study", "what my coach expected"]),
+    k("move", "Changing schools", "🏫", "changing schools", "staying at my school", "leaving my friends", ["moving with Dad to a school in another city", "staying with Grandma at my school", "the friends I'd grown close to"]),
+    k("other", "A brave moment", "🙋", "running for class president", "keeping quiet", "standing up in front of everyone", ["running for class president", "turning down my friend's nomination", "how embarrassing it would be to lose"]),
+    k("other", "Other", "✏️", "the first path", "the second path", "what weighed on me most", ["saying sorry first", "pretending nothing happened", "losing a friend"]),
+  ],
+  usEn: [
+    k("exam", "School", "📚", "the gifted program", "staying in my class", "my parents' hopes", ["testing into the gifted program", "staying in class with my friends", "letting my parents down"]),
+    k("other", "Friends", "🤝", "making new friends", "sticking with my best friend", "being left alone", ["sitting with the new kid at lunch", "sticking with my usual table", "being left out myself"]),
+    k("other", "Sports & hobbies", "⚽", "travel soccer", "quitting", "how much practice it took", ["joining the travel soccer team", "quitting to have my weekends free", "what my coach expected"]),
+    k("move", "Moving", "🏫", "moving to a new town", "staying with my grandparents", "leaving my friends", ["moving with my family to Texas", "staying behind with my grandparents", "the friends I'd grown close to"]),
+    k("other", "A brave moment", "🙋", "running for student council", "keeping quiet", "standing up in front of everyone", ["running for student council", "saying no when my friend nominated me", "how embarrassing it would be to lose"]),
+    k("other", "Other", "✏️", "the first path", "the second path", "what weighed on me most", ["saying sorry first", "pretending nothing happened", "losing a friend"]),
+  ],
+  usKo: [
+    k("exam", "학교", "📚", "영재 프로그램", "지금 반에 남기", "부모님의 기대", ["영재 프로그램 시험 보기", "친구들과 같은 반에 남기", "부모님이 실망하실지도 모른다는 걱정"]),
+    k("other", "친구", "🤝", "새 친구들과 어울리기", "단짝 곁에 남기", "혼자 남는 것", ["점심시간에 전학 온 친구와 앉기", "늘 앉던 자리에 앉기", "나도 따돌림당할지 모른다는 불안"]),
+    k("other", "운동·취미", "⚽", "원정 축구팀", "그만두기", "연습에 드는 시간", ["원정 축구팀 들어가기", "그만두고 주말을 비우기", "코치님의 기대"]),
+    k("move", "이사", "🏫", "새 동네로 이사", "조부모님 댁에 남기", "친구들과 헤어지는 것", ["가족과 텍사스로 이사", "조부모님 댁에 남기", "정든 친구들"]),
+    k("other", "도전", "🙋", "학생회 선거에 나가기", "조용히 지내기", "친구들 앞에 서는 게 떨렸던 것", ["학생회 선거에 나가기", "친구 추천을 거절하기", "떨어지면 창피할 것 같았던 것"]),
+    k("other", "기타", "✏️", "첫 번째 길", "두 번째 길", "가장 걸렸던 것", ["먼저 사과하기", "모른 척 넘어가기", "친구를 잃는 것"]),
+  ],
+};
+
+// 중학생·고등학생 (만 13-18): the same kinds, with the school choice of that age first.
+const TEEN_EXAM: { middle: Set4; high: Set4 } = {
+  middle: {
+    krKo: [k("exam", "진학", "🎓", "특목고 준비", "집 근처 일반고", "내신 성적", ["외고 입시 준비", "집 근처 일반고 진학", "학원비 부담"])],
+    krEn: [k("exam", "High school", "🎓", "prepping for a special-purpose high school", "the local high school", "my grades", ["prepping for a foreign-language high school", "the regular high school near home", "the cost of cram school"])],
+    usEn: [k("exam", "High school", "🎓", "the magnet school", "the local high school", "my grades", ["applying to the magnet school", "going to high school with my friends", "the long bus ride"])],
+    usKo: [k("exam", "진학", "🎓", "마그넷 스쿨", "동네 고등학교", "성적", ["마그넷 스쿨 지원", "친구들과 같은 고등학교 진학", "먼 통학길"])],
+  },
+  high: {
+    krKo: [k("exam", "입시", "🎓", "수시로 안정 지원", "정시로 상향 지원", "떨어질지 모른다는 불안", ["성적에 맞춰 안정권 대학 지원", "재수 각오하고 상향 지원", "부모님 형편"])],
+    krEn: [k("exam", "Exams", "🎓", "applying where I was safe", "aiming higher", "the fear of failing", ["applying to colleges my scores were safe for", "aiming higher and risking a retake year", "my parents' finances"])],
+    usEn: [k("exam", "School", "🎓", "applying early", "waiting for regular decision", "the fear of rejection", ["applying early to my dream school", "playing it safe with state schools", "what college would cost"])],
+    usKo: [k("exam", "진학", "🎓", "얼리 지원", "정시 지원", "떨어질지 모른다는 불안", ["꿈의 대학에 얼리 지원", "주립대에 안전하게 지원", "대학 학비"])],
+  },
+};
+
+const TEEN: Set4 = {
+  krKo: [
+    k("love", "친구·첫사랑", "💌", "고백하기", "친구로 남기", "어색해지는 것", ["좋아하던 친구에게 고백하기", "마음 숨기고 친구로 지내기", "우정이 깨지는 것"]),
+    k("other", "꿈·진로", "🎨", "하고 싶은 일", "공부에 집중", "부모님의 반대", ["웹툰 작가 꿈 좇기", "공부에 집중하기", "부모님의 반대"]),
+    k("other", "운동·동아리", "⚽", "운동부 들어가기", "공부에 집중", "선수가 될 수 있을지", ["축구부에 들어가기", "학원 다니며 공부하기", "선수가 될 수 있을지 모른다는 불안"]),
+    k("move", "전학·유학", "✈️", "조기 유학", "한국에 남기", "가족과 떨어지는 것", ["캐나다로 조기 유학", "한국에서 학교 다니기", "가족과 떨어지는 것"]),
+    k("other", "기타", "✏️", "첫 번째 길", "두 번째 길", "가장 걸렸던 것", ["자퇴하고 검정고시", "학교 계속 다니기", "친구들과 달라지는 것"]),
+  ],
+  krEn: [
+    k("love", "Friends & first love", "💌", "confessing", "staying friends", "things getting awkward", ["telling my friend I liked them", "hiding it and staying friends", "losing the friendship"]),
+    k("other", "Dreams", "🎨", "what I loved", "focusing on studying", "my parents' objection", ["chasing my dream of drawing webtoons", "focusing on studying", "my parents' objection"]),
+    k("other", "Sports & clubs", "⚽", "joining a sports team", "focusing on studying", "whether I could make it", ["joining the soccer team", "studying at cram school", "not knowing if I could make it as a player"]),
+    k("move", "Studying abroad", "✈️", "studying abroad early", "staying in Korea", "being away from family", ["going to school in Canada", "staying at school in Korea", "being away from my family"]),
+    k("other", "Other", "✏️", "the first path", "the second path", "what weighed on me most", ["dropping out to take the equivalency exam", "staying in school", "being different from my friends"]),
+  ],
+  usEn: [
+    k("love", "Friends & first love", "💌", "asking them out", "staying friends", "things getting awkward", ["asking my crush to prom", "staying just friends", "losing the friendship"]),
+    k("other", "Dreams", "🎨", "what I loved", "focusing on grades", "my parents' objection", ["going all in on music", "focusing on grades", "my parents' objection"]),
+    k("other", "Sports & clubs", "⚽", "trying out for the team", "keeping my afternoons free", "whether I'd make the cut", ["trying out for varsity", "keeping my afternoons free for friends", "not knowing if I'd make the cut"]),
+    k("move", "Moving", "✈️", "moving with my family", "staying to finish school", "leaving my friends", ["moving with my family across the country", "staying with an aunt to finish high school", "leaving my friends behind"]),
+    k("other", "Other", "✏️", "the first path", "the second path", "what weighed on me most", ["quitting the band", "sticking with it", "letting the others down"]),
+  ],
+  usKo: [
+    k("love", "친구·첫사랑", "💌", "데이트 신청하기", "친구로 남기", "어색해지는 것", ["좋아하던 친구에게 프롬 신청", "그냥 친구로 지내기", "우정이 깨지는 것"]),
+    k("other", "꿈·진로", "🎨", "하고 싶은 일", "성적에 집중", "부모님의 반대", ["음악에 모든 걸 걸기", "성적에 집중하기", "부모님의 반대"]),
+    k("other", "운동·동아리", "⚽", "운동부 선발전", "방과 후를 비우기", "뽑힐 수 있을지", ["대표팀 선발전 나가기", "방과 후엔 친구들과 놀기", "뽑히지 못할지도 모른다는 불안"]),
+    k("move", "이사", "✈️", "가족 따라 이사", "남아서 졸업하기", "친구들과 헤어지는 것", ["가족 따라 다른 주로 이사", "이모 댁에 남아 고등학교 마치기", "친구들을 두고 떠나는 것"]),
+    k("other", "기타", "✏️", "첫 번째 길", "두 번째 길", "가장 걸렸던 것", ["밴드 그만두기", "끝까지 함께하기", "친구들을 실망시키는 것"]),
+  ],
+};
+
+const ADULT: Set4 = { krKo: TP_KINDS, krEn: TP_KINDS_EN, usEn: US_TP_KINDS, usKo: US_TP_KINDS_KO };
+
+// The adult kinds from the age they start to fit: no job hunt at 17, no starting a business at 19.
+const ADULT_AGES: Partial<Record<TpKind, [number, number]>> = { exam: [17, 27], job: [18, 99], love: [18, 99], career: [22, 99], invest: [20, 99] };
+
+const setKey = (): keyof Set4 => (isUS() ? (isEn() ? "usEn" : "usKo") : isEn() ? "krEn" : "krKo");
+
+/** Life stage of an age (만 나이), the same cuts as lifeStage() in engine.ts. */
+const band = (age: number | null | undefined) => (age == null || age < 0 ? "adult" : age < 13 ? "child" : age < 16 ? "middle" : age < 19 ? "high" : "adult");
+
+/**
+ * The kinds of turning point for the current region, in the display language, that fit the age gone back to
+ * (만 나이): school, friends and hobbies for a child; schools, first love and dreams for a teenager; the adult forks
+ * from the age each starts to fit. With no age yet, the whole adult list.
+ */
+export const tpKinds = (age?: number | null): TpKindDef[] => {
+  const key = setKey();
+  const b = band(age);
+  if (b === "child") return CHILD[key];
+  if (b === "middle" || b === "high") return [...TEEN_EXAM[b][key], ...TEEN[key]];
+  const all = ADULT[key];
+  if (age == null || age < 0) return all;
+  return all.filter((d) => {
+    const r = ADULT_AGES[d.id];
+    return !r || (age >= r[0] && age <= r[1]);
+  });
+};
+
+/** A kind by its label or id: first among the kinds for that age, then any age (adult first) in the current region and language. */
+export const kindDef = (labelOrId?: string, age?: number | null): TpKindDef | undefined => {
+  if (!labelOrId) return undefined;
+  const key = setKey();
+  const lists = [age != null ? tpKinds(age) : [], ADULT[key], CHILD[key], TEEN_EXAM.middle[key], TEEN_EXAM.high[key], TEEN[key]];
+  for (const by of ["label", "id"] as const) for (const list of lists) {
+    const hit = list.find((d) => d[by] === labelOrId);
+    if (hit) return hit;
+  }
+  return undefined;
+};
 
 export interface TpBlanks {
   a: string;
@@ -242,7 +375,7 @@ export function quickTurningPoint(birthDate: string, gender: string, year: numbe
   let month = hit?.month ?? (isUS() ? 9 : 3);
   // This year: no later than now.
   if (year === now.getFullYear()) month = Math.min(month, now.getMonth() + 1);
-  const kind = hit && (hit.kind === "exam" || hit.kind === "job") ? kindDef(hit.kind)?.label : undefined;
+  const kind = hit && (hit.kind === "exam" || hit.kind === "job") ? kindDef(hit.kind, hit.age)?.label : undefined;
   return { ...EMPTY_TP, date: `${year}-${String(month).padStart(2, "0")}`, ...(kind ? { kind } : {}) };
 }
 

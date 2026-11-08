@@ -52,8 +52,9 @@ const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main
   // The first screen asks the birth date (required) with the nickname, gender and hometown (optional), as in Figma frame A.
   { id: "birth", get short() { return L("기본 정보"); }, secs: 25, required: true, main: true },
   { id: "year", get short() { return L("돌아갈 해"); }, secs: 8, quick: true },
-  { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
+  // The time first, so the kinds of fork offered fit the age gone back to (2026-11-08).
   { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
+  { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
   { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
   { id: "review", get short() { return L("시작"); }, secs: 5, main: true },
   { id: "family", get short() { return L("가족"); }, secs: 18 },
@@ -152,7 +153,7 @@ export function Onboarding({
   const onPath = (id: StepId) => flow.some((s) => s.id === id);
   const curMain = onPath(cur.id);
   const age = ageIn(p.birthDate, tp.date);
-  const kind = kindDef(tp.kind) ?? kindDef("other")!;
+  const kind = kindDef(tp.kind, age) ?? kindDef("other", age)!;
   const birthYear = Number(p.birthDate.slice(0, 4)) || 0;
 
   // Keep answers in the browser (encrypted, see localData.ts) a moment after each change.
@@ -177,7 +178,10 @@ export function Onboarding({
   const setDate = (v: Ymd) => {
     setTpYm(v);
     const date = v.y && v.m ? `${v.y}-${pad(v.m)}` : "";
-    setTp((t) => ({ ...t, date, situation: mode === "template" ? fillTemplate(ageIn(p.birthDate, date), blanks) : t.situation }));
+    const at = ageIn(p.birthDate, date);
+    // A kind picked for another age (입시 picked, then the year moved to 9) is dropped, so the blanks fit the new age.
+    const fits = (k?: string) => !k || at === null || tpKinds(at).some((d) => d.label === k);
+    setTp((t) => ({ ...t, date, kind: fits(t.kind) ? t.kind : undefined, situation: mode === "template" ? fillTemplate(at, blanks) : t.situation }));
   };
   const setBlank = (next: TpBlanks) => {
     setBlanks(next);
@@ -267,6 +271,10 @@ export function Onboarding({
       review: false,
     })[id];
 
+  // The neighbours of this question on the path being walked: 내 이야기로 시작 skips 바로 되돌리기's year question.
+  const atFlow = flow.findIndex((s) => s.id === cur.id);
+  const nextStep = atFlow >= 0 && atFlow < flow.length - 1 ? indexOf(flow[atFlow + 1].id) : step + 1;
+  const prevStep = atFlow > 0 ? indexOf(flow[atFlow - 1].id) : step - 1;
   const go = (to: number, review = false) => {
     setTried(false);
     setTypedError(null);
@@ -295,7 +303,7 @@ export function Onboarding({
       return;
     }
     if (quick) return go(indexOf("year"));
-    go(toReview || !cur.main ? REVIEW : step + 1);
+    go(toReview || !cur.main ? REVIEW : nextStep);
   };
   // From 빠른 시작 to the detailed questions, keeping the first screen and the year picked so far.
   const toDetailed = () => {
@@ -305,7 +313,7 @@ export function Onboarding({
       setTp({ ...tp, date: t.date, kind: tp.kind ?? t.kind });
       setTpYm(toYmd(t.date));
     }
-    go(answered("birth") ? indexOf("kind") : 0);
+    go(answered("birth") ? indexOf("date") : 0);
   };
   // An extra question opened from the summary goes back there either way.
   const leave = () => {
@@ -313,7 +321,7 @@ export function Onboarding({
     writeDraft(d, remember);
     onLeave(d);
   };
-  const back = () => (cur.id === "year" ? go(0) : !curMain ? go(REVIEW) : step === 0 ? onExit() : go(step - 1));
+  const back = () => (cur.id === "year" ? go(0) : !curMain ? go(REVIEW) : step === 0 ? onExit() : go(prevStep));
 
   const pick = (k: keyof Profile, v: string) => setP({ ...p, [k]: p[k] === v ? "" : v });
 
@@ -503,14 +511,13 @@ export function Onboarding({
             />
           </>
         );
-      case "kind": {
-        const recs = suggestions(p.birthDate, p.gender, now);
+      case "kind":
         return (
           <>
             {question(L("돌아가고 싶은 순간은 어떤 갈림길이었나요?"), L("가장 가까운 것을 골라 주세요. 다음 질문이 그에 맞게 바뀌어요."))}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label={L("변곡점 유형")}>
-              {tpKinds().map((k) => (
-                <Choice key={k.id} selected={tp.kind === k.label} onClick={() => setTp({ ...tp, kind: tp.kind === k.label ? undefined : k.label })}>
+              {tpKinds(age).map((k) => (
+                <Choice key={k.label} selected={tp.kind === k.label} onClick={() => setTp({ ...tp, kind: tp.kind === k.label ? undefined : k.label })}>
                   <span aria-hidden className="mr-1">
                     {k.icon}
                   </span>
@@ -518,21 +525,8 @@ export function Onboarding({
                 </Choice>
               ))}
             </div>
-            {recs.length > 0 && (
-              <Suggestions
-                title={L("이 나이에 많이들 겪는 순간")}
-                items={recs}
-                current={tp.date}
-                onPick={(s) => {
-                  setTp({ ...tp, kind: kindDef(s.kind)!.label, date: s.date, situation: mode === "template" ? fillTemplate(ageIn(p.birthDate, s.date), blanks) : tp.situation });
-                  setTpYm(toYmd(s.date));
-                  go(indexOf("date"), toReview);
-                }}
-              />
-            )}
           </>
         );
-      }
       case "date": {
         const recs = suggestions(p.birthDate, p.gender, now, tp.kind && kind.id);
         return (
@@ -554,8 +548,6 @@ export function Onboarding({
                 items={recs}
                 current={tp.date}
                 onPick={(s) => {
-                  // A skipped kind step takes the picked moment's kind, so the next step's blanks fit it.
-                  if (!tp.kind) setTp((t) => ({ ...t, kind: kindDef(s.kind)!.label }));
                   setDate(toYmd(s.date));
                 }}
               />
@@ -703,7 +695,7 @@ export function Onboarding({
               {curMain ? L("이전") : L("돌아가기")}
             </Button>
             {cur.main && !quick && !cur.required && !isLast && (
-              <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : step + 1)} className="min-h-11 text-stone-600 dark:text-stone-300">
+              <Button type="button" variant="ghost" onClick={() => go(toReview ? REVIEW : nextStep)} className="min-h-11 text-stone-600 dark:text-stone-300">
                 {L("건너뛰기")}
               </Button>
             )}
@@ -855,8 +847,8 @@ function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: Tur
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : "", true],
     ["birth", L("성별"), gender, true],
     ["birth", L("자란 곳"), p.hometown.trim() ? [countryName(country), p.hometown].join(" · ") : "", true],
-    ["kind", L("갈림길"), tp.kind ?? "", false],
     ["date", L("그때"), tp.date ? ymText(tp.date) : "", true],
+    ["kind", L("갈림길"), tp.kind ?? "", false],
     ["situation", L("상황"), tp.situation, true],
     ["situation", L("실제 선택"), tp.actualChoice, false],
   ];

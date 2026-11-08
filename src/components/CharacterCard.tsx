@@ -24,7 +24,7 @@ export function characterFacts(p: Profile, tp: TurningPoint, now: Date): { key: 
   add("family", L("가족"), clip(p.family, 24));
   add("personality", L("성격"), clip(p.personality, 24));
   add("current", L("지금"), clip(p.currentLife, 24));
-  const kind = kindDef(tp.kind);
+  const kind = kindDef(tp.kind, p.birthDate && tp.date ? ageIn(p.birthDate, tp.date) : null);
   add("kind", L("변곡점"), kind ? `${kind.icon} ${kind.label}` : "");
   if (tp.date) {
     const age = p.birthDate ? ageIn(p.birthDate, tp.date) : null;
