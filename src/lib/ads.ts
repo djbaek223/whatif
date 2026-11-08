@@ -15,3 +15,13 @@ export async function beforeMemoir(): Promise<void> {
 export function isPhone(): boolean {
   return typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches;
 }
+
+/**
+ * The AdSense publisher id ("ca-pub-1234567890123456") from the NEXT_PUBLIC_ADSENSE_CLIENT environment variable, or
+ * "" until the account exists. It is read at build time, so changing it needs a redeploy. The layout adds AdSense's
+ * verification meta tag and loader script when it is set, and /ads.txt lists it.
+ */
+export function adsenseClient(): string {
+  const id = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "").trim();
+  return /^ca-pub-\d{10,20}$/.test(id) ? id : "";
+}

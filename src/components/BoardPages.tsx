@@ -6,6 +6,7 @@ import { RANK_CATS, boardConfigured, type Memoir, type Period, type RankCat } fr
 import { countryFor, type Lang } from "@/lib/region";
 import { LikeButton, ReportButton } from "./Board";
 import { RecordGrid, RecordLine, money, tr } from "./BoardRecords";
+import { SiteFooter } from "./InfoPages";
 
 export const PER_PAGE = 10;
 export const boardPath = (lang: Lang) => (lang === "en" ? "/en/board" : "/board");
@@ -30,6 +31,7 @@ function Shell({ lang, children }: { lang: Lang; children: React.ReactNode }) {
         </Link>
       </nav>
       {children}
+      <SiteFooter lang={lang} />
     </main>
   );
 }
