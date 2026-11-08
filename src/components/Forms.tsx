@@ -51,7 +51,7 @@ export type StepId = "birth" | "year" | "kind" | "date" | "situation" | "review"
 const STEPS: { id: StepId; short: string; secs: number; required?: boolean; main?: boolean; quick?: boolean }[] = [
   // The first screen asks the birth date (required) with the nickname, gender and hometown (optional), as in Figma frame A.
   { id: "birth", get short() { return L("기본 정보"); }, secs: 25, required: true, main: true },
-  { id: "year", get short() { return L("돌아갈 해"); }, secs: 8, quick: true },
+  { id: "year", get short() { return L("돌아갈 해"); }, secs: 8, required: true, quick: true },
   { id: "kind", get short() { return L("갈림길"); }, secs: 5, main: true },
   { id: "date", get short() { return L("그때"); }, secs: 10, required: true, main: true },
   { id: "situation", get short() { return L("상황"); }, secs: 30, required: true, main: true },
