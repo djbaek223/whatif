@@ -20,6 +20,7 @@ import { canAutoFocusText } from "@/lib/keyboard";
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
 import { DatePicker, type Ymd } from "./DatePicker";
+import { BirthDateInput, birthParts } from "./BirthDateInput";
 import { Badge, blockedMessage, Button, Card, Field, FieldError, Input, Textarea } from "./ui";
 import { moderateAll } from "@/lib/moderation";
 import { L, T } from "@/lib/i18n";
@@ -202,12 +203,14 @@ export function Onboarding({
     }
   };
 
+  // The first empty birth date box in reading order (년 월 일, or Month Day Year in English).
+  const birthGap = birthParts().find((k) => !birth[k]) ?? "d";
   // Errors for required answers. Missing answers show once 다음 is pressed; wrong ones show as soon as they're typed.
   const errors: Partial<Record<StepId, { id: string; text: string } | null>> = {
     birth: typedError
       ? { id: "birth", text: typedError }
       : !p.birthDate && tried
-        ? { id: "birth", text: !birth.y ? L("태어난 해부터 골라 주세요") : !birth.m ? L("몇 월에 태어났는지 골라 주세요") : L("며칠에 태어났는지 골라 주세요") }
+        ? { id: `birth-${birthGap}`, text: { y: L("태어난 해를 네 자리로 적어 주세요"), m: L("태어난 달을 적어 주세요"), d: L("태어난 날을 적어 주세요") }[birthGap] }
         : null,
     date: typedError
       ? { id: "tp-date", text: typedError }
@@ -303,9 +306,9 @@ export function Onboarding({
     }
     if (invalid(cur.id)) {
       setTried(true);
-      const id = errors[cur.id]?.id ?? (cur.id === "year" ? "quick-year" : cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? "birth" : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
+      const id = errors[cur.id]?.id ?? (cur.id === "year" ? "quick-year" : cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? (typedError ? "birth" : `birth-${birthGap}`) : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
       const el = document.getElementById(id);
-      (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("button, input"))?.focus();
+      (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("[aria-invalid=true], button, input"))?.focus();
       return;
     }
     // The next question on this flow (STEPS also holds 빠른 시작's year right after 기본 정보).
@@ -355,11 +358,11 @@ export function Onboarding({
               {looksLikeRealName(p.name) && <span className="block text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</span>}
             </Field>
             <Field group required label={L("생년월일")} hint={L("나이와 그 시절 이야기를 맞추는 데 써요.")}>
-              <DatePicker
+              <BirthDateInput
                 id="birth"
                 value={birth}
                 onChange={setBirthYmd}
-                min={{ y: 1930, m: 1 }}
+                min={1930}
                 max={{ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() }}
                 error={err?.text}
                 onTypedError={setTypedError}
