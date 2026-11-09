@@ -1,0 +1,112 @@
+"use client";
+
+import { useEffect } from "react";
+
+/**
+ * Keeps the focused text box above the phone keyboard or number pad, on every screen.
+ *
+ * Phones open the keyboard over the page (the visual viewport shrinks, the page does not), and browsers
+ * scroll the box only "just into view", often still under the keyboard or the sticky 다음 bar. A short
+ * page can't scroll at all, because there is nothing below the box to scroll into. So while a keyboard is
+ * up this adds bottom room the height of the keyboard and moves the focused box to the upper part of the
+ * visible area: once the keyboard has finished opening, and again each time focus moves to another box
+ * (the birth date boxes jump from one to the next while the number pad stays up).
+ *
+ * A box can opt out with an ancestor `data-keyboard-scroll="self"` when its screen places it itself.
+ */
+
+const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image", "hidden"]);
+/** A visual viewport shorter than the page by more than this means an on-screen keyboard is up. */
+const KEYBOARD_MIN = 120;
+/** Where the box goes: its top this far down the visible area. */
+const TOP_SHARE = 0.3;
+/** Room kept clear at the bottom of the visible area for a sticky button bar. */
+const BOTTOM_CLEAR = 96;
+const TOP_CLEAR = 12;
+
+function isTextBox(el: Element | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.closest("[data-keyboard-scroll=self]")) return false;
+  if (el instanceof HTMLTextAreaElement) return !el.readOnly;
+  if (el instanceof HTMLInputElement) return !NOT_TEXT.has(el.type) && !el.readOnly && !el.disabled;
+  return el.isContentEditable;
+}
+
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let p = el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+    const s = getComputedStyle(p);
+    if (/(auto|scroll)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 1) return p;
+  }
+  return null;
+}
+
+export function KeyboardFocus() {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    let timer = 0;
+    let lastKeyboard = 0;
+
+    const keyboardHeight = () => Math.max(0, Math.round(window.innerHeight - vv.height));
+
+    const setRoom = (px: number) => {
+      if (px > 0) root.style.setProperty("--keyboard-room", `${px}px`);
+      else root.style.removeProperty("--keyboard-room");
+    };
+
+    const place = () => {
+      const kb = keyboardHeight();
+      const el = document.activeElement;
+      if (kb < KEYBOARD_MIN || !isTextBox(el)) {
+        setRoom(0);
+        lastKeyboard = 0;
+        return;
+      }
+      setRoom(kb);
+      const r = el.getBoundingClientRect();
+      // Position of the box inside what the person can actually see.
+      const top = r.top - vv.offsetTop;
+      const bottom = r.bottom - vv.offsetTop;
+      const fits = top >= TOP_CLEAR && bottom <= vv.height - BOTTOM_CLEAR;
+      const opened = lastKeyboard < KEYBOARD_MIN;
+      lastKeyboard = kb;
+      // Leave a box alone that is already in clear view, unless the keyboard just opened over it.
+      if (fits && !opened) return;
+      const want = Math.max(TOP_CLEAR, Math.min(vv.height * TOP_SHARE, vv.height - BOTTOM_CLEAR - r.height));
+      const delta = top - want;
+      if (Math.abs(delta) < 4) return;
+      const behavior: ScrollBehavior = reduce?.matches ? "auto" : "smooth";
+      const box = scrollParent(el);
+      if (box) box.scrollBy({ top: delta, behavior });
+      else window.scrollBy({ top: delta, behavior });
+    };
+
+    // The keyboard animates in over ~250ms and the viewport fires resize all along; act once it settles.
+    const soon = (ms: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(place, ms);
+    };
+
+    const onFocusIn = (e: FocusEvent) => {
+      if (!isTextBox(e.target as Element)) return;
+      // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
+      soon(keyboardHeight() >= KEYBOARD_MIN ? 60 : 450);
+    };
+    const onFocusOut = () => soon(200);
+    const onResize = () => soon(120);
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    vv.addEventListener("resize", onResize);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+      vv.removeEventListener("resize", onResize);
+      setRoom(0);
+    };
+  }, []);
+  return null;
+}

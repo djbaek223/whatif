@@ -210,7 +210,7 @@ export function CustomChoiceComposer({ busy, onSubmit }: { busy: boolean; onSubm
   const errorId = "free-error";
   const hintId = "free-hint";
   return (
-    <div ref={box} className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-900 dark:bg-indigo-950/40" role="group" aria-labelledby="free-title">
+    <div ref={box} data-keyboard-scroll="self" className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 dark:border-indigo-900 dark:bg-indigo-950/40" role="group" aria-labelledby="free-title">
       <p id="free-title" className="flex items-center gap-1.5 text-sm font-semibold text-indigo-900 dark:text-indigo-100">
         <PencilIcon />
         {L("나라면 이렇게 할래요")}
