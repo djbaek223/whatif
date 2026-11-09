@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { isToss } from "@/lib/platform";
 
 /**
  * Keeps the focused text box above the phone keyboard or number pad, on every screen.
@@ -13,6 +14,11 @@ import { useEffect } from "react";
  * (the birth date boxes jump from one to the next while the number pad stays up).
  *
  * A box can opt out with an ancestor `data-keyboard-scroll="self"` when its screen places it itself.
+ *
+ * Inside the Toss app (앱인토스) the keyboard covers the web view without shrinking the visual viewport, so the
+ * height can't be measured: iOS scrolls the box into view, then pulls it back under the keyboard because the page
+ * has nothing below to scroll into. There, while a text box is focused on a touch screen, the keyboard is assumed
+ * to take KEYBOARD_GUESS of the screen.
  */
 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image", "hidden"]);
@@ -23,6 +29,8 @@ const TOP_SHARE = 0.3;
 /** Room kept clear at the bottom of the visible area for a sticky button bar. */
 const BOTTOM_CLEAR = 96;
 const TOP_CLEAR = 12;
+/** Share of the screen an unmeasurable keyboard is assumed to cover (iPhone keyboard with its bar ≈ 0.40–0.45). */
+const KEYBOARD_GUESS = 0.45;
 
 function isTextBox(el: Element | null): el is HTMLElement {
   if (!(el instanceof HTMLElement)) return false;
@@ -47,9 +55,17 @@ export function KeyboardFocus() {
     const root = document.documentElement;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     let timer = 0;
+    let recheck = 0;
     let lastKeyboard = 0;
 
-    const keyboardHeight = () => Math.max(0, Math.round(window.innerHeight - vv.height));
+    const touch = window.matchMedia?.("(any-pointer: coarse)").matches ?? false;
+    const measured = () => Math.max(0, Math.round(window.innerHeight - vv.height));
+    // In the Toss app the viewport never shrinks for the keyboard; assume one while a text box is focused.
+    const guessed = () => (isToss && touch && isTextBox(document.activeElement) ? Math.round(window.innerHeight * KEYBOARD_GUESS) : 0);
+    const keyboardHeight = () => {
+      const kb = measured();
+      return kb >= KEYBOARD_MIN ? kb : Math.max(kb, guessed());
+    };
 
     const setRoom = (px: number) => {
       if (px > 0) root.style.setProperty("--keyboard-room", `${px}px`);
@@ -66,15 +82,17 @@ export function KeyboardFocus() {
       }
       setRoom(kb);
       const r = el.getBoundingClientRect();
-      // Position of the box inside what the person can actually see.
+      // What the person can actually see: the visual viewport, or above the assumed keyboard when it isn't measured.
+      const seen = measured() >= KEYBOARD_MIN ? vv.height : Math.min(vv.height, window.innerHeight - kb);
+      // Position of the box inside that.
       const top = r.top - vv.offsetTop;
       const bottom = r.bottom - vv.offsetTop;
-      const fits = top >= TOP_CLEAR && bottom <= vv.height - BOTTOM_CLEAR;
+      const fits = top >= TOP_CLEAR && bottom <= seen - BOTTOM_CLEAR;
       const opened = lastKeyboard < KEYBOARD_MIN;
       lastKeyboard = kb;
       // Leave a box alone that is already in clear view, unless the keyboard just opened over it.
       if (fits && !opened) return;
-      const want = Math.max(TOP_CLEAR, Math.min(vv.height * TOP_SHARE, vv.height - BOTTOM_CLEAR - r.height));
+      const want = Math.max(TOP_CLEAR, Math.min(seen * TOP_SHARE, seen - BOTTOM_CLEAR - r.height));
       const delta = top - want;
       if (Math.abs(delta) < 4) return;
       const behavior: ScrollBehavior = reduce?.matches ? "auto" : "smooth";
@@ -92,7 +110,13 @@ export function KeyboardFocus() {
     const onFocusIn = (e: FocusEvent) => {
       if (!isTextBox(e.target as Element)) return;
       // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
-      soon(keyboardHeight() >= KEYBOARD_MIN ? 60 : 450);
+      const up = measured() >= KEYBOARD_MIN || (isToss && lastKeyboard >= KEYBOARD_MIN);
+      soon(up ? 60 : 450);
+      // In the Toss app iOS can pull the page back once its keyboard finishes; look again after that.
+      if (isToss && !up) {
+        window.clearTimeout(recheck);
+        recheck = window.setTimeout(place, 900);
+      }
     };
     const onFocusOut = () => soon(200);
     const onResize = () => soon(120);
@@ -102,6 +126,7 @@ export function KeyboardFocus() {
     vv.addEventListener("resize", onResize);
     return () => {
       window.clearTimeout(timer);
+      window.clearTimeout(recheck);
       document.removeEventListener("focusin", onFocusIn);
       document.removeEventListener("focusout", onFocusOut);
       vv.removeEventListener("resize", onResize);
