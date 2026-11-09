@@ -18,28 +18,3 @@ export function api(path: string): string {
   return API_BASE + path;
 }
 
-
-/**
- * The game rating (게임물 등급) the 앱인토스 build shows on its first screen, e.g. "전체이용가" or "12세이용가".
- * Empty on the website and until the rating is issued. Set WHATIF_GAME_RATING in toss/.env.
- */
-export const GAME_RATING = (process.env.NEXT_PUBLIC_GAME_RATING ?? "").trim();
-
-/**
- * Things the host app wants to hear about. The website listens to nothing; the 앱인토스 build registers its own
- * (toss/src/toss.ts): a finished life's score goes to the Toss game center leaderboard.
- */
-export type PlatformHooks = {
-  /** A life just ended (once per life), with its final records. */
-  lifeEnded?: (records: { finalWealth: number; avgHappiness: number; donated: number; deathAge: number; badges: number }) => void;
-};
-
-let hooks: PlatformHooks = {};
-
-export function registerPlatformHooks(h: PlatformHooks): void {
-  hooks = h;
-}
-
-export function platformHooks(): PlatformHooks {
-  return hooks;
-}

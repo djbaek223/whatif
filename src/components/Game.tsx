@@ -37,8 +37,7 @@ import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
 import { SiteFooter } from "./InfoPages";
-import { GAME_RATING, isToss, platformHooks } from "@/lib/platform";
-import { lifeRecords } from "@/lib/records";
+import { isToss } from "@/lib/platform";
 import { TitleScreen } from "./Title";
 import { PlayView, type FreeResult } from "./Play";
 import { moderate } from "@/lib/moderation";
@@ -98,18 +97,6 @@ function keepLangCookie(l: Lang) {
  * initialLang is the language the server drew the page in: /en is English; on / it is the visitor's earlier pick
  * (cookie) or the browser's language, and `guessed` says a pick kept only on this device may still change it.
  */
-/** Lets the host app (the 앱인토스 build) know a life ended; never lets its failure touch the game. */
-function tellLifeEnded(dead: LifeState) {
-  const hook = platformHooks().lifeEnded;
-  if (!hook) return;
-  try {
-    const r = lifeRecords(dead);
-    hook({ finalWealth: r.finalWealth, avgHappiness: r.avgHappiness, donated: r.donated, deathAge: dead.deathAge ?? 0, badges: r.badges.length });
-  } catch {
-    // the leaderboard is extra
-  }
-}
-
 export default function Game({ initialLang, guessed }: { initialLang?: Lang; guessed?: boolean } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
   const [lang, setLangState] = useState<Lang>(initialLang ?? "ko");
@@ -329,7 +316,6 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
     if (stop === "choice" && next.pending && stopsProgress(autoDecide, asksPlayer(next.pending))) setAuto(false);
     if (stop === "death") {
       setAuto(false);
-      if (!prev.dead) tellLifeEnded(next);
       finish();
     }
   }
@@ -463,11 +449,6 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
                     <button type="button" onClick={eraseDevice} className="-my-2 px-1 py-2 text-[#ffb3c7] underline underline-offset-2 hover:text-white">
                       {L("지우기")}
                     </button>
-                  </p>
-                )}
-                {GAME_RATING && (
-                  <p>
-                    <span className="rounded border border-white/40 px-1.5 py-0.5 font-semibold text-[#efeaff]">{GAME_RATING}</span>
                   </p>
                 )}
                 <p>
