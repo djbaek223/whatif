@@ -64,6 +64,7 @@ import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timel
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
 import { buy, holdingFact, investIn, markToMarket, saleText, stakeFor, tradable, worth, type Bet } from "./invest";
 import { L, T, V } from "./i18n";
+import { startingWealth } from "./startWealth";
 
 export { formatWealth };
 
@@ -189,6 +190,16 @@ const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|�
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직|associate|office worker|employee|new hire)$/i;
 
+/**
+ * An adult who goes back starts with about the average net worth for their age in their country and that year, more or
+ * less, instead of whatever the narrator guessed (often 0). A student keeps pocket money, and a debt the story set stays.
+ */
+function openingWealth(init: OpeningResult["initial"], age: number, mi: number, seed: number): number {
+  const student = init.education === "school" || init.education === "highschool" || init.education === "university" || init.education === "graduate";
+  if (age < 20 || student || init.wealth < 0) return Math.round(init.wealth);
+  return startingWealth(region(), age, Math.floor(mi / 12), seed);
+}
+
 export function createLife(profile: Profile, tp: TurningPoint, opening: OpeningResult, opts: { ai?: boolean; hybrid?: boolean; region?: Region; lang?: Lang } = {}): LifeState {
   return inRegion(opts.region, () => createLifeHere(profile, tp, opening, opts), opts.lang, loveFor(profile.gender));
 }
@@ -271,7 +282,7 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     persona: opening.persona,
     mi,
     stats,
-    wealth: Math.round(init.wealth),
+    wealth: openingWealth(init, age, mi, seed),
     // Someone marked as job-seeking has no pay, even if the narrator guessed one.
     income: employed || (init.monthlyIncome > 0 && !init.employed) ? Math.round(init.monthlyIncome) : 0,
     flags,
