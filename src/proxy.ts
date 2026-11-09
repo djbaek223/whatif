@@ -4,11 +4,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * Lets the 앱인토스 mini-app call this site's API. The mini-app is a static bundle served by Toss from its own
  * address (https://<app>.apps.tossmini.com, and https://<app>.private-apps.tossmini.com while testing by QR), so its
  * requests are cross-origin. Only that app's own addresses are let in, never every *.tossmini.com: all mini-apps
- * share that domain. TOSS_APP_NAME is the app name registered in the 앱인토스 console (default "whatif");
+ * share that domain. TOSS_APP_NAME is the app name registered in the 앱인토스 console (default "whatif-host");
  * TOSS_ORIGINS adds more exact origins, comma-separated.
  */
 function allowedOrigins(): Set<string> {
-  const app = (process.env.TOSS_APP_NAME || "whatif").trim();
+  const app = (process.env.TOSS_APP_NAME || "whatif-host").trim();
   const extra = (process.env.TOSS_ORIGINS || "").split(",").map((o) => o.trim()).filter(Boolean);
   return new Set([`https://${app}.apps.tossmini.com`, `https://${app}.private-apps.tossmini.com`, ...extra]);
 }

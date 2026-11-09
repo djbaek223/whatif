@@ -9,11 +9,11 @@
 - `src/toss.ts` Safe Area(홈 인디케이터 여백)를 맞춰요.
 - `src/tossAds.ts` 토스 인앱 광고를 기존 광고 자리에 연결해요. 이야기 피드 배너, 회고록 쓰는 동안 전면 광고.
 - `src/shims/next-link.tsx` 웹사이트 페이지(게시판, 소개, 개인정보) 링크를 글자로만 보여줘요. 미니앱에서 외부 사이트로 몰래 나가지 않게요.
-- `apps-in-toss.config.ts` 앱 이름(`whatif`), 내비게이션 바, WebView 설정.
+- `apps-in-toss.config.ts` 앱 ID(`whatif-host`, 표시 이름은 "왓 이프"), 내비게이션 바, WebView 설정.
 
 미니앱에는 서버가 없어서 AI 내레이션, 회고록 게시판, 피드백은 웹사이트 API(`WHATIF_API_BASE`, 기본 https://whatif.host)를 불러요.
-웹사이트의 `src/proxy.ts`가 이 미니앱 주소(`https://whatif.apps.tossmini.com`, QR 테스트용 `https://whatif.private-apps.tossmini.com`)만 CORS로 허용해요.
-콘솔에 등록한 앱 이름이 `whatif`가 아니면 `apps-in-toss.config.ts`와 Vercel 환경 변수 `TOSS_APP_NAME`을 같이 바꿔 주세요.
+웹사이트의 `src/proxy.ts`가 이 미니앱 주소(`https://whatif-host.apps.tossmini.com`, QR 테스트용 `https://whatif-host.private-apps.tossmini.com`)만 CORS로 허용해요.
+콘솔에 등록한 앱 ID가 `whatif-host`가 아니게 되면 `apps-in-toss.config.ts`와 Vercel 환경 변수 `TOSS_APP_NAME`을 같이 바꿔 주세요.
 
 ## 실행
 
