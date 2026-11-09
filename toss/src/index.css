@@ -3,7 +3,13 @@
 /* The game's classes live in ../src; Tailwind only scans this folder by itself. */
 @source "../../src";
 
-/* Toss draws its own navigation bar above the web view; the bottom inset (home indicator) is ours to keep clear. */
-body {
-  padding-bottom: var(--toss-safe-bottom, env(safe-area-inset-bottom, 0px));
+/*
+ * The home indicator inset. The play screen's bottom sheets and controls dock already keep clear of it (globals.css
+ * tokens), so the page itself gets no extra bottom padding: that left an empty strip under the sheet. Here the tokens
+ * take the inset Toss reports (toss.ts sets --toss-safe-bottom), falling back to the browser's own.
+ */
+:root {
+  --toss-bottom: var(--toss-safe-bottom, env(safe-area-inset-bottom, 0px));
+  --dock-pad-bottom: max(0.75rem, var(--toss-bottom));
+  --controls-pad-bottom: max(0.5rem, var(--toss-bottom));
 }
