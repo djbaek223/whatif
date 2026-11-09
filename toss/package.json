@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "What If as an 앱인토스 (Apps in Toss) non-game WebView mini-app. Builds the same game as the website (../src) into a static bundle.",
+  "description": "What If as an 앱인토스 (Apps in Toss) game (게임) WebView mini-app. Builds the same game as the website (../src) into a static bundle.",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build && ait build",

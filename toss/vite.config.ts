@@ -29,6 +29,8 @@ export default defineConfig(({ mode }) => {
     NEXT_PUBLIC_APP_COMMIT: commit(),
     NEXT_PUBLIC_APP_BUILT: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10),
     NEXT_PUBLIC_ADSENSE_CLIENT: "",
+    // 게임물 등급 shown on the first screen, e.g. 전체이용가.
+    NEXT_PUBLIC_GAME_RATING: env.WHATIF_GAME_RATING ?? "",
   };
   return {
     plugins: [react(), tailwindcss()],
