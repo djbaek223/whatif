@@ -40,6 +40,8 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   word-break: keep-all;
+  /* Room under the page while a phone keyboard is up, so a box near the end can scroll above it (KeyboardFocus). */
+  padding-bottom: var(--keyboard-room, 0px);
 }
 
 @keyframes fadein {

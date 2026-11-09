@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
+import { KeyboardFocus } from "@/components/KeyboardFocus";
 import { adsenseClient } from "@/lib/ads";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full flex flex-col">
         {children}
+        <KeyboardFocus />
         <Analytics />
         {adsense && <Script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsense}`} crossOrigin="anonymous" strategy="afterInteractive" />}
       </body>
