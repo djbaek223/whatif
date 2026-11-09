@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { adProvider } from "@/lib/ads";
 
 /**
  * Where ads go, in both the Korean and the English edition. Until an ad network is connected, a spot shows a
@@ -33,13 +34,30 @@ function previewOn(): boolean {
   }
 }
 
-/** Whether ad spots are drawn at all: for now only with the preview switch on, in either language. */
+/** Whether ad spots are drawn at all: when an ad network is registered (the 앱인토스 build), else only with the preview switch on. */
 export function useAdsOn(): boolean {
   return useSyncExternalStore(
     () => () => {},
-    previewOn,
+    () => !!adProvider().banner || previewOn(),
     () => false,
   );
+}
+
+/** A real banner from the registered network, in a box of the spot's size so the page does not shift. */
+function NetworkBanner({ spot, className }: { spot: AdSpot; className: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const banner = adProvider().banner;
+    if (!el || !banner) return;
+    try {
+      return banner(spot, el);
+    } catch {
+      return undefined;
+    }
+  }, [spot]);
+  const { w, h } = SIZE[spot];
+  return <div ref={ref} aria-label="광고" className={className} style={{ width: "100%", maxWidth: w, minHeight: h, marginInline: "auto" }} />;
 }
 
 export function AdSlot({
@@ -51,6 +69,8 @@ export function AdSlot({
 }) {
   const on = useAdsOn();
   if (!on) return null;
+  const network = adProvider();
+  if (network.banner) return network.bannerSpots?.includes(spot) ? <NetworkBanner spot={spot} className={className} /> : null;
   const { w, h } = SIZE[spot];
   return (
     <aside

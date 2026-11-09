@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { api } from "@/lib/platform";
 import { Button, Input, Spinner, Textarea } from "./ui";
 import { L } from "@/lib/i18n";
 import { canAutoFocusText } from "@/lib/keyboard";
@@ -45,7 +46,7 @@ export function FeedbackDialog({ open, where, onClose }: { open: boolean; where:
     setStatus("sending");
     const website = (e.currentTarget as HTMLFormElement).elements.namedItem("website") as HTMLInputElement | null;
     try {
-      const res = await fetch("/api/feedback", {
+      const res = await fetch(api("/api/feedback"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, contact, where, website: website?.value ?? "" }),

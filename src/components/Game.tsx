@@ -37,6 +37,7 @@ import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
 import { SiteFooter } from "./InfoPages";
+import { isToss } from "@/lib/platform";
 import { TitleScreen } from "./Title";
 import { PlayView, type FreeResult } from "./Play";
 import { moderate } from "@/lib/moderation";
@@ -422,7 +423,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
       {screen === "intro" && (
         <div className="flex flex-1 flex-col">
           <TitleScreen
-            langs={LANGS}
+            langs={isToss ? [] : LANGS}
             lang={lang}
             onLang={pickLang}
             onPick={startFresh}
@@ -465,10 +466,13 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
               </>
             }
           />
-          <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
-            <BoardPreview lang={lang} />
-            <SiteFooter lang={lang} />
-          </div>
+          {/* The board and text pages are server-drawn pages of the website; the 앱인토스 build has no pages to link to. */}
+          {!isToss && (
+            <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
+              <BoardPreview lang={lang} />
+              <SiteFooter lang={lang} />
+            </div>
+          )}
         </div>
       )}
 

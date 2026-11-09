@@ -1,6 +1,7 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { api } from "@/lib/platform";
 import { statusLabel } from "@/lib/engine";
 import type { EndingResult } from "@/lib/narrator/schema";
 import type { LifeState } from "@/lib/types";
@@ -100,7 +101,7 @@ export function PublishDialog({
     setStatus("sending");
     const website = (e.currentTarget as HTMLFormElement).elements.namedItem("website") as HTMLInputElement | null;
     try {
-      const res = await fetch("/api/memoirs", {
+      const res = await fetch(api("/api/memoirs"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,7 +204,7 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
   const load = useCallback(async (before: number) => {
     if (!before) setStatus("loading");
     try {
-      const res = await fetch(`/api/memoirs?region=${region()}&before=${before}`, { cache: "no-store" });
+      const res = await fetch(api(`/api/memoirs?region=${region()}&before=${before}`), { cache: "no-store" });
       const data = (await res.json()) as { ok: boolean; reason?: string; items?: PublishedMemoir[]; more?: boolean };
       if (!data.ok) {
         setStatus(data.reason === "no-store" ? "no-store" : "error");
@@ -227,7 +228,7 @@ export function BoardDialog({ open, focus, onClose }: { open: boolean; focus?: s
   const remove = async (id: string) => {
     if (!window.confirm(L("이 회고록을 게시판에서 지울까요?"))) return;
     try {
-      const res = await fetch("/api/memoirs", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, key: mine[id]?.key }) });
+      const res = await fetch(api("/api/memoirs"), { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, key: mine[id]?.key }) });
       if (!res.ok) throw new Error();
       const rest = loadMine();
       delete rest[id];
@@ -354,7 +355,7 @@ export function ReportButton({ id, lang: shown }: { id: string; lang?: Lang }) {
     if (!window.confirm(tr(view, "이 글을 신고할까요? 욕설, 개인정보, 광고 같은 글은 확인 뒤 내려요."))) return;
     setState("sending");
     try {
-      const res = await fetch("/api/memoirs/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      const res = await fetch(api("/api/memoirs/report"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       if (!res.ok) throw new Error();
       try {
         const list = JSON.parse(localStorage.getItem(REPORTED_KEY) || "[]") as string[];
@@ -419,7 +420,7 @@ export function LikeButton({ id, initial, lang: shown }: { id: string; initial: 
     setLiked(on);
     setCount((c) => Math.max(0, c + (on ? 1 : -1)));
     try {
-      const res = await fetch("/api/memoirs/like", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, liker, on }) });
+      const res = await fetch(api("/api/memoirs/like"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, liker, on }) });
       const data = (await res.json()) as { ok?: boolean; likes?: number };
       if (!data.ok || typeof data.likes !== "number") throw new Error();
       setCount(data.likes);

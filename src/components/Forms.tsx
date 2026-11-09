@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { PROFILE_TTL_DAYS, writeDraft } from "@/lib/localData";
+import { isToss } from "@/lib/platform";
 import {
   ageIn,
   EMPTY_TP,
@@ -782,7 +783,8 @@ function Stepper({ step, flow, done, onPick }: { step: number; flow: typeof MAIN
   );
 }
 
-const COUNTRIES: Region[] = ["kr", "us"];
+// The 앱인토스 build is for Korea only.
+const COUNTRIES: Region[] = isToss ? ["kr"] : ["kr", "us"];
 
 function Choice({ selected, onClick, small = false, children }: { selected: boolean; onClick: () => void; small?: boolean; children: ReactNode }) {
   return (

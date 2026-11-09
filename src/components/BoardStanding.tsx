@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { api } from "@/lib/platform";
 import { L } from "@/lib/i18n";
 import { lifeRecords } from "@/lib/records";
 import { lang } from "@/lib/region";
@@ -31,7 +32,7 @@ export function BoardStanding({ life, posted, onPublish }: { life: LifeState; po
   const region = life.region ?? "kr";
   useEffect(() => {
     let live = true;
-    fetch(`/api/memoirs/rank?region=${region}&${query}`)
+    fetch(api(`/api/memoirs/rank?region=${region}&${query}`))
       .then((res) => res.json())
       .then((d: { ok?: boolean; standings?: Partial<Record<Cat, Standing>> }) => live && setRows(d.ok ? (d.standings ?? {}) : null))
       .catch(() => live && setRows(null));
