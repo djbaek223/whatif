@@ -20,8 +20,7 @@ import {
 import { canAutoFocusText } from "@/lib/keyboard";
 import type { Gender, Profile, TurningPoint } from "@/lib/types";
 import { CharacterCard } from "./CharacterCard";
-import { DatePicker, type Ymd } from "./DatePicker";
-import { BirthDateInput, birthParts } from "./BirthDateInput";
+import { DateBoxes, dateParts, type Ymd } from "./DateBoxes";
 import { Badge, blockedMessage, Button, Card, Field, FieldError, Input, Textarea } from "./ui";
 import { moderateAll } from "@/lib/moderation";
 import { L, T } from "@/lib/i18n";
@@ -140,6 +139,8 @@ export function Onboarding({
   const [remember, setRemember] = useState(initial.remember);
   const [birth, setBirth] = useState(() => toYmd(p.birthDate));
   const [tpYm, setTpYm] = useState(() => toYmd(tp.date));
+  // Bumped when a suggestion fills the date, so the boxes show it (they keep what is typed in them).
+  const [tpPick, setTpPick] = useState(0);
   const [typedError, setTypedError] = useState<string | null>(null);
   const [tried, setTried] = useState(false); // the user pressed 다음 on this step at least once
   const [toReview, setToReview] = useState(initial.toReview ?? false);
@@ -205,7 +206,7 @@ export function Onboarding({
   };
 
   // The first empty birth date box in reading order (년 월 일, or Month Day Year in English).
-  const birthGap = birthParts().find((k) => !birth[k]) ?? "d";
+  const birthGap = dateParts().find((k) => !birth[k]) ?? "d";
   // Errors for required answers. Missing answers show once 다음 is pressed; wrong ones show as soon as they're typed.
   const errors: Partial<Record<StepId, { id: string; text: string } | null>> = {
     birth: typedError
@@ -216,7 +217,7 @@ export function Onboarding({
     date: typedError
       ? { id: "tp-date", text: typedError }
       : !tp.date && tried
-        ? { id: "tp-date", text: !tpYm.y ? L("몇 년이었는지 골라 주세요") : L("몇 월이었는지 골라 주세요") }
+        ? { id: "tp-date", text: !tpYm.y ? L("몇 년이었는지 적어 주세요") : L("몇 월이었는지 적어 주세요") }
         : null,
     situation:
       mode === "template"
@@ -359,7 +360,7 @@ export function Onboarding({
               {looksLikeRealName(p.name) && <span className="block text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</span>}
             </Field>
             <Field group required label={L("생년월일")} hint={L("나이와 그 시절 이야기를 맞추는 데 써요.")}>
-              <BirthDateInput
+              <DateBoxes
                 id="birth"
                 value={birth}
                 onChange={setBirthYmd}
@@ -528,12 +529,13 @@ export function Onboarding({
         return (
           <>
             {question(L("그때가 언제였나요?"), age !== null && tp.date ? L`그때 ${age}살이었어요.` : L`${birthYear ? birthYear + 7 : 1940}년(일곱 살)부터 고를 수 있어요.`)}
-            <DatePicker
+            <DateBoxes
+              key={tpPick}
               id="tp-date"
               value={tpYm}
               onChange={setDate}
               withDay={false}
-              min={{ y: birthYear ? birthYear + 7 : 1940, m: 1 }}
+              min={birthYear ? birthYear + 7 : 1940}
               max={{ y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() }}
               error={err?.text}
               onTypedError={setTypedError}
@@ -545,6 +547,8 @@ export function Onboarding({
                 current={tp.date}
                 onPick={(s) => {
                   setDate(toYmd(s.date));
+                  setTypedError(null);
+                  setTpPick((n) => n + 1);
                 }}
               />
             )}
