@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
+import { GoogleTag } from "@/components/GoogleTag";
 import { KeyboardFocus } from "@/components/KeyboardFocus";
 import { adsenseClient } from "@/lib/ads";
 import { SITE_URL } from "@/lib/site";
@@ -34,6 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const adsense = adsenseClient();
   return (
     <html lang="ko" className="h-full antialiased">
+      <head>
+        <GoogleTag />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <KeyboardFocus />

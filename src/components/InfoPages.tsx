@@ -70,8 +70,8 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "이 기기(브라우저)에만 저장되는 정보", en: "Kept only on your device (browser)" },
       body: [
         {
-          ko: "입력한 프로필과 진행 기록은 암호화해서 이 기기의 브라우저 저장소에만 두고, 서버로 보내 저장하지 않아요. 언어, 소리, 화면 설정과 회고록 게시판 이용 기록(내가 올린 글의 삭제 키, 공감하거나 신고한 글, 공감 중복을 막으려고 만든 임의의 기기 번호)도 브라우저 저장소에 있어요. 쿠키는 고른 언어를 1년 동안 기억하는 것 하나뿐이에요. 브라우저 설정에서 사이트 데이터를 지우면 모두 사라져요.",
-          en: "The profile you enter and your progress are encrypted and kept only in this browser's storage; they are not sent to a server to be stored. Your language, sound and display settings and your memoir board activity (delete keys for posts you made, posts you liked or reported, and a random device number that stops repeat likes) are also in browser storage. The only cookie remembers your language for a year. Clearing the site's data in your browser removes all of it.",
+          ko: "입력한 프로필과 진행 기록은 암호화해서 이 기기의 브라우저 저장소에만 두고, 서버로 보내 저장하지 않아요. 언어, 소리, 화면 설정과 회고록 게시판 이용 기록(내가 올린 글의 삭제 키, 공감하거나 신고한 글, 공감 중복을 막으려고 만든 임의의 기기 번호)도 브라우저 저장소에 있어요. 이 사이트가 직접 만드는 쿠키는 고른 언어를 1년 동안 기억하는 것 하나뿐이에요(방문 통계와 광고에 쓰이는 Google 쿠키는 아래에 적었어요). 브라우저 설정에서 사이트 데이터를 지우면 모두 사라져요.",
+          en: "The profile you enter and your progress are encrypted and kept only in this browser's storage; they are not sent to a server to be stored. Your language, sound and display settings and your memoir board activity (delete keys for posts you made, posts you liked or reported, and a random device number that stops repeat likes) are also in browser storage. The only cookie this site sets itself remembers your language for a year (Google cookies used for visit statistics and ads are described below). Clearing the site's data in your browser removes all of it.",
         },
       ],
     },
@@ -112,6 +112,10 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
         {
           ko: "Vercel Web Analytics로 방문 수와 많이 본 페이지를 집계해요. 쿠키 없이 개인을 알아볼 수 없는 형태로 처리돼요.",
           en: "Vercel Web Analytics counts visits and the pages seen most. It works without cookies and in a form that does not identify individuals.",
+        },
+        {
+          ko: "Google 태그(Google 태그 관리자)로 Google 애널리틱스 같은 Google 분석 도구에 방문 정보(본 페이지, 머문 시간, 기기와 브라우저 종류, 대략적인 지역 등)를 보내 서비스 이용 방식을 분석해요. 이때 Google이 쿠키나 비슷한 기술을 쓸 수 있어요. 입력한 프로필과 인생 기록은 보내지 않아요. 브라우저에서 쿠키를 막거나 Google 애널리틱스 차단 부가기능(tools.google.com/dlpage/gaoptout)을 쓰면 수집을 거부할 수 있어요.",
+          en: "A Google tag (Google Tag Manager) sends visit information (pages seen, time spent, device and browser type, approximate region and similar) to Google analytics tools such as Google Analytics to understand how the service is used. Google may use cookies or similar technology for this. The profile you enter and your life records are not sent. You can refuse by blocking cookies in your browser or with the Google Analytics opt-out add-on (tools.google.com/dlpage/gaoptout).",
         },
       ],
     },
