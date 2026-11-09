@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The 앱인토스 build has its own package and checks (toss/package.json).
+    "toss/**",
   ]),
 ]);
 

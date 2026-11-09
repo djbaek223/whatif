@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { api } from "@/lib/platform";
 import { L } from "@/lib/i18n";
 import { countryFor, type Lang } from "@/lib/region";
 import type { PublishedMemoir } from "./Board";
@@ -17,7 +18,7 @@ export function BoardPreview({ lang }: { lang: Lang }) {
   const [popular, setPopular] = useState(false);
   useEffect(() => {
     let live = true;
-    fetch(`/api/memoirs?region=${countryFor(lang)}&home=1`)
+    fetch(api(`/api/memoirs?region=${countryFor(lang)}&home=1`))
       .then((r) => r.json())
       .then((d: { ok?: boolean; items?: PublishedMemoir[]; popular?: boolean }) => {
         if (!live) return;

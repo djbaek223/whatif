@@ -34,7 +34,7 @@ export function TitleScreen({
         <span aria-hidden className="title-osd font-mono text-sm font-bold tracking-[0.14em]">
           <span className="motion-safe:animate-[vhs-blink_1s_steps(2)_infinite]">◀◀</span> REW
         </span>
-        <div role="group" aria-label="Language · 언어" className="flex rounded-full border border-white/25 p-0.5 text-sm">
+        {langs.length > 1 && <div role="group" aria-label="Language · 언어" className="flex rounded-full border border-white/25 p-0.5 text-sm">
           {langs.map((l) => (
             <button
               key={l.id}
@@ -49,7 +49,7 @@ export function TitleScreen({
               {l.name}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-center gap-8 py-8 text-center lg:flex-row lg:justify-between lg:gap-16 lg:text-left">

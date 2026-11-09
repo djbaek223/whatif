@@ -1,0 +1,9 @@
+@import "../../src/app/globals.css";
+
+/* The game's classes live in ../src; Tailwind only scans this folder by itself. */
+@source "../../src";
+
+/* Toss draws its own navigation bar above the web view; the bottom inset (home indicator) is ours to keep clear. */
+body {
+  padding-bottom: var(--toss-safe-bottom, env(safe-area-inset-bottom, 0px));
+}

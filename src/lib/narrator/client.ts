@@ -1,10 +1,11 @@
+import { api } from "../platform";
 import { lang, region } from "../region";
 import { NARRATE_TIMEOUT_MS, type NarrateRequest } from "./schema";
 
 /** Calls the narration route for a life in the current region and language. Returns null when AI is off, fails or is too slow, so callers fall back to templates. */
 export async function narrate<T>(req: NarrateRequest): Promise<T | null> {
   try {
-    const res = await fetch("/api/narrate", {
+    const res = await fetch(api("/api/narrate"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ region: region(), lang: lang(), ...req }),
@@ -19,7 +20,7 @@ export async function narrate<T>(req: NarrateRequest): Promise<T | null> {
 
 export async function aiAvailable(): Promise<boolean> {
   try {
-    const res = await fetch("/api/narrate", { signal: AbortSignal.timeout(5_000) });
+    const res = await fetch(api("/api/narrate"), { signal: AbortSignal.timeout(5_000) });
     return Boolean((await res.json()).ai);
   } catch {
     return false;
