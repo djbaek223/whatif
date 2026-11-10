@@ -1,5 +1,6 @@
 "use client";
 
+import { isToss } from "@/lib/platform";
 import { useEffect, useState, type ReactNode } from "react";
 import { L } from "@/lib/i18n";
 import type { Lang } from "@/lib/region";
@@ -24,11 +25,11 @@ export function TitleScreen({
   onLang: (l: Lang) => void;
   onPick: (quick: boolean) => void;
   /** A game and/or unfinished questions to go back to, each shown like a save slot under the two buttons. */
-  slots: { label: string; detail?: string; onClick: () => void }[];
+  slots: { label: string; detail?: string; icon?: string; onClick: () => void }[];
   footer: ReactNode;
 }) {
   return (
-    <section aria-labelledby="title-q" className="title-hero relative flex min-h-[88svh] flex-col overflow-hidden px-4 pb-6 pt-4 text-[#efeaff] sm:px-8 lg:min-h-[640px]">
+    <section aria-labelledby="title-q" className={`title-hero relative flex min-h-[88svh] flex-col ${isToss ? "flex-1" : ""} overflow-hidden px-4 pb-6 pt-4 text-[#efeaff] sm:px-8 lg:min-h-[640px]`}>
       <div aria-hidden className="title-band" />
       <div className="relative flex items-center justify-between gap-3">
         <span aria-hidden className="title-osd font-mono text-sm font-bold tracking-[0.14em]">
@@ -89,7 +90,7 @@ export function TitleScreen({
               onClick={slot.onClick}
               className="mx-auto flex min-h-11 items-center gap-2 rounded-lg px-3 text-[15px] font-medium text-[#e4defc] underline decoration-white/40 underline-offset-4 hover:decoration-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
             >
-              <span aria-hidden className="font-mono text-xs no-underline">▶</span>
+              <span aria-hidden className="font-mono text-xs no-underline">{slot.icon ?? "▶"}</span>
               {slot.label}
               {slot.detail && <span className="text-[#c9c1ee]">· {slot.detail}</span>}
             </button>

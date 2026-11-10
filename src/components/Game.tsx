@@ -36,6 +36,7 @@ import { EndingView } from "./Ending";
 import { beforeMemoir } from "@/lib/ads";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
+import { BoardDialog } from "./Board";
 import { SiteFooter } from "./InfoPages";
 import { isToss } from "@/lib/platform";
 import { TitleScreen } from "./Title";
@@ -106,6 +107,8 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
   const [ending, setEnding] = useState<EndingResult | null>(null);
   const [memoir, setMemoir] = useState<MemoirPick>(null);
   const [ai, setAi] = useState(false);
+  // 앱인토스: the memoir board opens as a window over the title screen (the website links to its /board pages instead).
+  const [board, setBoard] = useState(false);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [stored, setStored] = useState<StoredProfile | null>(null);
   const [remember, setRemember] = useState(false);
@@ -440,6 +443,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
                   ]
                 : []),
               ...(draft ? [{ label: L("이어서 입력하기"), onClick: startNew }] : []),
+              ...(isToss ? [{ label: L("회고록 게시판"), detail: L("다른 사람들이 다시 산 인생"), icon: "☰", onClick: () => setBoard(true) }] : []),
             ]}
             footer={
               <>
@@ -473,6 +477,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
               <SiteFooter lang={lang} />
             </div>
           )}
+          {isToss && <BoardDialog open={board} onClose={() => setBoard(false)} />}
         </div>
       )}
 

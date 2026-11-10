@@ -3,9 +3,11 @@ import { createRoot } from "react-dom/client";
 import Game from "@/components/Game";
 import { KeyboardFocus } from "@/components/KeyboardFocus";
 import { setupToss } from "./toss";
+import { setupKbDebug } from "./kbDebug";
 import "./index.css";
 
 setupToss();
+setupKbDebug();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

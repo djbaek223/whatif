@@ -94,6 +94,7 @@ export const UI_EN: Record<string, string> = {
   "지우지 못했어요. 잠시 뒤 다시 시도해 주세요.": "Couldn't take it down. Please try again in a moment.",
   "목록": "All memoirs",
   "회고록 게시판": "Memoir board",
+  "다른 사람들이 다시 산 인생": "Lives others lived again",
   "익명": "Anonymous",
   "내 글 지우기": "Take down my memoir",
   "불러오는 중": "Loading",
