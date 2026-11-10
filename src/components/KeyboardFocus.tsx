@@ -19,8 +19,9 @@ import { isToss } from "@/lib/platform";
  * height can't be measured: iOS scrolls the box into view, then pulls it back under the keyboard because the page
  * has nothing below to scroll into. There, while a text box is focused on a touch screen, the keyboard is assumed
  * to take KEYBOARD_GUESS of the screen, and the room under the page is added the moment the box takes focus, before
- * iOS scrolls. Adding it only once the keyboard had settled let iOS pull the page back first, so the box went up,
- * down under the number pad, and up again. A box iOS already left in clear view is then not moved again.
+ * iOS scrolls. There iOS alone moves the box into view: a screen recording (2026-11-10) showed this code's own
+ * smooth scroll running into iOS's (up, down under the number pad, up again), also when focus hopped from one birth
+ * date box to the next. This code steps in only once iOS is done, and only if the box is still hidden.
  */
 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image", "hidden"]);
@@ -33,6 +34,8 @@ const BOTTOM_CLEAR = 96;
 const TOP_CLEAR = 12;
 /** Share of the screen an unmeasurable keyboard is assumed to cover (iPhone keyboard with its bar ≈ 0.40–0.45). */
 const KEYBOARD_GUESS = 0.45;
+/** Toss: a box counts as under the keyboard once it reaches this share of the guessed keyboard (the guess runs high). */
+const HIDDEN_SHARE = 0.8;
 
 function isTextBox(el: Element | null): el is HTMLElement {
   if (!(el instanceof HTMLElement)) return false;
@@ -86,6 +89,14 @@ export function KeyboardFocus() {
       }
       setRoom(kb);
       const r = el.getBoundingClientRect();
+      if (guessing()) {
+        lastKeyboard = kb;
+        // Toss: iOS has scrolled the box itself. Move it only if it still sits under the keyboard or above the top.
+        const top = r.top - vv.offsetTop;
+        const hidden = top < 0 || r.bottom - vv.offsetTop > window.innerHeight - kb * HIDDEN_SHARE;
+        if (hidden) window.scrollBy({ top: top - (window.innerHeight - kb) * TOP_SHARE, behavior: "auto" });
+        return;
+      }
       // What the person can actually see: the visual viewport, or above the assumed keyboard when it isn't measured.
       const seen = measured() >= KEYBOARD_MIN ? vv.height : Math.min(vv.height, window.innerHeight - kb);
       // Position of the box inside that.
@@ -94,9 +105,8 @@ export function KeyboardFocus() {
       const fits = top >= TOP_CLEAR && bottom <= seen - BOTTOM_CLEAR;
       const opened = lastKeyboard < KEYBOARD_MIN;
       lastKeyboard = kb;
-      // Leave a box alone that is already in clear view, unless the keyboard just opened over it. In the Toss app the
-      // room was there before iOS scrolled, so its own scroll stands when it left the box in view.
-      if (fits && (!opened || guessing())) return;
+      // Leave a box alone that is already in clear view, unless the keyboard just opened over it.
+      if (fits && !opened) return;
       const want = Math.max(TOP_CLEAR, Math.min(seen * TOP_SHARE, seen - BOTTOM_CLEAR - r.height));
       const delta = top - want;
       if (Math.abs(delta) < 4) return;
@@ -114,16 +124,17 @@ export function KeyboardFocus() {
 
     const onFocusIn = (e: FocusEvent) => {
       if (!isTextBox(e.target as Element)) return;
-      // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
-      const up = measured() >= KEYBOARD_MIN || (isToss && lastKeyboard >= KEYBOARD_MIN);
-      // Toss: make room now, so iOS's own scroll into view has somewhere to go and isn't pulled back.
-      if (!up && guessing()) setRoom(guessed());
-      soon(up ? 60 : 450);
-      // In the Toss app iOS can pull the page back once its keyboard finishes; look again after that.
-      if (isToss && !up) {
+      // Toss: make room now, so iOS's own scroll into view has somewhere to go, and look only once iOS is done.
+      if (guessing()) {
+        window.clearTimeout(timer);
+        setRoom(guessed());
         window.clearTimeout(recheck);
-        recheck = window.setTimeout(place, 900);
+        recheck = window.setTimeout(place, 700);
+        return;
       }
+      // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
+      const up = measured() >= KEYBOARD_MIN;
+      soon(up ? 60 : 450);
     };
     const onFocusOut = () => soon(200);
     const onResize = () => soon(120);
