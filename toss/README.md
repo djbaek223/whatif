@@ -20,7 +20,7 @@
 ```bash
 cd toss
 npm install
-cp .env.example .env   # 광고 그룹 ID를 넣어요 (없으면 광고 없이 동작)
+cp .env.example .env   # API 주소 (광고 ID는 .env.production에 이미 있어요)
 npm run dev            # 같은 와이파이에서 샌드박스 앱으로 QR 테스트
 npm run build          # vite build 후 ait build → .ait 파일
 npm run deploy         # 콘솔에 업로드 (ait deploy, API 키 필요)
@@ -28,5 +28,5 @@ npm run deploy         # 콘솔에 업로드 (ait deploy, API 키 필요)
 
 ## 출시 전 확인
 
-- 출시 번들에는 테스트 광고 그룹 ID가 아닌 실제 ID만 넣어요. 테스트 ID가 남아 있으면 반려돼요.
+- 실제 광고 그룹 ID(회고록 전면 광고, 스토리 피드 배너)는 `toss/.env.production`에 있고 `npm run build`에 자동으로 들어가요. 테스트 ID를 넣으면 반려돼요.
 - 웹사이트(Vercel)를 이 브랜치 이후 버전으로 배포해야 CORS가 열려요.
