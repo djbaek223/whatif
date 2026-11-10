@@ -22,7 +22,8 @@ import { isToss } from "@/lib/platform";
  * iOS scrolls. There iOS alone moves the box into view: a screen recording (2026-11-10) showed this code's own
  * smooth scroll running into iOS's (up, down under the number pad, up again), also when focus hopped from one birth
  * date box to the next. The page still moved down once with a single late check left in, so in the Toss app this
- * code only adds the room and never scrolls, and only as much room as the box needs (tossRoom).
+ * code only adds the room and never scrolls, and only as much room as the box needs (tossRoom). That holds also when
+ * the viewport does report the keyboard: the web path's smooth scroll must never run inside Toss.
  */
 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image", "hidden"]);
@@ -72,8 +73,6 @@ export function KeyboardFocus() {
       return kb >= KEYBOARD_MIN ? kb : Math.max(kb, guessed());
     };
 
-    const guessing = () => measured() < KEYBOARD_MIN && guessed() >= KEYBOARD_MIN;
-
     const setRoom = (px: number) => {
       if (px > 0) root.style.setProperty("--keyboard-room", `${px}px`);
       else root.style.removeProperty("--keyboard-room");
@@ -96,8 +95,8 @@ export function KeyboardFocus() {
         lastKeyboard = 0;
         return;
       }
-      // Toss: iOS moves the box itself; this code never scrolls there (see the note at the top).
-      if (guessing()) {
+      // Toss: iOS moves the box itself; this code never scrolls there, whether or not the viewport reports the keyboard.
+      if (isToss) {
         setRoom(tossRoom(el, kb));
         lastKeyboard = kb;
         return;
@@ -132,9 +131,10 @@ export function KeyboardFocus() {
     const onFocusIn = (e: FocusEvent) => {
       if (!isTextBox(e.target as Element)) return;
       // Toss: make room now, so iOS's own scroll into view has somewhere to go. Nothing else moves the page there.
-      if (guessing()) {
+      if (isToss) {
         window.clearTimeout(timer);
-        setRoom(tossRoom(e.target as HTMLElement, guessed()));
+        const kb = keyboardHeight();
+        setRoom(kb >= KEYBOARD_MIN ? tossRoom(e.target as HTMLElement, kb) : 0);
         return;
       }
       // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
