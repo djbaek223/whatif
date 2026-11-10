@@ -1,5 +1,6 @@
 "use client";
 
+import { isToss } from "@/lib/platform";
 import { useEffect, useState, type ReactNode } from "react";
 import { L } from "@/lib/i18n";
 import type { Lang } from "@/lib/region";
@@ -28,7 +29,7 @@ export function TitleScreen({
   footer: ReactNode;
 }) {
   return (
-    <section aria-labelledby="title-q" className="title-hero relative flex min-h-[88svh] flex-col overflow-hidden px-4 pb-6 pt-4 text-[#efeaff] sm:px-8 lg:min-h-[640px]">
+    <section aria-labelledby="title-q" className={`title-hero relative flex min-h-[88svh] flex-col ${isToss ? "flex-1" : ""} overflow-hidden px-4 pb-6 pt-4 text-[#efeaff] sm:px-8 lg:min-h-[640px]`}>
       <div aria-hidden className="title-band" />
       <div className="relative flex items-center justify-between gap-3">
         <span aria-hidden className="title-osd font-mono text-sm font-bold tracking-[0.14em]">
