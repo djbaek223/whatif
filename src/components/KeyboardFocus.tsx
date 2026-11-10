@@ -22,7 +22,7 @@ import { isToss } from "@/lib/platform";
  * iOS scrolls. There iOS alone moves the box into view: a screen recording (2026-11-10) showed this code's own
  * smooth scroll running into iOS's (up, down under the number pad, up again), also when focus hopped from one birth
  * date box to the next. The page still moved down once with a single late check left in, so in the Toss app this
- * code only adds the room and never scrolls.
+ * code only adds the room and never scrolls, and only as much room as the box needs (tossRoom).
  */
 
 const NOT_TEXT = new Set(["checkbox", "radio", "button", "submit", "reset", "range", "color", "file", "image", "hidden"]);
@@ -35,6 +35,8 @@ const BOTTOM_CLEAR = 96;
 const TOP_CLEAR = 12;
 /** Share of the screen an unmeasurable keyboard is assumed to cover (iPhone keyboard with its bar ≈ 0.40–0.45). */
 const KEYBOARD_GUESS = 0.45;
+/** Toss: room kept between the focused box and the assumed keyboard top. */
+const ROOM_MARGIN = 24;
 
 function isTextBox(el: Element | null): el is HTMLElement {
   if (!(el instanceof HTMLElement)) return false;
@@ -77,6 +79,15 @@ export function KeyboardFocus() {
       else root.style.removeProperty("--keyboard-room");
     };
 
+    // Toss: only as much room as it takes for the box to scroll just above the keyboard. A box with enough of the page
+    // below it (the birth date) gets none; the full keyboard height left a half-empty screen once the pad was closed.
+    const tossRoom = (el: HTMLElement, kb: number) => {
+      const now = parseFloat(root.style.getPropertyValue("--keyboard-room")) || 0;
+      const page = root.scrollHeight - now;
+      const boxBottom = el.getBoundingClientRect().bottom + window.scrollY;
+      return Math.max(0, Math.ceil(boxBottom + kb + ROOM_MARGIN - page));
+    };
+
     const place = () => {
       const kb = keyboardHeight();
       const el = document.activeElement;
@@ -85,13 +96,14 @@ export function KeyboardFocus() {
         lastKeyboard = 0;
         return;
       }
-      setRoom(kb);
-      const r = el.getBoundingClientRect();
       // Toss: iOS moves the box itself; this code never scrolls there (see the note at the top).
       if (guessing()) {
+        setRoom(tossRoom(el, kb));
         lastKeyboard = kb;
         return;
       }
+      setRoom(kb);
+      const r = el.getBoundingClientRect();
       // What the person can actually see: the visual viewport, or above the assumed keyboard when it isn't measured.
       const seen = measured() >= KEYBOARD_MIN ? vv.height : Math.min(vv.height, window.innerHeight - kb);
       // Position of the box inside that.
@@ -122,7 +134,7 @@ export function KeyboardFocus() {
       // Toss: make room now, so iOS's own scroll into view has somewhere to go. Nothing else moves the page there.
       if (guessing()) {
         window.clearTimeout(timer);
-        setRoom(guessed());
+        setRoom(tossRoom(e.target as HTMLElement, guessed()));
         return;
       }
       // Keyboard already up (moving between boxes): place right away; otherwise wait for it to open.
