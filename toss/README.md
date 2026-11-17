@@ -30,3 +30,12 @@ npm run deploy         # 콘솔에 업로드 (ait deploy, API 키 필요)
 
 - 실제 광고 그룹 ID(회고록 전면 광고, 스토리 피드 배너)는 `toss/.env.production`에 있고 `npm run build`에 자동으로 들어가요. 테스트 ID를 넣으면 반려돼요.
 - 웹사이트(Vercel)를 이 브랜치 이후 버전으로 배포해야 CORS가 열려요.
+
+## 토스 로그인 (생년월일·성별)
+
+미니앱에서는 첫 질문의 생년월일·성별을 직접 적지 않고 토스 로그인으로 채워요(웹사이트는 그대로 직접 입력).
+
+- `src/tossLogin.ts` `TossAuth.login()`으로 인가 코드를 받아 웹사이트 `/api/toss/login`에 보내요.
+- 웹사이트 `src/app/api/toss/login/route.ts` + `src/lib/tossPartner.ts`가 mTLS로 토큰 발급(`generate-token`) → 사용자 정보(`login-me`) → AES-256-GCM 복호화를 하고, 생년월일·성별만 돌려줘요. 서버에 저장하지 않아요.
+- 비밀값은 Vercel 환경 변수에만 있어요: `TOSS_MTLS_CERT`, `TOSS_MTLS_KEY`, `TOSS_LOGIN_DECRYPT_KEY`, `TOSS_LOGIN_AAD`. 이 번들에는 비밀값이 없어요.
+- 토스 앱 밖(브라우저의 `npm run dev`)에서는 로그인 버튼 대신 예전처럼 직접 입력해요.

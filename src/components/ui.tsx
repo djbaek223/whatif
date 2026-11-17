@@ -6,7 +6,7 @@ import { L } from "@/lib/i18n";
 import { isEn } from "@/lib/region";
 
 // Matches the Figma components (Button/Primary, Button/Disabled, Button/Ghost, Choice): a disabled primary button turns flat grey instead of fading.
-export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" | "tape" | "onTape" }) {
+export function Button({ variant = "primary", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "ghost" | "choice" | "tape" | "onTape" | "toss" }) {
   const styles = {
     primary:
       "bg-stone-900 text-stone-50 hover:bg-stone-700 disabled:bg-stone-200 disabled:text-stone-500 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-stone-300 dark:disabled:bg-stone-800 dark:disabled:text-stone-400",
@@ -15,6 +15,8 @@ export function Button({ variant = "primary", className = "", ...props }: Button
     tape: "bg-[#16122b] text-white hover:bg-[#2b2160] disabled:opacity-40 dark:bg-[#5b4cf0] dark:hover:bg-[#6d5fff]",
     // A light button on the dark VHS panel.
     onTape: "bg-white text-[#16122b] hover:bg-[#f3f1ff] disabled:opacity-40",
+    // 토스 로그인 in the 앱인토스 build: Toss blue (#3182F6, pressed #1B64DA), the same in dark mode.
+    toss: "bg-[#3182f6] font-semibold text-white hover:bg-[#1b64da] active:bg-[#1b64da] disabled:opacity-60",
     choice:
       "w-full text-left border border-field bg-white hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-40 dark:bg-stone-900 dark:hover:border-indigo-400 dark:hover:bg-indigo-950",
   }[variant];
