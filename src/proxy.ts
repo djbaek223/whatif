@@ -13,7 +13,23 @@ function allowedOrigins(): Set<string> {
   return new Set([`https://${app}.apps.tossmini.com`, `https://${app}.private-apps.tossmini.com`, ...extra]);
 }
 
+// The 연결 끊기 콜백 is called by Toss's servers, but the console's "test" button may call it from the browser.
+// It is guarded by Basic Auth and sets no cookies, so any origin may call it.
+const DISCONNECT = "/api/toss/disconnect";
+const OPEN_CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
 export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === DISCONNECT) {
+    if (request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: OPEN_CORS });
+    const res = NextResponse.next();
+    for (const [k, v] of Object.entries(OPEN_CORS)) res.headers.set(k, v);
+    return res;
+  }
   const origin = request.headers.get("origin");
   const allowed = !!origin && allowedOrigins().has(origin);
   const headers: Record<string, string> = allowed
