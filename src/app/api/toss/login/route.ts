@@ -5,9 +5,8 @@ import { TossLoginError, tossLoginProfile } from "@/lib/tossPartner";
  * 토스 로그인 for the 앱인토스 mini-app: POST { authorizationCode, referrer } (from TossAuth.login()) and get back
  * { ok: true, birthDate: "YYYY-MM-DD" | "", gender: "남" | "여" | "" }. Only the mini-app's own origins pass CORS
  * (src/proxy.ts). The exchange and the secrets it needs are in src/lib/tossPartner.ts. Nothing is stored, so the
- * 연결 끊기 callback has nothing to delete.
+ * 연결 끊기 callback has nothing to delete. Runs on the Node.js runtime (the default), which node:https needs.
  */
-export const runtime = "nodejs";
 
 // A light per-IP limit: a login is a few calls per user, so 30 an hour is plenty and stops code-guessing floods.
 const hits = new Map<string, number[]>();
