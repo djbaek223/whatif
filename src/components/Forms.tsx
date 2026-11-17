@@ -424,14 +424,17 @@ export function Onboarding({
               </span>
             </Field>
             )}
-            <Field group required label={L("자란 곳")} error={profileErr.hometown ?? undefined} errorId="hometown-error" hint={L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
-              <span role="group" aria-label={L("자란 나라")} className="grid grid-cols-2 gap-2">
-                {COUNTRIES.map((c) => (
-                  <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
-                    <span aria-hidden>{c === "us" ? "🇺🇸" : "🇰🇷"}</span> {countryName(c)}
-                  </Choice>
-                ))}
-              </span>
+            <Field group required label={L("자란 곳")} error={profileErr.hometown ?? undefined} errorId="hometown-error" hint={COUNTRIES.length > 1 ? L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.") : L("한국의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
+              {/* 앱인토스 is for Korea only, so there is no country to pick there. */}
+              {COUNTRIES.length > 1 && (
+                <span role="group" aria-label={L("자란 나라")} className="grid grid-cols-2 gap-2">
+                  {COUNTRIES.map((c) => (
+                    <Choice key={c} selected={country === c} onClick={() => setP({ ...p, country: c })}>
+                      <span aria-hidden>{c === "us" ? "🇺🇸" : "🇰🇷"}</span> {countryName(c)}
+                    </Choice>
+                  ))}
+                </span>
+              )}
               <Input id="hometown-input" aria-label={L("자란 지역")} value={p.hometown} onChange={setField("hometown")} aria-invalid={!!profileErr.hometown || undefined} aria-describedby={profileErr.hometown ? "hometown-error" : undefined} placeholder={country === "us" ? T("e.g. Columbus, Ohio") : L("예: 대전")} maxLength={40} />
             </Field>
           </>
@@ -914,7 +917,7 @@ function Review({ profile: p, tp, country, onEdit }: { profile: Profile; tp: Tur
     ["birth", L("별명"), p.name, true],
     ["birth", L("생년월일"), p.birthDate ? ymdText(p.birthDate) : "", true],
     ["birth", L("성별"), gender, true],
-    ["birth", L("자란 곳"), p.hometown.trim() ? [countryName(country), p.hometown].join(" · ") : "", true],
+    ["birth", L("자란 곳"), p.hometown.trim() ? (COUNTRIES.length > 1 ? [countryName(country), p.hometown].join(" · ") : p.hometown) : "", true],
     ["date", L("그때"), tp.date ? ymText(tp.date) : "", true],
     ["kind", L("갈림길"), tp.kind ?? "", false],
     ["situation", L("상황"), tp.situation, true],
