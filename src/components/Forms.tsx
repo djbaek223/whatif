@@ -394,7 +394,7 @@ export function Onboarding({
                     <span className="text-[13px] text-stone-500 dark:text-stone-400">{L("토스에서 불러왔어요")}</span>
                   </span>
                 ) : (
-                  <Button id="toss-login" type="button" onClick={loginToss} disabled={tossBusy} aria-describedby={tossError || profileErr.toss ? "toss-error" : undefined} className="w-full">
+                  <Button id="toss-login" type="button" variant="toss" onClick={loginToss} disabled={tossBusy} aria-describedby={tossError || profileErr.toss ? "toss-error" : undefined} className="w-full">
                     {tossBusy ? L("불러오는 중…") : L("토스로 로그인하고 불러오기")}
                   </Button>
                 )}
