@@ -13,21 +13,29 @@ function allowedOrigins(): Set<string> {
   return new Set([`https://${app}.apps.tossmini.com`, `https://${app}.private-apps.tossmini.com`, ...extra]);
 }
 
-// The 연결 끊기 콜백 is called by Toss's servers, but the console's "test" button may call it from the browser.
+// The 연결 끊기 콜백 is called by Toss's servers, but the console's "test" button calls it from the browser, which
+// needs CORS. That test may send credentials and its own headers, and a "*" origin is refused for a request with
+// credentials (the browser then reports "Failed to fetch"), so the caller's origin and asked-for headers are echoed.
 // It is guarded by Basic Auth and sets no cookies, so any origin may call it.
 const DISCONNECT = "/api/toss/disconnect";
-const OPEN_CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-  "Access-Control-Max-Age": "86400",
-};
+function openCors(request: NextRequest): Record<string, string> {
+  const origin = request.headers.get("origin");
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    ...(origin ? { "Access-Control-Allow-Credentials": "true" } : {}),
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": request.headers.get("access-control-request-headers") || "Authorization, Content-Type",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin, Access-Control-Request-Headers",
+  };
+}
 
 export function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname === DISCONNECT) {
-    if (request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: OPEN_CORS });
+  if (request.nextUrl.pathname.replace(/\/+$/, "") === DISCONNECT) {
+    const cors = openCors(request);
+    if (request.method === "OPTIONS") return new NextResponse(null, { status: 204, headers: cors });
     const res = NextResponse.next();
-    for (const [k, v] of Object.entries(OPEN_CORS)) res.headers.set(k, v);
+    for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
     return res;
   }
   const origin = request.headers.get("origin");
