@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { PROFILE_TTL_DAYS, writeDraft } from "@/lib/localData";
 import { isToss } from "@/lib/platform";
+import { tossLogin, TossLoginFailure, usesTossLogin } from "@/lib/tossLogin";
 import {
   ageIn,
   EMPTY_TP,
@@ -147,6 +148,31 @@ export function Onboarding({
   const [quick] = useState(initial.quick ?? false);
   const [year, setYear] = useState(initial.year ?? "");
   const root = useRef<HTMLDivElement>(null);
+  // 앱인토스: the birth date and gender come from 토스 로그인, not typed. fromToss says which of the two Toss filled
+  // (null = not logged in yet). A profile that already has both (a restored draft or saved hero) counts as filled.
+  const [viaToss] = useState(usesTossLogin);
+  const [fromToss, setFromToss] = useState<{ birth: boolean; gender: boolean } | null>(() =>
+    viaToss && initial.profile.birthDate && initial.profile.gender ? { birth: true, gender: true } : null,
+  );
+  const [tossBusy, setTossBusy] = useState(false);
+  const [tossError, setTossError] = useState<string | null>(null);
+  const askBirth = !viaToss || (!!fromToss && !fromToss.birth);
+  const askGender = !viaToss || (!!fromToss && !fromToss.gender);
+  const loginToss = async () => {
+    if (tossBusy) return;
+    setTossBusy(true);
+    setTossError(null);
+    try {
+      const id = await tossLogin();
+      setFromToss({ birth: !!id.birthDate, gender: !!id.gender });
+      setP((q) => ({ ...q, birthDate: id.birthDate || q.birthDate, gender: id.gender || q.gender }));
+      if (id.birthDate) setBirth(toYmd(id.birthDate));
+    } catch (e) {
+      setTossError(e instanceof TossLoginFailure && e.kind === "canceled" ? L("로그인이 취소됐어요. 다시 눌러 주세요.") : L("토스 정보를 불러오지 못했어요. 잠시 후 다시 눌러 주세요."));
+    } finally {
+      setTossBusy(false);
+    }
+  };
 
   // Where they grew up decides the school system, the examples and later the whole life, so the questions follow it.
   const country: Region = p.country ?? countryFor(lang());
@@ -248,6 +274,7 @@ export function Onboarding({
   const profileErr = {
     name: tried && !p.name.trim() ? L("별명을 정해 주세요. 막막하면 추천을 눌러 보세요") : null,
     gender: tried && !p.gender ? L("성별을 골라 주세요") : null,
+    toss: tried && viaToss && !fromToss ? L("토스 로그인으로 생년월일과 성별을 불러와 주세요") : null,
     hometown: tried && !p.hometown.trim() ? L("자란 지역을 적어 주세요") : null,
   };
   // What each question's boxes hold. Violence or sex in any of them keeps the question open until it is changed.
@@ -308,7 +335,7 @@ export function Onboarding({
     }
     if (invalid(cur.id)) {
       setTried(true);
-      const id = errors[cur.id]?.id ?? (cur.id === "year" ? "quick-year" : cur.id === "birth" ? (!p.name.trim() ? "nickname" : !p.birthDate ? (typedError ? "birth" : `birth-${birthGap}`) : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
+      const id = errors[cur.id]?.id ?? (cur.id === "year" ? "quick-year" : cur.id === "birth" ? (!p.name.trim() ? "nickname" : viaToss && !fromToss ? "toss-login" : !p.birthDate ? (typedError ? "birth" : `birth-${birthGap}`) : !p.gender ? "gender-group" : "hometown-input") : cur.id === "date" ? "tp-date" : mode === "template" ? (blanks.a.trim() ? "blank-b" : "blank-a") : "tp-situation");
       const el = document.getElementById(id);
       (el?.matches("button, input, select, textarea") ? el : el?.querySelector<HTMLElement>("[aria-invalid=true], button, input"))?.focus();
       return;
@@ -341,7 +368,7 @@ export function Onboarding({
       case "birth":
         return (
           <>
-            {question(L("주인공에 대해 알려 주세요"), L("네 가지 모두 꼭 필요해요. 이야기의 시대와 사건을 맞추는 데 써요."))}
+            {question(L("주인공에 대해 알려 주세요"), viaToss ? L("모두 꼭 필요해요. 이야기의 시대와 사건을 맞추는 데 써요.") : L("네 가지 모두 꼭 필요해요. 이야기의 시대와 사건을 맞추는 데 써요."))}
             <Field required label={L("별명")} error={profileErr.name ?? undefined} errorId="nickname-error" hint={L("실명 대신 별명을 써 주세요. 주인공을 부를 때만 쓰여요.")}>
               <span className="flex gap-2">
                 <Input id="nickname" data-autofocus value={p.name} onChange={setField("name")} aria-invalid={!!profileErr.name || undefined} aria-describedby={profileErr.name ? "nickname-error" : undefined} placeholder={L("예: 늦깎이여행자")} maxLength={20} />
@@ -359,6 +386,21 @@ export function Onboarding({
               </span>
               {looksLikeRealName(p.name) && <span className="block text-[13px] text-amber-700 dark:text-amber-400">{L("혹시 실명이라면, 개인정보 보호를 위해 별명으로 바꾸는 걸 권해요.")}</span>}
             </Field>
+            {viaToss && (
+              <Field group required label={L("생년월일 · 성별")} error={(tossError ?? profileErr.toss) || undefined} errorId="toss-error" hint={fromToss ? undefined : L("토스 로그인으로 불러와서 따로 적지 않아도 돼요. 나이와 그 시절 이야기, 입대 같은 사건에만 쓰여요.")}>
+                {fromToss && (fromToss.birth || fromToss.gender) ? (
+                  <span id="toss-login" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-stone-100 px-3.5 py-3 text-[15px] dark:bg-stone-800">
+                    <b className="font-semibold">{[fromToss.birth && ymdText(p.birthDate), fromToss.gender && ({ 남: L("남"), 여: L("여") } as Record<string, string>)[p.gender]].filter(Boolean).join(" · ")}</b>
+                    <span className="text-[13px] text-stone-500 dark:text-stone-400">{L("토스에서 불러왔어요")}</span>
+                  </span>
+                ) : (
+                  <Button id="toss-login" type="button" onClick={loginToss} disabled={tossBusy} aria-describedby={tossError || profileErr.toss ? "toss-error" : undefined} className="w-full">
+                    {tossBusy ? L("불러오는 중…") : L("토스로 로그인하고 불러오기")}
+                  </Button>
+                )}
+              </Field>
+            )}
+            {askBirth && (
             <Field group required label={L("생년월일")} hint={L("나이와 그 시절 이야기를 맞추는 데 써요.")}>
               <DateBoxes
                 id="birth"
@@ -370,6 +412,8 @@ export function Onboarding({
                 onTypedError={setTypedError}
               />
             </Field>
+            )}
+            {askGender && (
             <Field group required label={L("성별")} error={profileErr.gender ?? undefined} errorId="gender-error" hint={L("입대 같은 일부 사건에만 쓰여요.")}>
               <span id="gender-group" className="grid grid-cols-3 gap-2" role="group" aria-label={L("성별")}>
                 {(["남", "여", "기타"] as Gender[]).map((g) => (
@@ -379,6 +423,7 @@ export function Onboarding({
                 ))}
               </span>
             </Field>
+            )}
             <Field group required label={L("자란 곳")} error={profileErr.hometown ?? undefined} errorId="hometown-error" hint={L("고른 나라의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.")}>
               <span role="group" aria-label={L("자란 나라")} className="grid grid-cols-2 gap-2">
                 {COUNTRIES.map((c) => (

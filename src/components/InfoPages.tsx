@@ -105,6 +105,10 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
           en: "If you use Toss login in the What If mini-app inside Toss, we receive only the user identifier Toss issues for this service and the information you allowed on the consent screen. It is used only to keep you signed in and tell users apart, and is never sold or passed on.",
         },
         {
+          ko: "그중 게임에 쓰는 건 생년월일과 성별뿐이에요. 주인공의 나이와 시대, 입대 같은 사건을 맞추려고 처음 질문에 채워 넣고, 서버에는 저장하지 않아요. 이름 등 다른 항목은 쓰지 않아요.",
+          en: "Of that, the game uses only your date of birth and gender, filled into the first question to set the hero's age, era and events like military service. They are not stored on the server. Your name and other items are not used.",
+        },
+        {
           ko: "토스 앱에서 연결을 끊거나 동의를 철회하거나 토스를 탈퇴하면 토스가 그 사실을 알려 주고, 그때 로그인을 끝내고 그 계정으로 서버에 저장한 정보를 지워요.",
           en: "If you disconnect, withdraw consent or leave Toss, Toss tells us, and we end the sign-in and delete what was stored on the server for that account.",
         },
