@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
 import { GoogleTag } from "@/components/GoogleTag";
 import { KeyboardFocus } from "@/components/KeyboardFocus";
 import { adsenseClient } from "@/lib/ads";
@@ -18,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: { type: "website", locale: "ko_KR", siteName: "What If", title, description, url: "/" },
   twitter: { card: "summary_large_image", title, description },
   verification: { google: "lQZdZvhIVht6gTeFwjJheeCwHDfX3Mj1tkHPcYQs_Fk" },
-  // AdSense's site check looks for this tag; present only once NEXT_PUBLIC_ADSENSE_CLIENT is set.
+  // AdSense's site check looks for this tag on every page. The ad script itself loads only on content pages (ContentAds).
   other: adsenseClient() ? { "google-adsense-account": adsenseClient() } : undefined,
 };
 
@@ -32,7 +31,6 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const adsense = adsenseClient();
   return (
     <html lang="ko" className="h-full antialiased">
       <head>
@@ -42,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <KeyboardFocus />
         <Analytics />
-        {adsense && <Script async src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsense}`} crossOrigin="anonymous" strategy="afterInteractive" />}
       </body>
     </html>
   );

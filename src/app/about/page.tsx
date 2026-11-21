@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BoardShell } from "@/components/BoardPages";
+import { ContentAds } from "@/components/ContentAds";
 import { InfoBody } from "@/components/InfoPages";
 
 export const metadata: Metadata = {
@@ -12,6 +13,7 @@ export default function Page() {
   return (
     <BoardShell lang="ko">
       <InfoBody lang="ko" page="about" />
+      <ContentAds />
     </BoardShell>
   );
 }

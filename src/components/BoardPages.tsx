@@ -23,12 +23,13 @@ function Shell({ lang, children }: { lang: Lang; children: React.ReactNode }) {
   return (
     <main lang={lang} className="mx-auto w-full max-w-2xl flex-1 px-4 py-8 sm:py-12">
       <nav className="mb-6 flex items-center justify-between gap-3 text-sm">
-        <Link href={homePath(lang)} className="font-semibold tracking-widest text-indigo-600 dark:text-indigo-400">
+        {/* Plain links into the game: a full page load leaves behind any ad script a reading page loaded. */}
+        <a href={homePath(lang)} className="font-semibold tracking-widest text-indigo-600 dark:text-indigo-400">
           WHAT IF
-        </Link>
-        <Link href={homePath(lang)} className="rounded-full bg-stone-900 px-4 py-2 font-medium text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900">
+        </a>
+        <a href={homePath(lang)} className="rounded-full bg-stone-900 px-4 py-2 font-medium text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900">
           {tr(lang, "나도 살아보기")}
-        </Link>
+        </a>
       </nav>
       {children}
       <SiteFooter lang={lang} />

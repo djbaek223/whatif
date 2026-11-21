@@ -363,7 +363,6 @@ export function PlayView({
             )}
           </div>
         )}
-        <AdSlot spot="side" className="max-lg:hidden lg:[@media(max-height:819px)]:hidden" />
       </aside>
 
       {/* While the sheet leads, the story behind it steps back; folding the sheet brings it forward again. */}

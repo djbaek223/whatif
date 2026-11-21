@@ -5,8 +5,7 @@ import { registerAds } from "@/lib/ads";
  * Toss ads (토스애즈) in the game's existing ad spots (src/lib/ads.ts, src/components/AdSlot.tsx):
  *   feed     a list banner between the story's dates, every few choices (AdSlot "feed")
  *   memoir   a fullscreen ad while the memoir is written, after the player says yes (beforeMemoir)
- * The "wait" spot (under the scene-writing card) stays empty: it sits where the choices appear, so taps would land on
- * the ad by mistake. "side" is the desktop column and never shows on a phone.
+ * The game has no other ad spots (the website draws none in the game; its AdSense ads live only on content pages).
  *
  * Ad group ids come from the 앱인토스 console via .env (VITE_TOSS_AD_BANNER, VITE_TOSS_AD_FULLSCREEN). Without them no
  * ad network is registered and the spots stay hidden, as on the website.

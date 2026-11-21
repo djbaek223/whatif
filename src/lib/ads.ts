@@ -16,16 +16,16 @@ export async function beforeMemoir(): Promise<void> {
 }
 
 /**
- * The ad network behind the spots. The website has none yet (AdSlot draws its placeholder); the 앱인토스 build
+ * The ad network behind the spots. The website registers none (its game screens carry no ads; AdSense runs only on content pages); the 앱인토스 build
  * registers Toss ads at start-up (toss/src/tossAds.ts). Kept as a plain registry so the website never imports Toss code.
  */
 export type AdProvider = {
   /** Show a fullscreen ad and resolve once it is closed, failed or timed out. */
   fullscreen?: (spot: "memoir") => Promise<void>;
   /** The spots this network fills with a banner; the others stay empty. */
-  bannerSpots?: ("side" | "feed" | "wait")[];
+  bannerSpots?: "feed"[];
   /** Draw a banner for a spot into el; returns a cleanup. */
-  banner?: (spot: "side" | "feed" | "wait", el: HTMLElement) => () => void;
+  banner?: (spot: "feed", el: HTMLElement) => () => void;
 };
 
 let provider: AdProvider = {};
@@ -48,8 +48,8 @@ const ADSENSE_CLIENT = "ca-pub-2732165732113122";
 
 /**
  * The AdSense publisher id ("ca-pub-…"): NEXT_PUBLIC_ADSENSE_CLIENT when it is set (read at build time; set it to
- * something else to switch accounts), else the site's own id above. The layout adds AdSense's verification meta tag
- * and loader script, and /ads.txt lists it.
+ * something else to switch accounts), else the site's own id above. The layout adds AdSense's verification meta tag on
+ * every page, the content pages load the ad script (ContentAds), and /ads.txt lists it.
  */
 export function adsenseClient(): string {
   const id = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "").trim() || ADSENSE_CLIENT;

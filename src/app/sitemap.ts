@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { cachedList } from "@/lib/boardCache";
+import { ARTICLES } from "@/content/guide";
 import { boardConfigured, type Memoir } from "@/lib/memoirs";
 import type { Region } from "@/lib/region";
 import { SITE_URL } from "@/lib/site";
@@ -22,7 +23,7 @@ async function recent(region: Region): Promise<Memoir[]> {
   return out;
 }
 
-// Public pages: the start screens, the memoir boards, their halls of fame and their newest posts. Play state lives in the browser.
+// Public pages: the start screens, the guide and its articles, the help pages, the memoir boards, their halls of fame and their newest posts. Play state lives in the browser.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [kr, us] = await Promise.all([recent("kr"), recent("us")]);
   const post = (path: string, m: Memoir) => ({ url: `${site}${path}/${m.id}`, lastModified: m.createdAt, changeFrequency: "monthly" as const, priority: 0.5 });
@@ -33,6 +34,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: boards.en, changeFrequency: "daily", priority: 0.7, alternates: { languages: boards } },
     { url: `${site}/board/hall`, changeFrequency: "daily", priority: 0.7, alternates: { languages: { ko: `${site}/board/hall`, en: `${site}/en/board/hall` } } },
     { url: `${site}/en/board/hall`, changeFrequency: "daily", priority: 0.6, alternates: { languages: { ko: `${site}/board/hall`, en: `${site}/en/board/hall` } } },
+    { url: `${site}/guide`, changeFrequency: "weekly", priority: 0.8 },
+    ...ARTICLES.map((a) => ({ url: `${site}/guide/${a.slug}`, lastModified: a.date, changeFrequency: "monthly" as const, priority: 0.7 })),
+    ...(["how-to-play", "faq", "contact"] as const).map((page) => ({ url: `${site}/${page}`, changeFrequency: "monthly" as const, priority: 0.5 })),
     ...(["about", "terms", "privacy"] as const).flatMap((page) => [
       { url: `${site}/${page}`, changeFrequency: "yearly" as const, priority: 0.4, alternates: { languages: { ko: `${site}/${page}`, en: `${site}/en/${page}` } } },
       { url: `${site}/en/${page}`, changeFrequency: "yearly" as const, priority: 0.3, alternates: { languages: { ko: `${site}/${page}`, en: `${site}/en/${page}` } } },

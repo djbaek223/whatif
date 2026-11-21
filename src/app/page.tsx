@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import Game from "@/components/Game";
+import { GuidePreview } from "@/components/GuidePreview";
 import { LANG_COOKIE, langFromAcceptLanguage } from "@/lib/langPick";
 
 // The first paint is already in the visitor's language: the language they picked before (cookie), else the
@@ -15,5 +16,5 @@ export const metadata: Metadata = {
 export default async function Home() {
   const picked = (await cookies()).get(LANG_COOKIE)?.value;
   const lang = picked === "ko" || picked === "en" ? picked : langFromAcceptLanguage((await headers()).get("accept-language"));
-  return <Game initialLang={lang} guessed />;
+  return <Game initialLang={lang} guessed readingLinks={<GuidePreview />} />;
 }
