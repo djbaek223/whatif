@@ -18,6 +18,7 @@
     "check:typed": "tsx scripts/check-typed.ts",
     "check:club": "tsx scripts/check-club.ts",
     "check:moderation": "tsx scripts/check-moderation.ts",
+    "check:hold": "tsx scripts/check-hold.ts",
     "check:invest": "tsx scripts/check-invest.ts",
     "check:same": "tsx scripts/check-same.ts",
     "check:i18n": "tsx scripts/check-i18n.ts",

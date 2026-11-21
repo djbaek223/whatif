@@ -290,3 +290,48 @@ export function shareText(life: LifeState, line: string, parts: ShareParts, url:
   return rows.join("\n");
 }
 
+
+// ── Hold to keep stepping ───────────────────────────────
+
+/** The chapters that stop a held step button, named for the line under the buttons. */
+function stopTag(tag: string): string | null {
+  switch (tag) {
+    case "married": return L("결혼");
+    case "divorced": return L("이혼");
+    case "widowed": return L("사별");
+    case "child": return L("아이의 탄생");
+    case "school": return L("입학");
+    case "graduated": return L("졸업");
+    case "job": return L("새 직장");
+    case "business": return L("창업");
+    case "jobless": return L("실직");
+    case "retired": return L("은퇴");
+    case "home": return L("내 집 마련");
+    default: return null;
+  }
+}
+
+/**
+ * A change big enough that holding the step button stops there, so the player sees it: a marriage, a child,
+ * school or graduation, enlistment or discharge, a new job, a rare moment, a large swing in wealth, or health
+ * falling low (the end may be near). Choices and the end of the life stop the hold by leaving the timeline.
+ * Returns what changed, for the line under the buttons, or null.
+ */
+export function bigChange(before: LifeState, after: LifeState): string | null {
+  if (after === before || after.log.length <= before.log.length) return null;
+  const chapters = (after.chapters ?? []).slice((before.chapters ?? []).length);
+  for (const c of chapters) for (const t of c.tags ?? []) {
+    const name = stopTag(t);
+    if (name) return name;
+  }
+  if (after.flags.military !== before.flags.military) return after.flags.military ? L("입대") : L("전역");
+  if ((after.rares?.length ?? 0) > (before.rares?.length ?? 0)) return after.rares!.at(-1)!.title;
+  // Only what the months' pay and fixed costs don't explain: a steady drain or saving never stops the hold.
+  const months = after.mi - before.mi;
+  const costs = Object.values(after.expense ?? {}).reduce((a, b) => a + b, 0);
+  const swing = after.wealth - before.wealth - (after.income - costs) * months;
+  const scale = Math.max(Math.abs(before.wealth), 24 * Math.max(before.income, 0), 3000);
+  if (Math.abs(swing) >= 0.3 * scale) return swing > 0 ? L("자산이 크게 늘었어요") : L("자산이 크게 줄었어요");
+  if (before.stats.health > 20 && after.stats.health <= 20) return L("건강이 크게 나빠졌어요");
+  return null;
+}
