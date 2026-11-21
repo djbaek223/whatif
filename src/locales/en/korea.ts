@@ -53,7 +53,6 @@ export const EN_KR: Record<string, string> = {
   "아이의 수능": "The kid's suneung",
   "아이가 수능을 봤다. 시험장 앞에서 하루 종일 기다렸다.": "The kid took the suneung. You waited outside the exam hall all day.",
   "아이가 재수를 하겠다고 했다. 말없이 등을 두드려 줬다.": "The kid decided to retake the suneung. You patted their back and said nothing.",
-  "아이가 입대하는 날, 훈련소 앞에서 한참을 서 있었다.": "The day the kid enlisted, you stood outside the training camp a long time.",
   "회식 자리에서 팀장님의 노래를 세 곡이나 들었다.": "Sat through the team leader's three songs at the hoesik.",
   "지방 공장으로 장기 출장을 갔다.": "Spent weeks at a plant in the provinces on assignment.",
   "새벽 어학원에 등록했다.": "Signed up for an early-morning English class.",
