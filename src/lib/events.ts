@@ -6,8 +6,8 @@ import { MORE_EVENTS } from "./moreEvents";
 import { STORY_EVENTS, STORY_FORKS } from "./storyEvents";
 import { SCENE_EVENTS } from "./sceneEvents";
 import { GIVING_EVENTS } from "./givingEvents";
-import type { Axis, Category, InvestAsset, LifeFlags, LifeState, Stats, Theme } from "./types";
-import { inService, retaking } from "./timeline";
+import type { Axis, Category, InvestAsset, LifeFlags, LifeState, ServiceKind, Stats, Theme } from "./types";
+import { inService, owesService, retaking } from "./timeline";
 import { employee, ownsBusiness } from "./work";
 import { US_CORE_EVENTS, US_MORE_EVENTS } from "../regions/us/events";
 import { L } from "./i18n";
@@ -26,7 +26,7 @@ export interface Effect {
   flags?: Partial<LifeFlags>;
   eduYears?: number; // course length; classes start the next March (university) or term (graduate), see timeline.ts
   busyMonths?: number;
-  enlist?: boolean; // army service for as long as it lasted that year, with any course put on leave
+  enlist?: boolean | ServiceKind; // service for as long as it lasted that year (true: 육군), any job left and any course put on leave
   retake?: boolean; // another year for next year's exam (재수, 삼수)
   addChild?: boolean;
   intense?: number; // months of month-by-month turns after this
@@ -155,34 +155,62 @@ export const CORE_EVENTS: EventDef[] = [
   },
   {
     id: "military",
-    get title() { return L("입대 영장"); },
+    get title() { return L("입영 통지서"); },
     minAge: 19,
-    maxAge: 28,
-    // Once deferred, the notice comes back for sure when school ends or a year or two has passed.
-    perYear: (s) => (s.marks?.["army-delay"] !== undefined ? 2 : 0.5),
+    maxAge: 30,
+    perYear: armyPace,
     when: (s) => {
-      if (s.profile.gender !== "남" || s.flags.military) return false;
+      if (!owesService(s) || retaking(s)) return false;
       const delayed = s.marks?.["army-delay"];
       if (delayed === undefined) return true;
-      return s.flags.education === "university" ? s.mi >= s.flags.eduUntil : s.mi - delayed >= 18;
+      // Deferred for school: the notice comes back when the diploma does. Older saves deferred for work: 18 months.
+      return enrolled(s) ? s.mi >= s.flags.eduUntil : s.mi - delayed >= 18;
     },
-    intro: (s) => (s.marks?.["army-delay"] !== undefined ? L("미뤄 둔 입영 통지서가 다시 날아왔다. 이번에는 가야 한다.") : L("입영 통지서가 날아왔다.")),
+    intro: (s) => {
+      const delayed = s.marks?.["army-delay"] !== undefined;
+      if (s.flags.draft === "reserve") return delayed ? L("미뤄 둔 소집 통지서가 다시 날아왔다. 이번에는 가야 한다.") : L("보충역 소집 통지서가 날아왔다. 집에서 출퇴근하며 복무하게 된다.");
+      if (delayed) return L("졸업을 앞두고 미뤄 둔 입영 통지서가 다시 날아왔다. 이번에는 가야 한다.");
+      if (enrolled(s)) return L("학기가 끝나 갈 무렵 입영 통지서가 날아왔다. 동기들도 하나둘 휴학계를 내고 있다.");
+      return L("입영 통지서가 날아왔다.");
+    },
     choices: [
       {
         id: "enlist",
-        get label() { return L("지금 입대한다"); },
+        get label() { return L("육군 현역으로 입대한다"); },
+        when: (s) => s.flags.draft !== "reserve",
         effect: {
           get text() { return L("머리를 깎고 훈련소에 들어갔다."); },
           stats: { health: 3, relationships: 3, happiness: -6 },
-          enlist: true,
+          enlist: "army",
+        },
+      },
+      {
+        id: "air-force",
+        get label() { return L("공군에 지원한다 (복무 기간이 3개월 더 길다)"); },
+        when: (s) => s.flags.draft !== "reserve" && s.marks?.["army-delay"] === undefined,
+        effect: {
+          get text() { return L("공군 시험에 붙어 훈련소로 향했다."); },
+          stats: { health: 2, knowledge: 2, relationships: 2, happiness: -4 },
+          enlist: "air",
+        },
+      },
+      {
+        id: "reserve",
+        get label() { return L("보충역으로 복무를 시작한다"); },
+        when: (s) => s.flags.draft === "reserve",
+        effect: {
+          get text() { return L("기초군사훈련을 마치고 배정받은 기관으로 출근하기 시작했다."); },
+          stats: { relationships: 1, happiness: -2 },
+          enlist: "reserve",
         },
       },
       {
         id: "delay",
-        get label() { return L("학업이나 일을 이유로 미룬다"); },
-        when: (s) => (s.flags.education === "university" || s.flags.employed) && s.marks?.["army-delay"] === undefined && ageOf(s) < 26,
+        get label() { return L("졸업할 때까지 입대를 미룬다"); },
+        // 학업 사유 입영 연기: a student can defer until the degree is done, up to about 24 for a four-year course.
+        when: (s) => enrolled(s) && s.marks?.["army-delay"] === undefined && ageOf(s) < 24 && s.mi < s.flags.eduUntil - 6,
         effect: {
-          get text() { return L("입대를 미뤘다. 언젠가는 가야 한다."); },
+          get text() { return L("학업을 이유로 입영을 연기했다. 졸업하면 바로 가야 한다."); },
           stats: { happiness: 2 },
           mark: "army-delay",
         },
@@ -196,8 +224,13 @@ export const CORE_EVENTS: EventDef[] = [
     maxAge: 35,
     perYear: 1,
     once: true,
-    when: (s) => s.flags.education === "university" && s.mi >= s.flags.eduUntil && !inService(s),
-    intro: (s) => L`${s.flags.school ? `${s.flags.school} ` : ""}졸업장을 받았다. 무엇을 할지 정해야 한다.`,
+    // A man who still owes service goes in before the career starts (the notice comes with the diploma);
+    // a year on, the fork plays anyway so a life can't stall here.
+    when: (s) => s.flags.education === "university" && s.mi >= s.flags.eduUntil && !inService(s) && (!owesService(s) || s.mi >= s.flags.eduUntil + 12),
+    intro: (s) =>
+      s.flags.serviceFrom !== undefined && s.flags.serviceFrom >= s.flags.eduUntil
+        ? L("전역했다. 졸업장은 입대 전에 받아 두었다. 이제 무엇을 할지 정해야 한다.")
+        : L`${s.flags.school ? `${s.flags.school} ` : ""}졸업장을 받았다. 무엇을 할지 정해야 한다.`,
     choices: [
       {
         id: "big-company",
@@ -414,10 +447,11 @@ export const CORE_EVENTS: EventDef[] = [
     get title() { return L("일자리 찾기"); },
     minAge: 20,
     maxAge: 50,
-    perYear: 0.8,
+    // Just out of the service, finding work comes first.
+    perYear: (s) => (s.flags.serviceUntil !== undefined && s.mi >= s.flags.serviceUntil && s.mi - s.flags.serviceUntil < 12 ? 1 : 0.8),
     cooldown: 12,
     repeatable: true,
-    when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done",
+    when: (s) => !s.flags.employed && !s.flags.retired && s.flags.education === "done" && !inService(s),
     intro: (s) => L`통장 잔고가 줄어들고 있다${s.wealth < 1000 ? L` (남은 자산 ${formatWealth(s.wealth)})` : ""}.${s.flags.children ? L` ${s.flags.children > 1 ? L`아이 ${s.flags.children}명을` : L("아이를")} 키우려면` : ""} 일을 구해야 한다.`,
     choices: [
       {
@@ -659,7 +693,8 @@ export const CORE_EVENTS: EventDef[] = [
     maxAge: 55,
     perYear: 0.45,
     cooldown: 12,
-    when: (s) => s.flags.partner === "dating",
+    // Hardly anyone marries before doing military service; the talk comes after it.
+    when: (s) => s.flags.partner === "dating" && !inService(s) && !owesService(s),
     repeatable: true, // comes back until it is settled
     get intro() { return L("연인과 결혼 이야기가 오가기 시작했다."); },
     choices: [
@@ -1045,6 +1080,25 @@ const POOLS: Partial<Record<Region, EventDef[]>> = {};
 export function eventsHere(): EventDef[] {
   const r = region();
   return (POOLS[r] ??= EVENTS.filter((e) => !e.region || e.region === r));
+}
+
+/** In a university or graduate course that hasn't ended. */
+const enrolled = (s: LifeState) => (s.flags.education === "university" || s.flags.education === "graduate") && s.mi < s.flags.eduUntil;
+
+/**
+ * How soon the draft notice comes (per year; 1 means at the next turn). Students mostly go after the first or second
+ * year (a rare few before classes even start); men who aren't studying go at 19-21, and nobody waits past 22.
+ * After a deferral the notice comes as soon as the diploma does.
+ */
+function armyPace(s: LifeState): number {
+  if (s.marks?.["army-delay"] !== undefined) return 1;
+  const age = ageOf(s);
+  if (enrolled(s)) {
+    if (age >= 24) return 1;
+    const since = s.mi - (s.flags.entered ?? s.flags.eduFrom ?? s.mi);
+    return since < 9 ? 0.08 : since < 21 ? 0.75 : 1;
+  }
+  return age < 20 ? 0.4 : age < 22 ? 0.7 : 1;
 }
 
 export function ageOf(s: LifeState): number {

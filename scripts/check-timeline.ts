@@ -4,7 +4,7 @@
 // Run: npm run check:timeline
 import { advanceUntilStop, autoPick, createLife, formatMi, lifeFacts, resolveChoice } from "../src/lib/engine";
 import { fallbackOpening } from "../src/lib/narrator/fallback";
-import { serviceMonths } from "../src/lib/timeline";
+import { inService, owesService, serviceLength, serviceMonths } from "../src/lib/timeline";
 import type { LifeFlags, LifeState, Profile, TurningPoint } from "../src/lib/types";
 
 const failures: string[] = [];
@@ -39,7 +39,8 @@ function watch(a: LifeFlags, s: LifeState, seen: Seen, label: string) {
   if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) {
     const len = b.serviceUntil! - b.serviceFrom;
     seen.service.push([b.serviceFrom, b.serviceUntil!]);
-    if (len !== serviceMonths(b.serviceFrom)) fail(`${label}: enlisted ${formatMi(b.serviceFrom)} for ${len}개월, expected ${serviceMonths(b.serviceFrom)}`);
+    if (len !== serviceLength(b.serviceFrom, b.serviceKind)) fail(`${label}: enlisted ${formatMi(b.serviceFrom)} (${b.serviceKind}) for ${len}개월, expected ${serviceLength(b.serviceFrom, b.serviceKind)}`);
+    if (b.serviceKind !== "reserve" && b.draft === "reserve") fail(`${label}: judged 보충역 but went in as ${b.serviceKind}`);
   }
   if (a.education === "university" && b.education !== "university" && seen.entered !== undefined && b.education === "done") {
     seen.graduated = s.mi;
@@ -47,6 +48,10 @@ function watch(a: LifeFlags, s: LifeState, seen: Seen, label: string) {
     if (s.mi - seen.entered < 47 + leave - 6) fail(`${label}: entered ${formatMi(seen.entered)}, served ${leave}개월 meanwhile, finished ${formatMi(s.mi)}`);
     for (const [f, u] of seen.service) if (s.mi >= f && s.mi < u) fail(`${label}: graduated ${formatMi(s.mi)} while in the army`);
   }
+  // Military service comes before the career: no diploma-to-job or wedding while it is still owed, no job while serving.
+  if (a.education === "university" && b.education === "done" && owesService(s) && s.mi < b.eduUntil + 12) fail(`${label}: graduated ${formatMi(s.mi)} without military service`);
+  if (b.partner === "married" && a.partner !== "married" && (owesService(s) || inService(s))) fail(`${label}: married ${formatMi(s.mi)} before or during military service`);
+  if (inService(s) && b.employed) fail(`${label}: employed (${b.job}) while serving, ${formatMi(s.mi)}`);
 }
 
 /** Plays to 2015 or so. With retakeFirst, the first exam result is answered with a retake. */
@@ -86,6 +91,36 @@ for (let i = 0; i < 300; i++) {
   if (!sample.length && seen.entered !== undefined && seen.service.length && seen.graduated !== undefined)
     sample = (r.life.memory ?? []).slice(0, 8);
 }
+// 4. The draft exam: 현역, 보충역 or 면제 at 19, then the notice; a student mostly goes after the first or second year.
+{
+  const kinds: Record<string, number> = {};
+  const afterEntry: number[] = [];
+  for (const birth of ["1966-04-01", "1990-04-01", "2004-04-01"]) {
+    const p = { ...profile, birthDate: birth, universityYear: undefined };
+    const t: TurningPoint = { date: `${Number(birth.slice(0, 4)) + 16}-03`, situation: "고등학교에 막 올라갔다.", actualChoice: "공부를 열심히 했다", regret: "", kind: "입시" };
+    for (let i = 0; i < 100; i++) {
+      let life = createLife(p, t, fallbackOpening(p, t));
+      for (let guard = 0; guard < 600 && !life.dead && life.mi < Number(birth.slice(0, 4)) * 12 + 30 * 12; guard++) {
+        const before = structuredClone(life.flags);
+        // Pick 현역 or 보충역, never the deferral, to measure when the notice comes on its own.
+        const own = life.pending?.eventId === "military" ? life.pending.options.find((o) => o.id !== "delay")?.id : null;
+        life = life.pending ? resolveChoice(life, own ?? autoPick(life) ?? life.pending.options[0].id) : advanceUntilStop(life).state;
+        if (life.flags.serviceFrom !== undefined && before.serviceFrom === undefined && before.education === "university" && before.entered !== undefined) afterEntry.push(life.flags.serviceFrom - before.entered);
+      }
+      const k = life.flags.draft ?? "none";
+      kinds[k] = (kinds[k] ?? 0) + 1;
+      if (life.flags.draft !== "exempt" && !life.flags.serviceFrom) fail(`${birth}#${i}: ${life.flags.draft} but never served by 30`);
+    }
+  }
+  const sorted = afterEntry.sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  console.log(`draft exam over 300 men: ${JSON.stringify(kinds)}; students enlist a median ${median} months after entering (n=${sorted.length})`);
+  if (!kinds.active || !kinds.reserve || !kinds.exempt) fail(`draft exam outcomes missing: ${JSON.stringify(kinds)}`);
+  if (kinds.active < 200) fail(`too few 현역: ${kinds.active}/300`);
+  if (median < 9 || median > 24) fail(`students enlist a median ${median} months after entering, expected after the first or second year`);
+  if (sorted.at(-1)! > 30) fail(`a student enlisted ${sorted.at(-1)} months after entering without deferring`);
+}
+
 console.log(`turning point 1996-11 retake: ${retakers}/300 retaking, ${entered} entered university, ${served} served, ${graduated} graduated, ${told} told the dates`);
 if (sample.length) console.log(`sample memory:\n  ${sample.join("\n  ")}`);
 

@@ -52,6 +52,11 @@ export const DEGREE_LABELS: Record<Degree, string> = {
   get phd() { return L("박사"); },
 };
 
+/** 병역판정: 현역 (grades 1-3), 보충역 (grade 4: 방위, 공익, 사회복무요원), 면제 (grades 5-6). */
+export type Draft = "active" | "reserve" | "exempt";
+/** 육군, 공군 (a few months longer), or 보충역 commuting from home. */
+export type ServiceKind = "army" | "air" | "reserve";
+
 export type Partner = "none" | "dating" | "married" | "divorced" | "widowed";
 
 export interface LifeFlags {
@@ -85,6 +90,8 @@ export interface LifeFlags {
   retakes?: number; // exam retakes so far
   serviceFrom?: number; // month index of enlistment
   serviceUntil?: number; // month index of discharge
+  draft?: Draft; // 병역판정검사 result at 19 (Korean men); missing before the exam and in older saves
+  serviceKind?: ServiceKind; // how the service is done; missing in older saves (army)
   // Degrees (education.ts); missing in lives saved before them, then read from education and school.
   degree?: Degree; // highest degree finished
   program?: Degree; // the degree the current course leads to, credited once its last month has passed

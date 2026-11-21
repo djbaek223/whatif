@@ -148,7 +148,7 @@ export const LIFE_EVENTS: EventDef[] = [
     intro: "",
     effect: {
       get text() { return L("과 MT에서 밤새 게임을 하고 새벽에 라면을 끓였다."); },
-      get alt() { return [L("축제 주점에서 밤새 전을 부쳤다."), L("새내기 배움터에서 이름도 모르던 동기들과 친해졌다."), L("시험이 끝난 밤, 동기들과 학교 앞 술집에서 늦게까지 떠들었다.")]; },
+      get alt() { return [L("축제 주점에서 밤새 전을 부쳤다."), L("개강 파티에서 처음 보는 후배들과 금세 친해졌다."), L("시험이 끝난 밤, 동기들과 학교 앞 술집에서 늦게까지 떠들었다.")]; },
       stats: { happiness: 3, relationships: 4, health: -1 },
     },
   },
@@ -224,12 +224,27 @@ export const LIFE_EVENTS: EventDef[] = [
     maxAge: 28,
     perYear: 0.8,
     cooldown: 5,
-    when: inService,
+    when: (s) => inService(s) && s.flags.serviceKind !== "reserve",
     intro: "",
     effect: {
       get text() { return L("첫 휴가를 나와 먹은 엄마 밥이 눈물 나게 맛있었다."); },
       get alt() { return [L("새벽 근무를 서며 별을 세었다."), L("혹한기 훈련에서 발가락이 얼 뻔했다."), L("PX에서 냉동식품을 사 먹으며 동기들과 웃었다."), L("편지 한 통에 하루 종일 기분이 좋았다."), L("제대 날짜를 세며 달력에 X 표를 그었다.")]; },
       stats: { relationships: 1, health: 1 },
+    },
+  },
+  {
+    id: "reserve-life",
+    get title() { return L("보충역 복무"); },
+    minAge: 18,
+    maxAge: 30,
+    perYear: 0.8,
+    cooldown: 5,
+    when: (s) => inService(s) && s.flags.serviceKind === "reserve",
+    intro: "",
+    effect: {
+      get text() { return L("아침마다 배정받은 기관으로 출근해 서류를 정리했다."); },
+      get alt() { return [L("퇴근하고 집에 와 엄마 밥을 먹을 수 있다는 게 다행이었다."), L("현역으로 간 친구의 편지를 받고 괜히 미안해졌다."), L("민원인에게 한참 혼나고 돌아와 소집해제 날짜를 세었다.")]; },
+      stats: { relationships: 1, happiness: 1 },
     },
   },
   // ── 연애와 결혼 ─────────────────────────────────────
@@ -524,7 +539,7 @@ export const LIFE_EVENTS: EventDef[] = [
     intro: "",
     effect: {
       get text() { return L("아이가 독립해 집을 나갔다. 텅 빈 방이 낯설었다."); },
-      get alt() { return [L("아이가 입대하는 날, 훈련소 앞에서 한참을 서 있었다."), L("아이가 첫 월급으로 빨간 내복을 사 왔다.")]; },
+      get alt() { return [L("아이가 기숙사로 짐을 옮기던 날, 돌아오는 차 안이 유난히 조용했다."), L("아이가 첫 월급으로 빨간 내복을 사 왔다.")]; },
       stats: { happiness: 1, relationships: -1 },
     },
   },

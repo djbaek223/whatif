@@ -60,7 +60,7 @@ import type {
 import type { MomentResult, OpeningResult, SceneResult } from "./narrator/schema";
 import { kindDef, schoolYears } from "./onboarding";
 import { ROUTINE, seasonMore, workLines } from "./routine";
-import { enlist, inService, nextMarch, retaking, startCourse, startRetake, timelineFacts } from "./timeline";
+import { dischargeWord, draftExam, enlist, inService, owesService, nextMarch, retaking, serviceName, startCourse, startRetake, timelineFacts } from "./timeline";
 import { BUSINESS, businessTitle, employee, ownsBusiness } from "./work";
 import { buy, holdingFact, investIn, markToMarket, saleText, stakeFor, tradable, worth, type Bet } from "./invest";
 import { L, T, V } from "./i18n";
@@ -186,6 +186,11 @@ function uniDates(profile: Profile, mi: number, age: number): { entered?: number
   return { until: nextMarch(mi + Math.max(12, (23 - age) * 12)) - 1 };
 }
 
+// The player's own words about military service: done (전역, 제대, 군필, 복학) or exempted.
+const SERVED = /전역|제대|군필|복학|소집\s?해제|병역\s?(필|면제|특례)|면제|군대(를|도)?\s?다녀|산업기능요원|전문연구요원/;
+const EXEMPT = /면제/;
+const ownWords = (p: Profile, tp: TurningPoint) => [tp.situation, tp.actualChoice, p.currentLife, p.personality].join(" ");
+
 const JOBLESS = /구직|취준|취업\s?준비|무직|백수|실직|준비생|휴학|없음|\b(job hunting|unemployed|between jobs|laid off|none|looking for work|on leave)\b/i;
 const GENERIC_PLACE = /^(대기업|중견기업|중소기업|스타트업|공기업|외국계|회사)$/;
 const GENERIC_JOB = /^(회사원|직장인|사원|사회초년생|신입|정규직|associate|office worker|employee|new hire)$/i;
@@ -239,7 +244,12 @@ function createLifeHere(profile: Profile, tp: TurningPoint, opening: OpeningResu
     children: Math.max(0, Math.min(5, init.children)),
     homeOwner: false,
     retired: false,
-    military: region() === "us" || profile.gender !== "남" || age > 24, // no draft in the US (enlisting is a choice)
+    // No draft in the US (enlisting is a choice). A Korean man past 24, or one whose story says he served or was
+    // exempted, has it behind him.
+    military: region() === "us" || profile.gender !== "남" || age > 24 || SERVED.test(ownWords(profile, tp)),
+    ...(region() !== "us" && profile.gender === "남" && (age > 24 || SERVED.test(ownWords(profile, tp)))
+      ? { draft: EXEMPT.test(ownWords(profile, tp)) ? ("exempt" as const) : ("active" as const) }
+      : {}),
     busyUntil: mi,
     noKids: false,
     // Children who already exist at the turning point get rough birth months, oldest first.
@@ -350,8 +360,12 @@ function eduFits(edu: OpeningChoice["education"], s: LifeState): boolean {
   return true;
 }
 
+// An opening path that is going into the service now ("군대 일찍 가기", "공군에 지원한다"), not one that puts it off.
+const ENLIST_NOW = /입대|입영|군대|훈련소|군 복무|현역|공군|해군|해병|카투사|공익|사회복무/;
+const NOT_NOW = /미루|미룬|연기|안 가|가지 않|나중|졸업 (후|하고)|대학 먼저|먼저 대학|면제|대신|\b(later|after (college|graduat))/;
+
 function presetEffect(choice: OpeningChoice, s: LifeState): Effect {
-  const effect = basePresetEffect(choice, s);
+  const effect = enlistNow(choice, s, basePresetEffect(choice, s));
   const edu = choice.education;
   if (!edu || edu === "same" || edu === s.flags.education || !eduFits(edu, s)) return effect;
   // Going back to the exam (재수, 반수) waits for next year's exam season; university is the March after it.
@@ -360,6 +374,13 @@ function presetEffect(choice: OpeningChoice, s: LifeState): Effect {
   const enroll: Effect["enroll"] =
     edu === "university" ? { level: "university", pick: choice.original ? "profile" : "fit" } : edu === "graduate" ? { level: "graduate" } : undefined;
   return { ...effect, flags: { ...effect.flags, education: edu }, ...(years ? { eduYears: years } : {}), ...(enroll && !effect.enroll ? { enroll } : {}) };
+}
+
+/** A Korean man who owes service and picked a path that is enlisting goes in now, 공군 or 보충역 as the path says. */
+function enlistNow(choice: OpeningChoice, s: LifeState, effect: Effect): Effect {
+  if (!owesService(s) || ageOf(s) < 18 || !ENLIST_NOW.test(choice.label) || NOT_NOW.test(choice.label)) return effect;
+  const kind = s.flags.draft === "reserve" || /공익|사회복무/.test(choice.label) ? "reserve" : /공군/.test(choice.label) ? "air" : "army";
+  return { text: kind === "reserve" ? L("보충역 복무를 시작했다.") : L("머리를 깎고 훈련소에 들어갔다."), stats: { health: 2, relationships: 2, happiness: -4 }, enlist: kind };
 }
 
 function basePresetEffect(choice: OpeningChoice, s: LifeState): Effect {
@@ -718,7 +739,7 @@ function applyEffect(s: LifeState, effect: Effect, rng: Rng, out: Applied = { te
   if (effect.eduYears) startCourse(s.flags, s.mi, effect.enroll?.level === "university" && isMedical(s.profile.major) ? 6 : effect.eduYears);
   if (effect.busyMonths) s.flags.busyUntil = Math.max(s.flags.busyUntil, s.mi + effect.busyMonths);
   if (effect.retake) out.texts.push(startRetake(s));
-  if (effect.enlist) out.texts.push(...enlist(s));
+  if (effect.enlist) out.texts.push(...enlist(s, effect.enlist === true ? "army" : effect.enlist));
   if (effect.addChild) {
     s.flags.children += 1;
     s.flags.kidsBorn = [...(s.flags.kidsBorn ?? []), s.mi];
@@ -794,7 +815,8 @@ function changesBetween(a: LifeFlags, s: LifeState): string[] {
   if (degreeOf(b) !== degreeOf(a) && DEGREE_RANK[degreeOf(b)] >= DEGREE_RANK.college)
     out.push(L`학위 취득: ${DEGREE_LABELS[degreeOf(b)]}${a.school ?? b.school ? ` (${V(a.school ?? b.school)})` : ""}`);
   if (b.retaking !== undefined && b.retakes !== a.retakes) out.push(L`${(b.retakes ?? 1) >= 2 ? L("삼수") : L("재수")} 시작 (다음 수능 ${Math.floor(b.retaking / 12)}년 11월)`);
-  if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom) out.push(L`입대: 육군 ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} 전역 예정`);
+  if (b.serviceFrom !== undefined && b.serviceFrom !== a.serviceFrom)
+    out.push(L`${b.serviceKind === "reserve" ? L("복무 시작") : L("입대")}: ${serviceName(b)} ${(b.serviceUntil ?? 0) - b.serviceFrom}개월, ${formatMi(b.serviceUntil ?? 0)} ${dischargeWord(b)} 예정`);
   if (b.partner !== a.partner)
     out.push({ none: L("연인과 헤어짐"), dating: L("연애 시작"), married: L("결혼"), divorced: L("이혼"), widowed: L("배우자와 사별") }[b.partner]);
   if (b.children > a.children) out.push(L`${ORDINAL()[b.children] ?? L`${b.children}째`} 아이 출생`);
@@ -1464,7 +1486,7 @@ function drift(s: LifeState, months: number) {
   const relTarget = 45 + (f.partner === "married" ? 12 : f.partner === "dating" ? 6 : 0) + f.children * 4;
   s.stats.relationships = clamp(s.stats.relationships + (relTarget - s.stats.relationships) * 0.015 * months);
 
-  const settled = f.employed || f.retired || studying ? 4 : -6;
+  const settled = f.employed || f.retired || studying || inService(s) ? 4 : -6;
   const money = s.wealth < 0 ? -8 : Math.min(8, s.wealth / 15000);
   const happyTarget = 38 + s.stats.relationships * 0.2 + s.stats.health * 0.1 + settled + money;
   s.stats.happiness = clamp(s.stats.happiness + (happyTarget - s.stats.happiness) * 0.03 * months);
@@ -1714,6 +1736,9 @@ function advanceTurnHere(state: LifeState): { state: LifeState; stop: StopReason
   const age = ageOf(s);
   const year = Math.floor(s.mi / 12);
   const entries: LogEntry[] = [];
+  // 병역판정검사 at 19 decides 현역, 보충역 or 면제 before any draft notice.
+  const exam = draftExam(s, rng);
+  if (exam) entries.push({ mi: s.mi, kind: "event", text: exam });
   let stop: StopReason = null;
   const costs = noteCosts(s);
   if (costs) entries.push(costs);

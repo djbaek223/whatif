@@ -2,6 +2,7 @@
 export const US_MISC_KO: Record<string, string> = {
   "e.g. Columbus, Ohio": "예: 오하이오주 콜럼버스",
   "Four years of active duty, out in {0}.": "4년 현역 복무, {0} 전역 예정이다.",
+  "Left the job behind.": "다니던 일은 그만두었다.",
   "College is on hold: back in {0}, graduating {1}.": "대학은 휴학했다. {0} 복학, {1} 졸업 예정.",
   "Took a gap year to work and reapply. Decisions come in spring {0}; college starts in September {1} at the earliest.": "1년 동안 일하며 대학에 다시 지원하기로 했다. 합격 발표는 {0}년 봄, 대학은 빨라도 {1}년 9월에 들어간다.",
   "Gap year: reapplying to college, decisions in spring {0}, starting September {1} at the earliest. Do not write that they got in or started before then": "갭이어: 대학 재지원 중, 합격 발표 {0}년 봄, 입학은 빨라도 {1}년 9월. 그 전에 대학에 붙거나 입학했다고 쓰지 않음",
