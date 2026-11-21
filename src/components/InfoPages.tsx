@@ -10,7 +10,7 @@ type Pair = { ko: string; en: string };
 type Section = { title: Pair; body: Pair[] };
 
 /** The date the privacy text last changed. Update it with the text. */
-const UPDATED = "2026-11-17";
+const UPDATED = "2026-11-21";
 
 const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
   title: { ko: "What If 소개", en: "About What If" },
@@ -50,8 +50,8 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "시대와 나라를 반영해요", en: "Built on real eras and countries" },
       body: [
         {
-          ko: "주인공이 태어난 해와 자란 나라에 따라 학교 제도, 대학 입시, 병역, 취업 시장, 물가와 집값, 그 시절의 뉴스가 달라져요. 한국판에서는 학력고사와 수능, 병역판정검사와 입영, 외환위기 같은 시대의 흐름이 이야기에 반영되고, 미국판에서는 미국의 학교 제도와 직장, 사회보장 제도를 따라요.",
-          en: "The year the hero was born and the country they grew up in change the schools, college admissions, military service, job market, prices, housing and the news of the time. A Korean life follows Korea's exams, draft and the 1997 crisis; an American life follows American schools, work and Social Security.",
+          ko: "주인공이 태어난 해와 자란 나라에 따라 학교 제도와 대학 입시, 병역, 그 시절에 있던 회사와 물건, 그리고 뉴스가 달라져요. 한국 인생에서는 학력고사와 수능, 병역판정검사와 입영, 외환위기 같은 시대의 흐름이 이야기에 반영되고, 미국 인생에서는 미국의 대학 지원과 학자금 대출, 징병 추첨과 입대, 직장과 사회보장 제도를 따라요. 금액은 시대와 상관없이 지금 돈의 가치로 보여 줘요.",
+          en: "The year the hero was born and the country they grew up in change the schools, college admissions, military service, the companies and things that existed, and the news of the time. A Korean life follows Korea's entrance exams, the draft and the 1997 crisis; an American life follows college applications and student loans, the draft lottery and enlistment, American work and Social Security. Money is always shown in today's value, whatever the year.",
         },
       ],
     },
@@ -59,8 +59,8 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "읽을거리도 있어요", en: "Reading" },
       body: [
         {
-          ko: "가이드(whatif.host/guide)에는 1970년대부터 2010년대까지의 한국 생활상, 입시·군대·취업·결혼·집 같은 인생의 갈림길, 후회와 '만약'에 관한 칼럼, 게임을 더 깊게 즐기는 방법을 정리한 글이 있어요. 모든 글은 기록된 사실과 연구를 바탕으로 직접 썼어요.",
-          en: "The guide (whatif.host/guide, in Korean) has articles on everyday life in Korea from the 1970s to the 2010s, life's common turning points (exams, military service, work, marriage, housing), columns on regret and 'what if', and tips for the game. Every article is written by hand from the record and from research.",
+          ko: "가이드(whatif.host/guide)에는 1970년대부터 2010년대까지의 한국 생활상, 입시·군대·취업·결혼·집 같은 인생의 갈림길, 후회와 '만약'에 관한 칼럼, 게임을 더 깊게 즐기는 방법을 정리한 글이 있어요. 영어 가이드(whatif.host/en/guide)는 같은 구성으로 미국의 생활상과 갈림길을 다뤄요. 모든 글은 기록된 사실과 연구를 바탕으로 직접 썼어요.",
+          en: "The guide (whatif.host/en/guide) has articles on everyday American life from the 1970s to the 2010s, the turning points most people meet (college, the military, work, marriage, a home), columns on regret and 'what if', and ways to get more out of the game. A Korean guide with the same sections covers life in Korea. Every article is written by hand from the historical record and published research.",
         },
       ],
     },
@@ -77,7 +77,7 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "무료로 운영돼요", en: "Free to play" },
       body: [
         {
-          ko: "What If는 무료이고 회원가입도 없어요. 장면을 쓰는 AI 비용과 서버 비용은 광고로 충당해요. 광고는 가이드와 소개 같은 읽을거리 페이지에만 두고, 입력과 플레이, 엔딩 같은 게임 화면에는 넣지 않아요.",
+          ko: "What If는 무료이고 웹사이트에는 회원가입도 없어요. 장면을 쓰는 AI 비용과 서버 비용은 광고로 충당해요. 웹사이트에서는 광고를 가이드와 소개 같은 읽을거리 페이지에만 두고, 입력과 플레이, 엔딩 같은 게임 화면에는 넣지 않아요. 토스 앱 안의 미니앱에서는 토스 광고를 써요.",
           en: "What If is free and needs no account. The cost of the AI that writes the scenes and of the servers is covered by ads. Ads appear only on reading pages such as the guide and this page, never on the game screens (setup, play, ending).",
         },
       ],
@@ -87,7 +87,7 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       body: [
         {
           ko: "버그 제보, 기능 제안, 게시물 삭제 요청은 문의 페이지(whatif.host/contact)나 게임 안 ⋯ 메뉴의 ‘의견 보내기’로 남겨 주세요. 보내 주신 내용은 운영자가 직접 읽어요.",
-          en: "For bug reports, ideas or post removal, use the contact page (whatif.host/contact) or “Send feedback” in the game's ⋯ menu. The operator reads every message.",
+          en: "For bug reports, ideas or post removal, use the contact page (whatif.host/en/contact) or “Send feedback” in the game's ⋯ menu. The operator reads every message.",
         },
       ],
     },
@@ -105,8 +105,8 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "이 기기(브라우저)에만 저장되는 정보", en: "Kept only on your device (browser)" },
       body: [
         {
-          ko: "입력한 프로필과 진행 기록은 암호화해서 이 기기의 브라우저 저장소에만 두고, 서버로 보내 저장하지 않아요. 언어, 소리, 화면 설정과 회고록 게시판 이용 기록(내가 올린 글의 삭제 키, 공감하거나 신고한 글, 공감 중복을 막으려고 만든 임의의 기기 번호)도 브라우저 저장소에 있어요. 이 사이트가 직접 만드는 쿠키는 고른 언어를 1년 동안 기억하는 것 하나뿐이에요(방문 통계와 광고에 쓰이는 Google 쿠키는 아래에 적었어요). 브라우저 설정에서 사이트 데이터를 지우면 모두 사라져요.",
-          en: "The profile you enter and your progress are encrypted and kept only in this browser's storage; they are not sent to a server to be stored. Your language, sound and display settings and your memoir board activity (delete keys for posts you made, posts you liked or reported, and a random device number that stops repeat likes) are also in browser storage. The only cookie this site sets itself remembers your language for a year (Google cookies used for visit statistics and ads are described below). Clearing the site's data in your browser removes all of it.",
+          ko: "입력한 프로필과 진행 기록은 암호화해서 이 기기의 브라우저 저장소에만 두고, 서버로 보내 저장하지 않아요. 기본으로는 지금 탭에만 두어 탭을 닫으면 사라지고, ‘이 기기에 저장하기’를 고르면 이 브라우저에 남아 180일 동안 쓰지 않으면 자동으로 지워져요. 언어, 소리, 화면 설정과 회고록 게시판 이용 기록(내가 올린 글의 삭제 키, 공감하거나 신고한 글, 공감 중복을 막으려고 만든 임의의 기기 번호)도 브라우저 저장소에 있어요. 이 사이트가 직접 만드는 쿠키는 고른 언어를 1년 동안 기억하는 것 하나뿐이에요(방문 통계와 광고에 쓰이는 Google 쿠키는 아래에 적었어요). 브라우저 설정에서 사이트 데이터를 지우면 모두 사라져요.",
+          en: "The profile you enter and your progress are encrypted and kept only in this browser's storage; they are not sent to a server to be stored. By default they are kept for the current tab only and disappear when it closes; if you choose “Save on this device”, they stay in this browser and are deleted automatically after 180 days without use. Your language, sound and display settings and your memoir board activity (delete keys for posts you made, posts you liked or reported, and a random device number that stops repeat likes) are also in browser storage. The only cookie this site sets itself remembers your language for a year (Google cookies used for visit statistics and ads are described below). Clearing the site's data in your browser removes all of it.",
         },
       ],
     },
@@ -114,8 +114,8 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "장면을 쓰는 동안 AI에 전달되는 정보", en: "What the AI receives while writing scenes" },
       body: [
         {
-          ko: "장면과 회고록을 쓰는 동안 프로필(별명, 태어난 해와 달, 지역, 학교와 직장 같은 입력 내용), 돌아간 순간, 지금까지의 삶, 직접 써서 고른 선택의 내용이 외부 AI 모델 제공업체(현재 BytePlus ModelArk에서 제공하는 DeepSeek 모델)로 전달돼요. 이 내용은 글을 쓰는 데에만 쓰이고 What If 서버에는 저장하지 않아요. 실명, 연락처, 주소 같은 민감한 정보는 입력하지 말아 주세요.",
-          en: "While scenes and the memoir are written, your profile (nickname, birth year and month, region, school and work you entered), the moment you went back to, the life so far, and any choice you wrote in your own words are sent to an outside AI model provider (currently DeepSeek models served through BytePlus ModelArk). It is used only to write the text and is not stored on What If's servers. Please do not enter real names, contact details, addresses or other sensitive information.",
+          ko: "장면과 회고록을 쓰는 동안 프로필(별명, 태어난 해와 달, 성별, 자란 지역, 직접 적은 가족·성격·지금의 삶 같은 입력 내용), 돌아간 순간과 그때의 상황, 지금까지의 삶, 직접 써서 고른 선택의 내용이 외부 AI 모델 제공업체(현재 BytePlus ModelArk에서 제공하는 DeepSeek 모델)로 전달돼요. 이 내용은 글을 쓰는 데에만 쓰이고 What If 서버에는 저장하지 않아요. 실명, 연락처, 주소 같은 민감한 정보는 입력하지 말아 주세요.",
+          en: "While scenes and the memoir are written, your profile (nickname, birth year and month, gender, where you grew up, and the family, personality and present life you described), the moment you went back to and its situation, the life so far, and any choice you wrote in your own words are sent to an outside AI model provider (currently DeepSeek models served through BytePlus ModelArk). It is used only to write the text and is not stored on What If's servers. Please do not enter real names, contact details, addresses or other sensitive information.",
         },
       ],
     },
@@ -193,8 +193,8 @@ const PRIVACY: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "문의와 변경", en: "Questions and changes" },
       body: [
         {
-          ko: "개인정보에 관한 문의나 삭제 요청은 게임 안 ⋯ 메뉴의 ‘의견 보내기’로 알려 주세요. 이 방침이 바뀌면 이 페이지의 날짜와 내용을 고쳐요.",
-          en: "For questions or deletion requests about your information, use “Send feedback” in the ⋯ menu inside the game. If this policy changes, this page and its date are updated.",
+          ko: "개인정보에 관한 문의나 삭제 요청은 문의 페이지(whatif.host/contact)나 게임 안 ⋯ 메뉴의 ‘의견 보내기’로 알려 주세요. 이 방침이 바뀌면 이 페이지의 날짜와 내용을 고쳐요.",
+          en: "For questions or deletion requests about your information, use the contact page (whatif.host/en/contact) or “Send feedback” in the ⋯ menu inside the game. If this policy changes, this page and its date are updated.",
         },
       ],
     },
@@ -363,7 +363,10 @@ export function SiteFooter({ lang }: { lang: Lang }) {
     lang === "en"
       ? [
           ["About", infoPath(lang, "about")],
-          ["Guide (Korean)", "/guide"],
+          ["Guide", "/en/guide"],
+          ["How to play", "/en/how-to-play"],
+          ["FAQ", "/en/faq"],
+          ["Contact", "/en/contact"],
           ["Terms", infoPath(lang, "terms")],
           ["Privacy policy", infoPath(lang, "privacy")],
           ["Memoir board", "/en/board"],

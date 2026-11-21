@@ -17,4 +17,6 @@ export type Article = {
   body: Block[];
   /** Slugs of related articles, shown at the end. */
   related: string[];
+  /** The slug of the matching article in the other language's guide (its edition for the other country), for hreflang. */
+  pair?: string;
 };

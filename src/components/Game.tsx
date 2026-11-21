@@ -102,7 +102,7 @@ function keepLangCookie(l: Lang) {
  * readingLinks: server-drawn links into the reading pages (the guide), shown under the board preview on the start screen.
  * Passed in by the page so the guide's text never ships in the game's bundle.
  */
-export default function Game({ initialLang, guessed, readingLinks }: { initialLang?: Lang; guessed?: boolean; readingLinks?: React.ReactNode } = {}) {
+export default function Game({ initialLang, guessed, readingLinks }: { initialLang?: Lang; guessed?: boolean; readingLinks?: Partial<Record<Lang, React.ReactNode>> } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
   const [lang, setLangState] = useState<Lang>(initialLang ?? "ko");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
@@ -478,7 +478,7 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
           {!isToss && (
             <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
               <BoardPreview lang={lang} />
-              {lang === "ko" && readingLinks}
+              {readingLinks?.[lang]}
               <SiteFooter lang={lang} />
             </div>
           )}

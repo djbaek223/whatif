@@ -4,8 +4,8 @@ import { FaqPage } from "@/components/SitePages";
 
 export const metadata: Metadata = {
   title: "자주 묻는 질문 · What If",
-  description: "What If의 요금, 개인정보 저장, AI의 역할, MBTI 반영, 회고록 삭제 등 자주 묻는 질문에 답했어요.",
-  alternates: { canonical: "/faq" },
+  description: "What If의 요금, 개인정보 저장, AI의 역할, 성격 반영, 회고록 삭제 등 자주 묻는 질문에 답했어요.",
+  alternates: { canonical: "/faq", languages: { ko: "/faq", en: "/en/faq" } },
 };
 
 export default function Page() {

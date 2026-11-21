@@ -135,10 +135,6 @@ export function EndingView({
         </ol>
       </Card>
 
-      <div className="flex h-24 items-center justify-center rounded-2xl border border-dashed border-stone-300 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">
-        {L("광고 영역 (출시 때 연결)")}
-      </div>
-
       <div className="space-y-2">
         <Button className="w-full" onClick={onReplay}>
           {L("다른 삶 살아보기")}
