@@ -4,14 +4,14 @@ import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObjec
 import { costBreakdown, costTotal, monthlyCosts } from "@/lib/budget";
 import { ageOf } from "@/lib/events";
 import { formatMi, formatWealth, asksPlayer, isBigChoice, pendingKeyOf, payLabel, statusLabel, turnLength } from "@/lib/engine";
-import { consequenceOf, degreeLine, markerFor, markerId, playMode, type Milestone } from "@/lib/playUi";
+import { bigChange, consequenceOf, degreeLine, markerFor, markerId, playMode, type Milestone } from "@/lib/playUi";
 import { sceneOf, type SceneState } from "@/lib/scene";
 import { loadSoundPref, setSound, sfx } from "@/lib/sound";
 import type { LifeChapter, LifeState, LogEntry, PendingChoice, StatKey } from "@/lib/types";
 import { AboutDialog, versionLabel } from "./About";
 import { AdSlot, useAdsOn } from "./AdSlot";
 import { BoardDialog } from "./Board";
-import { ConsequenceView, DecisionPanel, type FreeResult, ProgressDock, TimelineDock } from "./Decision";
+import { ConsequenceView, DecisionPanel, type FreeResult, ProgressDock, TimelineDock, useHoldStep } from "./Decision";
 import { FeedbackDialog } from "./Feedback";
 import { BadgeToast, bigSwings, DiceRoll, rollOf, type Roll, YearBanner } from "./GameFx";
 import { LifeHud, useCompactHud } from "./LifeHud";
@@ -133,6 +133,20 @@ export function PlayView({
     carryOn: () => setChosenFrom(null),
   };
 
+  // Holding the step button keeps stepping. It stops when the timeline gives way (a choice, the present-day card,
+  // the end of the life) or when a step brings a big change the player should see before time runs on.
+  const hold = useHoldStep(act.step);
+  const { phase: holdPhase, stop: holdStop } = hold;
+  const holdFrom = useRef(life);
+  useEffect(() => {
+    const before = holdFrom.current;
+    holdFrom.current = life;
+    if (holdPhase === "idle") return;
+    if (mode !== "timeline") return holdStop();
+    const why = holdPhase === "running" && bigChange(before, life);
+    if (why) holdStop(why);
+  }, [life, mode, holdPhase, holdStop]);
+
   const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
     const t = e.target as HTMLElement | null;
@@ -154,16 +168,25 @@ export function PlayView({
       act.carryOn();
     } else if (mode === "timeline" && e.key === " ") {
       e.preventDefault();
-      act.step();
+      if (!e.repeat) hold.press(); // its keyup steps once, or ends the hold
+
     } else if (mode === "timeline" && (e.key === "Enter" || e.key === "a" || e.key === "A")) {
       e.preventDefault();
       act.progress();
     } else if (mode === "progressing" && (e.key === "a" || e.key === "A")) handlers.onStop();
   });
+  const onKeyUp = useEffectEvent((e: KeyboardEvent) => {
+    if (e.key === " ") hold.release(mode !== "timeline");
+  });
   useEffect(() => {
     const h = (e: KeyboardEvent) => onKey(e);
+    const u = (e: KeyboardEvent) => onKeyUp(e);
     window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
+    window.addEventListener("keyup", u);
+    return () => {
+      window.removeEventListener("keydown", h);
+      window.removeEventListener("keyup", u);
+    };
   }, []);
 
   // Choosing, answering, folding the sheet and starting or stopping progress each take the focused control off the page.
@@ -336,7 +359,7 @@ export function PlayView({
             ) : mode === "progressing" ? (
               <ProgressDock when={formatMi(life.mi)} autoDecide={autoDecide} keys={keys} onStop={handlers.onStop} onToggleAutoDecide={handlers.onToggleAutoDecide} />
             ) : (
-              <TimelineDock months={turnLength(life)} keys={keys} onStep={act.step} onProgress={act.progress} />
+              <TimelineDock months={turnLength(life)} keys={keys} hold={hold} onProgress={act.progress} />
             )}
           </div>
         )}

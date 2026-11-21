@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Consequence, signed, spanName, stepLabel } from "@/lib/playUi";
 import type { PendingChoice, StatKey } from "@/lib/types";
 import { SCENE_LATE_MS, SceneWait } from "./Waiting";
@@ -400,14 +400,177 @@ function StatChangeRow({ stat, label, from, to, diff }: { stat: StatKey; label: 
 
 // ── Docks ───────────────────────────────────────────────
 
-/** Timeline mode: one way forward by a step, one to let time run to the next choice. */
-export function TimelineDock({ months, keys, onStep, onProgress }: { months: number; keys: boolean; onStep: () => void; onProgress: () => void }) {
+// ── Hold to keep stepping ───────────────────────────────
+
+/** How long a press waits before it starts repeating (the ring fills meanwhile), and the steady pace after that. */
+export const HOLD_DELAY_MS = 400;
+export const HOLD_EVERY_MS = 500;
+
+export type HoldPhase = "idle" | "charging" | "running";
+
+export interface HoldStep {
+  phase: HoldPhase;
+  /** A finger, the mouse or a key went down on the step button (or Space anywhere on the page). */
+  press: () => void;
+  /** It came up: a press that never started repeating is a single tap and steps once; cancel never steps. */
+  release: (cancel?: boolean) => void;
+  /** Something big happened, or the timeline gave way to a choice: stop repeating, the press stays spent. */
+  stop: (why?: string | null) => void;
+  /** Why the last hold stopped by itself, for the line under the buttons. */
+  stopped: string | null;
+}
+
+/**
+ * Press and hold the step button: after HOLD_DELAY_MS it steps, then keeps stepping every HOLD_EVERY_MS, at an
+ * even pace, until it is let go or stop() is called. A short press is one step, as a plain tap always was.
+ * Each repeated step gives a short buzz on phones that can.
+ */
+export function useHoldStep(step: () => void): HoldStep {
+  const [phase, setPhase] = useState<HoldPhase>("idle");
+  const [stopped, setStopped] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const held = useRef(false); // the press is down
+  const fired = useRef(false); // and has already stepped by holding
+  const latest = useRef(step);
+  useLayoutEffect(() => {
+    latest.current = step;
+  }, [step]);
+  const fire = () => {
+    try {
+      navigator.vibrate?.(12);
+    } catch {}
+    latest.current();
+  };
+  const clear = () => {
+    clearTimeout(timer.current);
+    clearInterval(timer.current);
+    timer.current = undefined;
+  };
+  const stop = useCallback((why: string | null = null) => {
+    held.current = false; // the finger may still be down; letting go later is not another step
+    clear();
+    setPhase("idle");
+    setStopped(why);
+  }, []);
+  const press = useCallback(() => {
+    if (held.current) return;
+    held.current = true;
+    fired.current = false;
+    setStopped(null);
+    setPhase("charging");
+    clear();
+    timer.current = setTimeout(() => {
+      fired.current = true;
+      setPhase("running");
+      fire();
+      timer.current = setInterval(fire, HOLD_EVERY_MS);
+    }, HOLD_DELAY_MS);
+  }, []);
+  const release = useCallback((cancel = false) => {
+    if (!held.current) return;
+    held.current = false;
+    clear();
+    setPhase("idle");
+    if (!fired.current && !cancel) latest.current();
+  }, []);
+  useEffect(() => clear, []);
+  return { phase, press, release, stop, stopped };
+}
+
+/**
+ * The ring around a held button: it fills along the border while the press waits, then a bright stretch keeps
+ * flowing around it while time runs. With reduced motion the ring only fills and the color deepens, nothing circles.
+ */
+function HoldRing({ phase }: { phase: HoldPhase }) {
+  const ref = useRef<SVGSVGElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useLayoutEffect(() => {
+    const el = ref.current?.parentElement;
+    if (!el) return;
+    const size = () => setBox({ w: el.offsetWidth, h: el.offsetHeight });
+    size();
+    const ro = new ResizeObserver(size);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const pad = 4; // the ring sits just outside the button, where the focus ring would be
+  const w = box.w + pad * 2;
+  const h = box.h + pad * 2;
+  const rect = { x: 1.5, y: 1.5, width: Math.max(0, w - 3), height: Math.max(0, h - 3), rx: 15, pathLength: 100 };
+  return (
+    <svg ref={ref} aria-hidden data-phase={phase} className="hold-ring pointer-events-none absolute overflow-visible" style={{ left: -pad, top: -pad, width: w, height: h }} viewBox={`0 0 ${w || 1} ${h || 1}`}>
+      {box.w > 0 && (
+        <>
+          <rect {...rect} className="hold-ring-track" />
+          <rect {...rect} className="hold-ring-fill" />
+          <rect {...rect} className="hold-ring-flow" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+/** Timeline mode: one way forward by a step (hold it to keep going), one to let time run to the next choice. */
+export function TimelineDock({ months, keys, hold, onProgress }: { months: number; keys: boolean; hold: HoldStep; onProgress: () => void }) {
+  // A press that started with a pointer is answered by the pointer; the click that follows it is not a second step.
+  const pointerAt = useRef(0);
+  const down = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    pointerAt.current = Date.now();
+    // Keep getting the pointer's events while it moves a little, so a held finger isn't lost to the page.
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    hold.press();
+  };
+  const keyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== " " && e.key !== "Enter") return;
+    e.preventDefault(); // no native click: the key's own release decides between one step and a hold
+    if (!e.repeat) hold.press();
+  };
+  const keyUp = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== " " && e.key !== "Enter") return;
+    e.preventDefault();
+    hold.release();
+  };
+  const active = hold.phase !== "idle";
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-[1.15fr_1fr] gap-2">
-        <Button variant="tape" className="vhs-glow flex min-h-12 min-w-0 items-center justify-center gap-1.5 whitespace-nowrap" onClick={onStep} aria-keyshortcuts={keys ? "Space" : undefined} data-focus="controls">
-          {stepLabel(months)}
-          <span aria-hidden>→</span>
+        <Button
+          variant="tape"
+          data-phase={hold.phase}
+          className="hold-step vhs-glow relative flex min-h-12 min-w-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap select-none"
+          onPointerDown={down}
+          onPointerUp={() => {
+            pointerAt.current = Date.now();
+            hold.release();
+          }}
+          onPointerCancel={() => hold.release(true)}
+          onLostPointerCapture={() => hold.release(true)}
+          onContextMenu={(e) => e.preventDefault()}
+          onKeyDown={keyDown}
+          onKeyUp={keyUp}
+          onBlur={() => hold.release(true)}
+          onClick={() => {
+            // A screen reader's activation, or a click with no pointer press just before it: one step.
+            if (Date.now() - pointerAt.current > 1000) {
+              hold.press();
+              hold.release();
+            }
+          }}
+          aria-keyshortcuts={keys ? "Space" : undefined}
+          aria-describedby="hold-step-hint"
+          data-focus="controls"
+        >
+          <HoldRing phase={hold.phase} />
+          <span className="relative flex items-center gap-1.5">
+            {hold.phase === "running" && (
+              <span aria-hidden className="vhs-osd font-mono text-xs">
+                ▶▶
+              </span>
+            )}
+            {stepLabel(months)}
+            {hold.phase !== "running" && <span aria-hidden>→</span>}
+          </span>
         </Button>
         <Button variant="ghost" className="flex min-h-12 min-w-0 items-center justify-center gap-1.5 px-3 whitespace-nowrap" onClick={onProgress} aria-keyshortcuts={keys ? "Enter A" : undefined}>
           <span className="flex max-[359px]:hidden">
@@ -416,6 +579,17 @@ export function TimelineDock({ months, keys, onStep, onProgress }: { months: num
           {L("선택까지 진행")}
         </Button>
       </div>
+      <p id="hold-step-hint" className="min-h-4 text-xs text-stone-600 dark:text-stone-400" aria-live="polite">
+        {hold.stopped ? (
+          <>
+            <b className="font-semibold text-stone-800 dark:text-stone-200">{hold.stopped}</b> · {L("큰 변화가 있어 멈췄어요")}
+          </>
+        ) : active ? (
+          L("손을 떼면 멈춰요")
+        ) : (
+          L("길게 누르면 계속 진행해요")
+        )}
+      </p>
       <p className={`hidden text-xs text-stone-600 dark:text-stone-400 ${keys ? "lg:block" : ""}`}>
         <Kbd>Space</Kbd> {stepLabel(months)} · <Kbd>Enter</Kbd> {L("선택까지 진행")} · <Kbd>1</Kbd>~<Kbd>4</Kbd> {L("선택")}
       </p>
