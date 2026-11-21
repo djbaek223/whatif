@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Game from "@/components/Game";
+import { GuidePreview } from "@/components/GuidePreview";
 
 const title = "What If · Live the life you didn't choose";
 const description = "Go back to a moment in your past, make a different choice, and live that life to the very end. An AI life simulator.";
@@ -13,5 +14,5 @@ export const metadata: Metadata = {
 };
 
 export default function English() {
-  return <Game initialLang="en" />;
+  return <Game initialLang="en" readingLinks={{ ko: <GuidePreview lang="ko" />, en: <GuidePreview lang="en" /> }} />;
 }

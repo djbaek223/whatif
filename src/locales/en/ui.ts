@@ -69,7 +69,6 @@ export const UI_EN: Record<string, string> = {
   "✦ 희귀한 순간 ·": "✦ Rare moments ·",
   "번": "",
   "내가 한 선택들": "The choices I made",
-  "광고 영역 (출시 때 연결)": "Ad space (connected at launch)",
   "다른 변곡점 고르기": "Pick another turning point",
   "게시판에서 보기": "See it on the board",
   "회고록 게시": "Post memoir",

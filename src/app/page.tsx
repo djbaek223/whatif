@@ -16,5 +16,5 @@ export const metadata: Metadata = {
 export default async function Home() {
   const picked = (await cookies()).get(LANG_COOKIE)?.value;
   const lang = picked === "ko" || picked === "en" ? picked : langFromAcceptLanguage((await headers()).get("accept-language"));
-  return <Game initialLang={lang} guessed readingLinks={<GuidePreview />} />;
+  return <Game initialLang={lang} guessed readingLinks={{ ko: <GuidePreview lang="ko" />, en: <GuidePreview lang="en" /> }} />;
 }
