@@ -137,6 +137,7 @@ export const UI_EN: Record<string, string> = {
   "생년월일 · 성별": "Date of birth · gender",
   "토스 로그인으로 불러와서 따로 적지 않아도 돼요. 나이와 그 시절 이야기, 입대 같은 사건에만 쓰여요.": "They come from your Toss login, so there is nothing to type. Used only for your age, the stories of the time and events like military service.",
   "토스로 로그인하고 불러오기": "Log in with Toss to fill them",
+  "한국의 학교와 군대, 그 시절 뉴스와 사건으로 인생이 흘러가요.": "The life follows Korea's schools and military service, and the news and events of the time.",
   "불러오는 중…": "Loading…",
   "토스에서 불러왔어요": "From Toss",
   "토스 로그인으로 생년월일과 성별을 불러와 주세요": "Log in with Toss to fill your date of birth and gender",
