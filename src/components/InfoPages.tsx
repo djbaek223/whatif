@@ -1,7 +1,6 @@
 // The text pages every site with ads is expected to have: what the service is (소개) and what it does with people's
 // information (개인정보 처리방침). Server-rendered in either language and linked from the footer of every public page.
 // Each page's text lives here as {ko, en} pairs, so it can be read and corrected in one place.
-import Link from "next/link";
 import type { Lang } from "@/lib/region";
 
 export type InfoPage = "about" | "privacy" | "terms";
@@ -30,11 +29,38 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       ],
     },
     {
+      title: { ko: "왜 만들었나요", en: "Why we made it" },
+      body: [
+        {
+          ko: "누구에게나 '그때 다른 선택을 했다면'이라는 질문이 하나쯤 있어요. 재수를 했다면, 다른 회사에 갔다면, 그 사람에게 고백했다면. 이 질문은 머릿속에서는 한 장면으로 끝나지만, 실제 인생에서는 그 뒤로 수십 년이 이어져요. What If는 그 수십 년을 직접 살아 보며, 가 보지 않은 길에도 그만의 기쁨과 어려움이 있다는 것을 느껴 보도록 만들었어요.",
+          en: "Most people carry one question: what if I had chosen differently? Retaken the exam, joined another company, said it to that person. In the head the question ends in a single scene, but in a real life decades follow. What If lets you live those decades and see that the road not taken had its own joys and troubles too.",
+        },
+      ],
+    },
+    {
       title: { ko: "누가 정하나요", en: "Who decides what happens" },
       body: [
         {
           ko: "능력치, 돈, 성공과 실패, 수명은 규칙 엔진이 확률로 정해요. AI는 그 결과를 장면과 문장으로만 써요. 실제 사건 뉴스는 그 시절의 기록을 바탕으로 해요. 같은 선택이어도 결과는 매번 달라져요.",
           en: "A rules engine decides stats, money, successes, failures and lifespan by chance. The AI only writes the results as scenes and sentences. News of real events comes from the record of that time. The same choice can turn out differently each time.",
+        },
+      ],
+    },
+    {
+      title: { ko: "시대와 나라를 반영해요", en: "Built on real eras and countries" },
+      body: [
+        {
+          ko: "주인공이 태어난 해와 자란 나라에 따라 학교 제도, 대학 입시, 병역, 취업 시장, 물가와 집값, 그 시절의 뉴스가 달라져요. 한국판에서는 학력고사와 수능, 병역판정검사와 입영, 외환위기 같은 시대의 흐름이 이야기에 반영되고, 미국판에서는 미국의 학교 제도와 직장, 사회보장 제도를 따라요.",
+          en: "The year the hero was born and the country they grew up in change the schools, college admissions, military service, job market, prices, housing and the news of the time. A Korean life follows Korea's exams, draft and the 1997 crisis; an American life follows American schools, work and Social Security.",
+        },
+      ],
+    },
+    {
+      title: { ko: "읽을거리도 있어요", en: "Reading" },
+      body: [
+        {
+          ko: "가이드(whatif.host/guide)에는 1970년대부터 2010년대까지의 한국 생활상, 입시·군대·취업·결혼·집 같은 인생의 갈림길, 후회와 '만약'에 관한 칼럼, 게임을 더 깊게 즐기는 방법을 정리한 글이 있어요. 모든 글은 기록된 사실과 연구를 바탕으로 직접 썼어요.",
+          en: "The guide (whatif.host/guide, in Korean) has articles on everyday life in Korea from the 1970s to the 2010s, life's common turning points (exams, military service, work, marriage, housing), columns on regret and 'what if', and tips for the game. Every article is written by hand from the record and from research.",
         },
       ],
     },
@@ -51,8 +77,17 @@ const ABOUT: { title: Pair; lead: Pair; sections: Section[] } = {
       title: { ko: "무료로 운영돼요", en: "Free to play" },
       body: [
         {
-          ko: "What If는 무료예요. 장면을 쓰는 AI 비용과 서버 비용은 광고로 충당해요. 광고는 이야기를 방해하지 않는 자리에만 두고, 광고라는 표시를 붙여요.",
-          en: "What If is free. The cost of the AI that writes the scenes and of the servers is covered by ads. Ads go only where they do not get in the way of the story, and they are labelled as ads.",
+          ko: "What If는 무료이고 회원가입도 없어요. 장면을 쓰는 AI 비용과 서버 비용은 광고로 충당해요. 광고는 가이드와 소개 같은 읽을거리 페이지에만 두고, 입력과 플레이, 엔딩 같은 게임 화면에는 넣지 않아요.",
+          en: "What If is free and needs no account. The cost of the AI that writes the scenes and of the servers is covered by ads. Ads appear only on reading pages such as the guide and this page, never on the game screens (setup, play, ending).",
+        },
+      ],
+    },
+    {
+      title: { ko: "문의", en: "Contact" },
+      body: [
+        {
+          ko: "버그 제보, 기능 제안, 게시물 삭제 요청은 문의 페이지(whatif.host/contact)나 게임 안 ⋯ 메뉴의 ‘의견 보내기’로 남겨 주세요. 보내 주신 내용은 운영자가 직접 읽어요.",
+          en: "For bug reports, ideas or post removal, use the contact page (whatif.host/contact) or “Send feedback” in the game's ⋯ menu. The operator reads every message.",
         },
       ],
     },
@@ -319,23 +354,40 @@ export function InfoBody({ lang, page }: { lang: Lang; page: InfoPage }) {
   );
 }
 
-/** Links to the text pages and the board, at the foot of every public page. */
+/**
+ * Links to the reading pages, the text pages and the board, at the foot of every public page. Plain <a> links (full page
+ * loads), because the reading pages load the ad script and the game's start screen must not carry it along.
+ */
 export function SiteFooter({ lang }: { lang: Lang }) {
-  const links: [string, string][] = [
-    [lang === "en" ? "About" : "소개", infoPath(lang, "about")],
-    [lang === "en" ? "Terms" : "이용약관", infoPath(lang, "terms")],
-    [lang === "en" ? "Privacy policy" : "개인정보 처리방침", infoPath(lang, "privacy")],
-    [lang === "en" ? "Memoir board" : "회고록 게시판", lang === "en" ? "/en/board" : "/board"],
-  ];
+  const links: [string, string][] =
+    lang === "en"
+      ? [
+          ["About", infoPath(lang, "about")],
+          ["Guide (Korean)", "/guide"],
+          ["Terms", infoPath(lang, "terms")],
+          ["Privacy policy", infoPath(lang, "privacy")],
+          ["Memoir board", "/en/board"],
+        ]
+      : [
+          ["소개", infoPath(lang, "about")],
+          ["가이드", "/guide"],
+          ["이용 방법", "/how-to-play"],
+          ["자주 묻는 질문", "/faq"],
+          ["문의", "/contact"],
+          ["이용약관", infoPath(lang, "terms")],
+          ["개인정보 처리방침", infoPath(lang, "privacy")],
+          ["회고록 게시판", "/board"],
+        ];
   return (
     <footer className="mt-12 border-t border-stone-200 pt-5 dark:border-stone-800">
       <nav aria-label={lang === "en" ? "Site" : "사이트 안내"} className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-stone-600 dark:text-stone-400">
         {links.map(([label, href]) => (
-          <Link key={href} href={href} className="underline-offset-2 hover:underline">
+          <a key={href} href={href} className="underline-offset-2 hover:underline">
             {label}
-          </Link>
+          </a>
         ))}
       </nav>
+      <p className="mt-4 text-xs text-stone-500 dark:text-stone-400">© What If · whatif.host</p>
     </footer>
   );
 }

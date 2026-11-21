@@ -98,7 +98,11 @@ function keepLangCookie(l: Lang) {
  * initialLang is the language the server drew the page in: /en is English; on / it is the visitor's earlier pick
  * (cookie) or the browser's language, and `guessed` says a pick kept only on this device may still change it.
  */
-export default function Game({ initialLang, guessed }: { initialLang?: Lang; guessed?: boolean } = {}) {
+/**
+ * readingLinks: server-drawn links into the reading pages (the guide), shown under the board preview on the start screen.
+ * Passed in by the page so the guide's text never ships in the game's bundle.
+ */
+export default function Game({ initialLang, guessed, readingLinks }: { initialLang?: Lang; guessed?: boolean; readingLinks?: React.ReactNode } = {}) {
   const [screen, setScreen] = useState<Screen>("intro");
   const [lang, setLangState] = useState<Lang>(initialLang ?? "ko");
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
@@ -474,6 +478,7 @@ export default function Game({ initialLang, guessed }: { initialLang?: Lang; gue
           {!isToss && (
             <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8">
               <BoardPreview lang={lang} />
+              {lang === "ko" && readingLinks}
               <SiteFooter lang={lang} />
             </div>
           )}

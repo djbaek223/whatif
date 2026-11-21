@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { newsList } from "@/lib/news";
-import { AdSlot } from "./AdSlot";
 import { Spinner } from "./ui";
 import { L } from "@/lib/i18n";
 import { isEn } from "@/lib/region";
@@ -153,7 +152,6 @@ export function EndingWait() {
 
 /** After this long the wait is called out as slow, and the player is told the story carries on without it. */
 export const SCENE_LATE_MS = 9000;
-const AD_AFTER_MS = 1500;
 
 /**
  * Shown in the choice sheet while the narrator writes a scene. The request is one call that reports no progress,
@@ -197,8 +195,6 @@ export function SceneWait({ elapsed }: { elapsed: number }) {
         <div className="shimmer h-14 rounded-xl" />
       </div>
     </div>
-    {/* Only a wait long enough to notice (the AI writing it) gets an ad spot; a template scene is on screen at once. */}
-    {elapsed >= AD_AFTER_MS && <AdSlot spot="wait" className="mt-3" />}
     </>
   );
 }
