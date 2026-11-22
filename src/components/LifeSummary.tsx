@@ -8,6 +8,8 @@ import { Button, StatBars } from "./ui";
 import { L } from "@/lib/i18n";
 import { ageText } from "@/lib/format";
 import { SITE_URL } from "@/lib/site";
+import { shareProvider } from "@/lib/share";
+import { logEvent } from "@/lib/analytics";
 
 /**
  * Life Summary: the life looked back on as a story, not a score. Who, from when to when, the work and the family
@@ -108,14 +110,33 @@ export function ShareDialog({ open, life, line, onClose }: { open: boolean; life
     if (open && !d.open) d.showModal();
     else if (!open && d.open) d.close();
   }, [open]);
-  // Always the production address, so a share from a preview or the old domain still points to the live site.
-  const url = SITE_URL;
-  const text = masked(shareText(life, line, parts, url), parts.name ? { ...life, profile: { ...life.profile, name: "" } } : life);
+  // The website: always the production address, so a share from a preview or the old domain still points to the live
+  // site. 앱인토스: a Toss link that opens the mini-app (lib/share.ts), made when the window opens.
+  const toss = shareProvider();
+  const [tossLink, setTossLink] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || !toss || tossLink) return;
+    let live = true;
+    toss.link().then(
+      (l) => live && setTossLink(l),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [open, toss, tossLink]);
+  const textFor = (url: string) => masked(shareText(life, line, parts, url), parts.name ? { ...life, profile: { ...life.profile, name: "" } } : life);
+  const text = textFor(toss ? (tossLink ?? toss.fallback) : SITE_URL);
 
   const share = async () => {
     setDone("");
+    logEvent("share", { via: toss ? "toss" : "web" });
     try {
-      if (navigator.share) {
+      if (toss) {
+        const link = tossLink ?? (await toss.link().catch(() => null));
+        await toss.send(textFor(link ?? toss.fallback));
+        setDone("shared");
+      } else if (navigator.share) {
         await navigator.share({ title: "What If", text });
         setDone("shared");
       } else {

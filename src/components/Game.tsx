@@ -34,6 +34,7 @@ import { EMPTY_TP } from "@/lib/onboarding";
 import type { LifeState, Profile, TurningPoint } from "@/lib/types";
 import { EndingView } from "./Ending";
 import { beforeMemoir } from "@/lib/ads";
+import { logEvent } from "@/lib/analytics";
 import { EMPTY_DRAFT, EMPTY_PROFILE, Onboarding, type WizardDraft } from "./Forms";
 import { BoardPreview } from "./BoardPreview";
 import { BoardDialog } from "./Board";
@@ -230,10 +231,15 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
     setEnding(null);
   };
 
-  const resume = () => saved && resumeFrom(saved, ai);
+  const resume = () => {
+    if (!saved) return;
+    logEvent("resume", { ended: !!saved.life?.dead });
+    resumeFrom(saved, ai);
+  };
 
   const startNew = () => setScreen("profile"); // came back from 처음으로: pick up where they left off
   const startFresh = (q: boolean) => {
+    logEvent(q ? "start_quick" : "start_story");
     setQuick(q);
     setProfile(stored?.profile ?? saved?.profile ?? EMPTY_PROFILE);
     setTp(EMPTY_TP);
@@ -277,6 +283,7 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
     const opening = here(() => (res && res.choices.length >= 2 ? { ...res, choices: topUpChoices(res.choices, p, t) } : fallbackOpening(p, t)));
     personalized.current = null;
     setLife(withBadges(createLife(p, t, opening, { ai, hybrid: HYBRID, region: p.country ?? "kr", lang })));
+    logEvent("life_start", { ai: !!res });
     setEnding(null);
     setPresentOpen(false);
     setAuto(false);
@@ -284,7 +291,8 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
   }
 
   // The end of a life first says so and asks whether to write the memoir (EndingView); nothing is written until then.
-  function finish() {
+  function finish(dead: LifeState) {
+    logEvent("life_end", { age: dead.deathAge ?? 0, choices: dead.choices.length });
     setMemoir(null);
     setEnding(null);
     setTimeout(() => setScreen("ending"), 1200);
@@ -293,6 +301,7 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
   async function writeMemoir() {
     if (!life?.dead) return;
     const dead = life;
+    logEvent("memoir_write");
     setMemoir("write");
     setEnding(null);
     window.scrollTo({ top: 0 }); // asked from the bottom of the skipped view: the memoir starts at its top
@@ -306,9 +315,10 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
           turningPoint: dead.turningPoint,
           deathAge: dead.deathAge ?? 0,
         })
-      : null, beforeMemoir()]);
+      : null, beforeMemoir(dead)]);
     if (lifeRef.current !== dead) return; // moved on to another life meanwhile
     setEnding(res ?? fallbackEnding(dead));
+    logEvent("memoir_shown", { ai: !!res });
   }
 
   function afterAdvance(prev: LifeState, advanced: LifeState, stop: StopReason) {
@@ -323,7 +333,7 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
     if (stop === "choice" && next.pending && stopsProgress(autoDecide, asksPlayer(next.pending))) setAuto(false);
     if (stop === "death") {
       setAuto(false);
-      finish();
+      finish(next);
     }
   }
 
@@ -347,6 +357,7 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
 
   const choose = (optionId: string, freeText?: string, intent?: Intent | null) => {
     if (!life?.pending) return;
+    logEvent("choice", { big: asksPlayer(life.pending), free: !!freeText });
     setLife(withBadges(resolveChoice(life, optionId, freeText, intent)));
   };
 
@@ -447,7 +458,10 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
                   ]
                 : []),
               ...(draft ? [{ label: L("이어서 입력하기"), onClick: startNew }] : []),
-              ...(isToss ? [{ label: L("회고록 게시판"), detail: L("다른 사람들이 다시 산 인생"), icon: "☰", onClick: () => setBoard(true) }] : []),
+              ...(isToss ? [{ label: L("회고록 게시판"), detail: L("다른 사람들이 다시 산 인생"), icon: "☰", onClick: () => {
+                logEvent("board_open");
+                setBoard(true);
+              } }] : []),
             ]}
             footer={
               <>
@@ -558,9 +572,16 @@ export default function Game({ initialLang, guessed, readingLinks }: { initialLa
           ending={ending}
           memoir={memoir}
           onWriteMemoir={writeMemoir}
-          onSkipMemoir={() => setMemoir("skip")}
-          onReplay={() => startOpening(profile, tp)}
+          onSkipMemoir={() => {
+            logEvent("memoir_skip");
+            setMemoir("skip");
+          }}
+          onReplay={() => {
+            logEvent("replay");
+            startOpening(profile, tp);
+          }}
           onNewTurningPoint={() => {
+            logEvent("new_turning_point");
             setSaved({ screen, profile, tp, life, ending, memoir }); // stays to go back to until the new life begins
             setLife(null);
             setEnding(null);

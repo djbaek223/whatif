@@ -1,6 +1,8 @@
 import { SafeArea } from "@apps-in-toss/web-framework";
 import { setupTossAds } from "./tossAds";
 import { setupTossLogin } from "./tossLogin";
+import { setupTossAnalytics } from "./tossAnalytics";
+import { setupTossShare } from "./tossShare";
 
 /**
  * Everything the mini-app adds around the shared game. What If is registered as a non-game (비게임) mini-app, so it
@@ -9,8 +11,10 @@ import { setupTossLogin } from "./tossLogin";
  */
 export function setupToss(): void {
   keepSafeArea();
+  setupTossAnalytics();
   setupTossAds();
   setupTossLogin();
+  setupTossShare();
 }
 
 /** Keeps the bottom of the page clear of the home indicator, also after rotation. */
