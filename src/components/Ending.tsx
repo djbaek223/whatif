@@ -14,6 +14,8 @@ import { L } from "@/lib/i18n";
 import { isEn } from "@/lib/region";
 import { ageText } from "@/lib/format";
 import { summaryOf } from "@/lib/playUi";
+import { memoirAdAhead } from "@/lib/ads";
+import { logEvent } from "@/lib/analytics";
 
 export function EndingView({
   life,
@@ -94,7 +96,7 @@ export function EndingView({
         <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-stone-600 dark:text-stone-400">{L("회고록은 쓰지 않았어요. 마음이 바뀌면 지금 써도 돼요.")}</p>
           <Button variant="ghost" className="shrink-0" onClick={onWriteMemoir}>
-            {L("회고록 쓰기")}
+            <MemoirLabel ad={memoirAdAhead(life)} />
           </Button>
         </Card>
       )}
@@ -166,6 +168,7 @@ export function EndingView({
           ending={ending}
           onClose={() => setWriting(false)}
           onPublished={(id) => {
+            logEvent("board_publish");
             setPosted(id);
             setWriting(false);
             setBoard(true);
@@ -196,6 +199,8 @@ function LifeEnded({ life, onWrite, onSkip }: { life: LifeState; onWrite: () => 
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   const big = life.choices.length;
+  // 앱인토스 UX 원칙 2: when a fullscreen ad comes before the memoir, the buttons say so before anything is pressed.
+  const [ad] = useState(() => memoirAdAhead(life));
   return (
     <div className="flex min-h-[70dvh] flex-col justify-center gap-8 py-10">
       <div className="text-center">
@@ -215,17 +220,29 @@ function LifeEnded({ life, onWrite, onSkip }: { life: LifeState; onWrite: () => 
           <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">
             {L("지나온 선택들을 돌아보며 한 편의 글로 남기고, 현실의 삶과도 비교해 드려요.")}
           </p>
+          {ad && <p className="text-sm font-medium text-stone-700 dark:text-stone-300">{L("짧은 광고를 한 번 본 뒤 바로 회고록을 보여 드려요.")}</p>}
         </div>
         <div className="space-y-2">
           <Button className="w-full" onClick={onWrite}>
-            {L("회고록 쓰기")}
+            <MemoirLabel ad={ad} />
           </Button>
           <Button variant="ghost" className="w-full" onClick={onSkip}>
             {L("쓰지 않고 돌아보기")}
-            <span className="block text-xs font-normal opacity-80">{L("요약과 인생 그래프만 볼게요")}</span>
+            <span className="block text-xs font-normal opacity-80">{ad ? L("광고 없이 요약과 인생 그래프만 볼게요") : L("요약과 인생 그래프만 볼게요")}</span>
           </Button>
         </div>
       </Card>
     </div>
+  );
+}
+
+/** "회고록 쓰기", or "광고 보고 회고록 받기" with an ad mark when a fullscreen ad will show first (lib/ads.ts memoirAdAhead). */
+function MemoirLabel({ ad }: { ad: boolean }) {
+  if (!ad) return <>{L("회고록 쓰기")}</>;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="rounded border border-current px-1 text-[11px] font-bold leading-4">{L("광고")}</span>
+      {L("광고 보고 회고록 받기")}
+    </span>
   );
 }
